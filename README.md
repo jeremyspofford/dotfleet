@@ -14,6 +14,5 @@ No TUI, service, runtime or add-on code is included. See the draft
 [add-on contract](docs/ADDON-INTERFACE.md). Version 1.0.0 requires an explicit
 owner declaration of production readiness.
 
-These two files are staged in dotfiles only because creating the requested private
-`jeremyspofford/dotfleet` repository is blocked. They should become that repo's
-entire initial tree once repository creation is available.
+The jeremyspofford/dotfleet repository is the home of Dotfleet (Layer 1), seeded 2026-11-15 from the stub originally staged in jeremyspofford/dotfiles.
+They should become that repo's entire initial tree once repository creation is available.
