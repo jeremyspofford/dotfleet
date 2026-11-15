@@ -15,4 +15,4 @@ No TUI, service, runtime or add-on code is included. See the draft
 owner declaration of production readiness.
 
 The jeremyspofford/dotfleet repository is the home of Dotfleet (Layer 1), seeded 2026-11-15 from the stub originally staged in jeremyspofford/dotfiles.
-They should become that repo's entire initial tree once repository creation is available.
+They form this repo's initial tree.
