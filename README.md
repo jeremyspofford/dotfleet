@@ -1,18 +1,21 @@
 # Dotfleet
 
-A planned fleet layer above [dotfiles](https://github.com/jeremyspofford/dotfiles).
-Dotfiles is independently usable; Dotfleet consumes it and will orchestrate git,
-chezmoi and Mise across machines and domains. This is a documentation-only stub.
+Dotfleet will manage a fleet: a group of machines. This repository, `jeremyspofford/dotfleet`, contains documentation only.
+It is Layer 1 above [dotfiles](https://github.com/jeremyspofford/dotfiles), the independent Layer 0 configuration project.
+Dotfleet will use dotfiles; dotfiles will not require Dotfleet.
+Git records source history. chezmoi generates home configuration files. Mise manages developer tools.
+Dotfleet will coordinate these tools across machines and domains, or groups of settings.
+A profile saves a machine's domain and identity.
 
-Roadmap:
-- TUI onboarding for bundled or user-owned dotfiles repositories.
-- Multi-machine personal, work and client profiles.
-- Sync orchestration using existing tools.
-- An explicit add-on interface with installation, validation and teardown.
+## Planned work
 
-No TUI, service, runtime or add-on code is included. See the draft
-[add-on contract](docs/ADDON-INTERFACE.md). Version 1.0.0 requires an explicit
-owner declaration of production readiness.
+- Terminal onboarding: guide setup in a text interface, called a TUI.
+- Repository choice: use bundled dotfiles or the user's own repository.
+- Machine profiles: select personal settings, employer settings (`work`), or client settings.
+- Sync: coordinate existing tools to update machines.
+- Add-ons: optional extensions with explicit install, validation, and removal rules.
 
-The jeremyspofford/dotfleet repository is the home of Dotfleet (Layer 1), seeded 2026-11-15 from the stub originally staged in jeremyspofford/dotfiles.
-They form this repo's initial tree.
+No TUI, service, runtime, or add-on code exists here. The runtime is the program that would run Dotfleet.
+Read the [draft add-on contract](docs/ADDON-INTERFACE.md). Follow [WRITING.md](docs/WRITING.md) when changing documentation.
+Only the owner can declare production readiness and authorize version 1.0.0.
+The initial tree came from the stub in `jeremyspofford/dotfiles` on 2026-11-15.

@@ -1,0 +1,44 @@
+name: Docs
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  documentation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Check files and local links
+        run: |
+          git diff --check HEAD^ HEAD
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          paths = [Path(name) for name in (
+              'README.md', 'AGENTS.md', 'docs/WRITING.md', 'docs/ADDON-INTERFACE.md')]
+          for path in paths:
+              assert path.is_file(), f'Missing document: {path}'
+              text = path.read_text()
+              for link in re.findall(r'\]\(([^)]+)\)', text):
+                  if '://' not in link:
+                      target = (path.parent / link.split('#')[0]).resolve()
+                      assert target.is_file(), f'Broken link in {path}: {link}'
+              # Check prose sentences; commands and paths inside code are literal.
+              prose = re.sub(r'```.*?```', '', text, flags=re.S)
+              prose = re.sub(r'!?\[([^]]*)\]\([^)]*\)', r'\1', prose)
+              prose = re.sub(r'`[^`]+`', 'CODE', prose)
+              blocks = re.split(r'\n\s*\n|\n(?=\s*(?:[-*]|[0-9]+[.]|[|]))', prose)
+              for block in blocks:
+                  if block.lstrip().startswith('#'):
+                      continue
+                  for cell in block.split('|'):
+                      for sentence in re.split(r'(?<=[.!?])\s+', cell):
+                          words = re.findall(r"[\w]+(?:[-’'][\w]+)*", sentence)
+                          assert len(words) <= 25, f'Long sentence in {path}: {sentence}'
+          assert '## Documentation style — mandatory' in Path('AGENTS.md').read_text()
+          print('Files, local links, sentence length, and agent rules passed.')
+          PY
