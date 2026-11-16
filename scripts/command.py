@@ -43,9 +43,12 @@ DESCRIPTIONS = {
 }
 
 
-class HelpFormatter(argparse.RawDescriptionHelpFormatter):
+class HelpFormatter(argparse.HelpFormatter):
     def _format_usage(self, usage, actions, groups, prefix):
         return super()._format_usage(usage, actions, groups, prefix or 'Usage: ')
+
+    def _fill_text(self, text, width, indent):
+        return '\n'.join(argparse.HelpFormatter._fill_text(self, line, width, indent) for line in text.splitlines())
 
 
 TERMS = ('Profile: saved machine choices. Pins: exact tool versions. Groups: optional content.\n'
@@ -62,7 +65,7 @@ def parser():
     p.add_argument('--version', action='version', version=(ROOT / 'VERSION').read_text().strip())
     sub = p.add_subparsers(dest='command', required=True, metavar='COMMAND')
     for name, detail in DESCRIPTIONS.items():
-        q = sub.add_parser(name, help=detail.split('. ')[0] + '.', description=detail,
+        q = sub.add_parser(name, prog='dotfleet ' + name, help=detail.split('. ')[0] + '.', description=detail,
                            formatter_class=HelpFormatter,
                            epilog='Example: dotfleet ' + name + '\n' + TERMS + '\nRun dotfleet --help for exit codes. All prompts require Enter and use the terminal.')
         if name == 'rollback':
