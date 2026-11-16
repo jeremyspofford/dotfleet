@@ -230,3 +230,27 @@ A content checkout remains at its current commit after rollback. Use diff to rev
 Uninstall offers to restore the oldest backup. Otherwise, it removes known managed files and the manager's command, checkout, and converted source.
 Uninstall keeps installed tools, the content checkout, and all backups. Removal includes local edits, which the new backup preserves.
 Rollback and uninstall require terminal confirmation. A scripted rollback without a folder only lists backups.
+
+## Recorded machines
+
+The fleet registry records machines in `~/.local/share/dotfleet/fleet.toml`, inside the manager store. It is not content and never enters your dotfiles checkout.
+Run `dotfleet machines` to read this machine's record and any other records in that file.
+These are saved facts, not live results. Cross-machine queries and automatic registry transfer are deferred.
+
+Each completed apply, update, restore, or backup refreshes this hostname's record. Other machine records stay intact.
+The record contains hostname, operating system, domain, domain confirmation, content repository and commit, manager version, last run, and last backup.
+It also records the home folder, RUN.json path, result, and whether this machine remains enrolled. Full commit IDs and paths stay in the file.
+The hostname identifies the record. Choose unique hostnames before combining records from different machines.
+Identity, tool pins, credentials, and secret values stay out of the registry. They remain in their existing private stores.
+Read-only commands and cancellation before confirmation never refresh timestamps or create registry files.
+Uninstall records the completed removal without deleting other machine records. Backups include the earlier registry file for manual recovery.
+Automatic rollback does not restore that file. It refreshes this machine instead, preserving other machines recorded since the backup.
+
+The schema, meaning the file's required structure, starts at version 1. The format is defined in [the decision record](docs/DESIGN.md).
+The registry is private, with file mode 0600. Invalid registry data stops setup before apply.
+
+## Add-on records
+
+An add-on is an optional manager extension. Run `dotfleet addons` to list validated installed records. No add-ons ship with Dotfleet.
+The [add-on contract](docs/ADDON-INTERFACE.md) defines installation declarations, allowed data access, output ownership, and safe teardown.
+A test fixture validates the contract. It is not installed or offered as a product add-on.

@@ -548,7 +548,7 @@ def prepare(home, checkout, profile, manifest, folder):
     agents = agent_configs.generate(home, agent_configs.native_os(), True, profile=profile, content_root=checkout) if any(profile.get('agents', {}).values()) else {}
     changed |= {name for name, item in agents.items() if not fingerprint(home / name) or any(fingerprint(home / name).get(key) != value for key, value in item.items())}
     changed |= {name for name in stale if fingerprint(home / name) is not None}
-    controls = {'.config/chezmoi/chezmoi.toml', '.config/dotfleet/profile.toml', '.local/state/dotfleet/outputs.json', '.local/state/dotfleet/last-run.json'}
+    controls = {'.local/share/dotfleet/fleet.toml', '.config/chezmoi/chezmoi.toml', '.config/dotfleet/profile.toml', '.local/state/dotfleet/outputs.json', '.local/state/dotfleet/last-run.json'}
     stable_source = home / 'dotfiles' if native else home / '.local/share/dotfleet/chezmoi-source'
     final_config = {'sourceDir': str(stable_source), 'umask': 0o077, 'data': data}
     for name, content in [('.config/chezmoi/chezmoi.toml', toml(final_config)), ('.config/dotfleet/profile.toml', toml(profile))]:
@@ -723,8 +723,7 @@ def main(argv=None, edit=None, software=None, before_apply=None):
                 raise ValueError('Managed files still differ:\n' + status)
             names = plan['names'] | set(plan['generated'])
             atomic(home / '.local/state/dotfleet/outputs.json', json.dumps({name: fingerprint(home / name) for name in sorted(names)}, indent=2) + '\n')
-            account.finish('SUCCESS', warnings, 'CLEAN (no differences)')
-            return 0
+            return account.finish('SUCCESS', warnings, 'CLEAN (no differences)')
     except (OSError, ValueError, RuntimeError, KeyError) as error:
         print(f'Setup failed: {error}', file=sys.stderr)
         if account:
