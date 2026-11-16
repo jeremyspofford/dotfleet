@@ -102,6 +102,24 @@ class RegistryCommandTests(unittest.TestCase):
         self.assertEqual(json.loads(Path(latest['last_run_record']).read_text())['result'], latest['result'])
         self.assertEqual(self.cli('addons').count('none; no add-ons ship'), 1)
 
+    def test_content_cannot_replace_private_registry_or_profile(self):
+        self.enroll()
+        from test_manager import command
+        for name in [registry.REGISTRY, '.config/dotfleet/profile.toml']:
+            target = self.content / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text('# must never reach home\n')
+            command('git', '-C', str(self.content), 'add', '--force', name)
+            command('git', '-C', str(self.content), '-c', 'user.name=Test', '-c', 'user.email=test@example.invalid',
+                    'commit', '-m', 'test: forbidden content state')
+            before = (self.home / registry.REGISTRY).read_bytes()
+            output = self.cli('update', expected=1)
+            self.assertIn('Content cannot own manager state', output)
+            self.assertEqual((self.home / registry.REGISTRY).read_bytes(), before)
+            command('git', '-C', str(self.content), 'rm', name)
+            command('git', '-C', str(self.content), '-c', 'user.name=Test', '-c', 'user.email=test@example.invalid',
+                    'commit', '-m', 'test: remove forbidden content')
+
     def test_restore_and_uninstall_preserve_new_other_machine_records(self):
         self.enroll()
         self.cli('backup')

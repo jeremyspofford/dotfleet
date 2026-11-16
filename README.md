@@ -250,6 +250,7 @@ Automatic rollback does not restore that file. It refreshes this machine instead
 
 The schema, meaning the file's required structure, starts at version 1. The format is defined in [the decision record](docs/DESIGN.md).
 The registry is private, with file mode 0600. Invalid registry data stops setup before apply.
+Content cannot manage the registry or profile file. These belong to the manager.
 
 ## Add-on records
 

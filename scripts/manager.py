@@ -530,6 +530,9 @@ def prepare(home, checkout, profile, manifest, folder):
                 target = target.with_name('private_' + target.name)
             atomic(target, content)
         names |= set(generated)
+    private_state = names & {'.local/share/dotfleet/fleet.toml', '.config/dotfleet/profile.toml'}
+    if private_state:
+        raise ValueError('Content cannot own manager state: ' + ', '.join(sorted(private_state)))
     state_path = home / '.local/state/dotfleet/outputs.json'
     previous = json.loads(state_path.read_text()) if state_path.exists() else {}
     stale = set(previous) - names - set(generated)
