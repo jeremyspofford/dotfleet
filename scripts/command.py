@@ -19,6 +19,7 @@ from common import LoggerStream, atomic, read_toml, relative, run, toml
 import manager as m
 import enrollment as e
 import registry
+import owned_views
 from installation import COMMAND, MANAGER
 from render_run import render, render_view
 from run_account import RunAccount, commit, profile_changes
@@ -28,7 +29,11 @@ PROFILE = '.config/dotfleet/profile.toml'
 CONTROLS = {registry.REGISTRY, PROFILE, '.config/chezmoi/chezmoi.toml', '.local/state/dotfleet/outputs.json',
             '.local/state/dotfleet/agents.json', '.local/state/dotfleet/last-run.json', COMMAND}
 DESCRIPTIONS = {
-    'machines': 'Show recorded machine facts from fleet.toml. The registry is the manager’s file of saved machine records. This command makes no live network queries.',
+    'profile': 'Show saved domain, identity, pins, groups, and agents from profile.toml. An agent is a coding assistant. Change choices through their commands or configure.',
+    'backups': 'List backup folders with their dates, recorded results, and sizes. A backup is a saved copy of files. Change nothing.',
+    'secrets': 'Show secret variable names declared by the content manifest, the repository’s settings file. Set means a nonempty value exists. Never print values.',
+    'content': 'Show the content checkout, a local Git copy. Report its repository, commit, behind state, and short Git status. Change nothing.',
+    'machines': 'Show recorded machine facts from fleet.toml. The registry is the manager’s file of saved machine records. This command makes no live network queries. Export shows this machine; remove deletes a stale record.',
     'addons': 'List installed add-ons, optional manager extensions. A manifest declares an extension’s actions. A receipt records its owned outputs. No add-ons ship with Dotfleet.',
     'update': 'Pull the manager and content repositories, then apply your saved choices. A repository stores versioned files.',
     'status': 'Show this machine’s profile, saved choices, installed pins, groups, checkout state, drift, and recent backups. Drift means managed files differ.',
@@ -70,7 +75,11 @@ def parser():
         q = sub.add_parser(name, prog='dotfleet ' + name, help=detail.split('. ')[0] + '.', description=detail,
                            formatter_class=HelpFormatter,
                            epilog='Example: dotfleet ' + name + '\n' + TERMS + '\nRun dotfleet --help for exit codes. All prompts require Enter and use the terminal.')
-        if name == 'diff':
+        if name == 'machines':
+            q.add_argument('action', nargs='?', choices=['export', 'remove'], help='export shows this machine; remove deletes a stale hostname')
+            q.add_argument('hostname', nargs='?', help='the exact stale hostname to remove')
+            q.add_argument('--output', metavar='FILE', help='with export, save one private TOML record for transfer; the terminal stays human-readable')
+        elif name == 'diff':
             q.add_argument('--stat', action='store_true', help='print changed paths only, without patch bodies; use the same exit codes')
         elif name == 'rollback':
             q.add_argument('backup', nargs='?', help='backup folder name or path; omit to list and choose in a terminal')
@@ -158,7 +167,15 @@ def command_profile_gaps(p):
 def read_view(args, home, p):
     name = args.command
     manifest = read_toml(home / 'dotfiles/dotfleet.toml')
-    if name == 'machines':
+    if name == 'profile':
+        pairs = owned_views.profile_rows(home, p)
+    elif name == 'backups':
+        pairs = owned_views.backup_rows(home, records(home))
+    elif name == 'secrets':
+        pairs = owned_views.secret_rows(home, manifest)
+    elif name == 'content':
+        pairs = owned_views.content_rows(home, p, checkout_state)
+    elif name == 'machines':
         pairs = registry.rows(home, (ROOT / 'VERSION').read_text().strip())
     elif name == 'addons':
         from addons import installed_addons
@@ -188,6 +205,10 @@ def read_view(args, home, p):
             clean = (path / '.git').exists() and not run('git', '-C', str(path), 'status', '--porcelain').strip()
             pairs.append((label, 'PASS · clean' if clean else 'FAIL · save local edits, then run dotfleet update'))
         pairs.append(('Backup', 'PASS' if records(home) else 'FAIL · run dotfleet backup'))
+        config_path = home / '.config/chezmoi/chezmoi.toml'
+        source = read_toml(config_path).get('sourceDir', '')
+        pairs.append(('Manager config', str(config_path)))
+        pairs.append(('Converted source', 'PASS · ' + source if source and Path(source).is_dir() else 'FAIL · run dotfleet update'))
         info('Doctor', pairs, home)
         return int(any('FAIL' in value for _, value in pairs))
     else:
@@ -200,7 +221,9 @@ def read_view(args, home, p):
         pairs += [('Group ' + key, value) for key, value in p.get('groups', {}).items()]
         pairs += [('Content', checkout_state(home / 'dotfiles')), ('Drift', 'present; run dotfleet diff' if status(home) else 'none'),
                   ('Last run', str(last) + ' · ' + str(record.get('result', 'unknown')) if last else 'none'),
-                  ('Last backup', str(backups[-1]) if backups else 'none')]
+                  ('Last backup', str(backups[-1]) if backups else 'none'),
+                  ('Manager config', str(home / '.config/chezmoi/chezmoi.toml')),
+                  ('Converted source', read_toml(home / '.config/chezmoi/chezmoi.toml').get('sourceDir', 'missing; run dotfleet update'))]
     info(name.capitalize(), pairs or [('Selections', 'none')], home)
     return 0
 
@@ -430,7 +453,17 @@ def main(argv=None):
     args = parser().parse_args(argv)
     try:
         p = profile(home)
-        if args.command in ('status', 'doctor', 'version', 'machines', 'addons') or args.command in ('domain', 'groups') and not args.name or args.command == 'pins' and not args.action:
+        if args.command == 'machines':
+            if args.action == 'remove':
+                if not args.hostname or args.output:
+                    parser().error('machines remove needs a hostname and does not accept --output')
+                return remove_machine(home, args.hostname)
+            if args.hostname or args.output and args.action != 'export':
+                parser().error('use machines export --output FILE or machines remove HOSTNAME')
+            if args.action == 'export':
+                info('Machine export', owned_views.export_rows(home, (ROOT / 'VERSION').read_text().strip(), args.output), home)
+                return 0
+        if args.command in ('profile', 'backups', 'secrets', 'content', 'status', 'doctor', 'version', 'machines', 'addons') or args.command in ('domain', 'groups') and not args.name or args.command == 'pins' and not args.action:
             return read_view(args, home, p)
         if args.command == 'update':
             with tempfile.TemporaryDirectory(prefix='dotfleet-update-') as folder:
@@ -495,6 +528,43 @@ def main(argv=None):
         info('Command stopped', [('Reason', str(error)), ('Next step', 'Use dotfleet COMMAND --help for the selected action.')], home)
         return 2 if args.command == 'diff' else 1
     return 0
+
+
+def remove_machine(home, hostname):
+    import difflib
+    import fcntl
+    import socket
+    if hostname == socket.gethostname():
+        raise ValueError('This machine is active. Only another machine’s stale record can be removed.')
+    path = home / registry.REGISTRY
+    if not path.exists():
+        raise ValueError('No registry exists. Nothing was removed.')
+    descriptor = os.open(path.parent / '.fleet.lock', os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+    with os.fdopen(descriptor, 'a') as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        data = registry.load(home)
+        if hostname not in data['machines']:
+            raise ValueError('No saved machine named ' + hostname + '. Nothing was removed.')
+        del data['machines'][hostname]
+        after = registry.serialize(data)
+        account = RunAccount(home, ROOT)
+        account.checkouts = []
+        account.software = []
+        account.manifest = m.backup_inventory(home, [registry.REGISTRY])
+        account.files = [{'path': str(path), 'relative': registry.REGISTRY, 'action': 'changed',
+                          'before': m.fingerprint(path)}]
+        folder = m.backup_location(home)
+        account.locations['Backup folder'] = str(folder)
+        account.locations['Converted source'] = read_toml(home / '.config/chezmoi/chezmoi.toml').get('sourceDir', 'not configured')
+        with tempfile.TemporaryDirectory() as temporary:
+            account.diff_path = Path(temporary) / 'registry.patch'
+            atomic(account.diff_path, ''.join(difflib.unified_diff(path.read_text().splitlines(True), after.splitlines(True),
+                                                                 fromfile=str(path), tofile=str(path))))
+            m.backup(home, [registry.REGISTRY], folder)
+            account.bind_backup(folder)
+            atomic(path, after)
+            account.confirm_files(m.fingerprint)
+    return account.finish('SUCCESS', [], 'differences remain; run dotfleet diff' if status(home) else 'clean')
 
 
 def snapshot(home, operations):
