@@ -1,4 +1,9 @@
-"""Keep command views and prompt colors consistent with the shell logger."""
+"""Keep command views and prompt colors consistent with the shell logger.
+
+Usage: python3 -m unittest discover -s tests -v.
+Help: PYTHONPATH=scripts:tests python3 tests/test_style.py --help.
+"""
+
 import argparse
 import contextlib
 import io
@@ -24,25 +29,62 @@ ROOT = Path(__file__).resolve().parents[1]
 def command_goldens():
     with tempfile.TemporaryDirectory() as temporary:
         home = Path(temporary)
-        for path in ['dotfiles/.git', '.local/share/dotfleet/manager/.git', '.local/share/dotfleet/chezmoi-source', '.config/chezmoi']:
+        for path in [
+            "dotfiles/.git",
+            ".local/share/dotfleet/manager/.git",
+            ".local/share/dotfleet/chezmoi-source",
+            ".config/chezmoi",
+        ]:
             (home / path).mkdir(parents=True)
-        (home / '.config/chezmoi/chezmoi.toml').write_text(toml({'sourceDir': str(home / '.local/share/dotfleet/chezmoi-source')}))
-        profile = {'domain': 'personal', 'domain_chosen': True, 'git_name': 'Example Person',
-                   'git_email': 'example@example.invalid', 'pins': {'node': '24.14.1'}, 'groups': {'helpers': True}}
-        backup = home / 'dotfleet-backups/20261116-120000'
+        (home / ".config/chezmoi/chezmoi.toml").write_text(
+            toml({"sourceDir": str(home / ".local/share/dotfleet/chezmoi-source")})
+        )
+        profile = {
+            "domain": "personal",
+            "domain_chosen": True,
+            "git_name": "Example Person",
+            "git_email": "example@example.invalid",
+            "pins": {"node": "24.14.1"},
+            "groups": {"helpers": True},
+        }
+        backup = home / "dotfleet-backups/20261116-120000"
         backup.mkdir(parents=True)
-        (backup / 'RUN.json').write_text('{"result":"SUCCESS"}')
-        machine = dict(hostname='example-hub', home=str(home), os='Linux', domain='personal', domain_chosen=True,
-                       content_repo='https://example.invalid/dotfiles', content_commit='1234567890abcdef1234567890abcdef12345678',
-                       manager_version='0.1.0', last_run='2026-11-16T12:00:00+00:00', last_backup=str(backup),
-                       last_run_record=str(backup / 'RUN.json'), result='SUCCESS', enrolled=True)
+        (backup / "RUN.json").write_text('{"result":"SUCCESS"}')
+        machine = dict(
+            hostname="example-hub",
+            home=str(home),
+            os="Linux",
+            domain="personal",
+            domain_chosen=True,
+            content_repo="https://example.invalid/dotfiles",
+            content_commit="1234567890abcdef1234567890abcdef12345678",
+            manager_version="0.1.0",
+            last_run="2026-11-16T12:00:00+00:00",
+            last_backup=str(backup),
+            last_run_record=str(backup / "RUN.json"),
+            result="SUCCESS",
+            enrolled=True,
+        )
         outputs = {}
-        with patch.object(command, 'run', return_value=''), patch.object(command, 'records', return_value=[backup]), \
-                patch.object(command.e, 'installed', return_value={'node': [{'version': '24.14.1'}]}), \
-                patch.object(command, 'checkout_state', return_value='12345678 · 0 behind last fetched upstream · clean'), \
-                patch.object(registry, 'load', return_value={'schema_version': 1, 'machines': {'example-hub': machine}}), \
-                patch.object(socket, 'gethostname', return_value='example-hub'):
-            for name in ['status', 'doctor', 'machines']:
+        with (
+            patch.object(command, "run", return_value=""),
+            patch.object(command, "records", return_value=[backup]),
+            patch.object(
+                command.enrollment, "installed", return_value={"node": [{"version": "24.14.1"}]}
+            ),
+            patch.object(
+                command,
+                "checkout_state",
+                return_value="12345678 · 0 behind last fetched upstream · clean",
+            ),
+            patch.object(
+                registry,
+                "load",
+                return_value={"schema_version": 1, "machines": {"example-hub": machine}},
+            ),
+            patch.object(socket, "gethostname", return_value="example-hub"),
+        ):
+            for name in ["status", "doctor", "machines"]:
                 output = io.StringIO()
                 with contextlib.redirect_stdout(output):
                     result = command.read_view(argparse.Namespace(command=name), home, profile)
@@ -54,23 +96,27 @@ def command_goldens():
 class StyleTests(unittest.TestCase):
     def test_command_goldens(self):
         for name, output in command_goldens().items():
-            self.assertEqual(output, (ROOT / f'tests/fixtures/views/{name}.txt').read_text())
+            self.assertEqual(output, (ROOT / f"tests/fixtures/views/{name}.txt").read_text())
             for line in output.splitlines():
                 self.assertLessEqual(len(line), 100)
-            self.assertNotIn('[machines.', output)
+            self.assertNotIn("[machines.", output)
 
     def test_python_and_shell_palette_and_section_rule_match(self):
-        env = dict(os.environ, TERM='xterm-256color')
-        env.pop('NO_COLOR', None)
+        env = dict(os.environ, TERM="xterm-256color")
+        env.pop("NO_COLOR", None)
         for disabled in [False, True]:
-            current = dict(env, NO_COLOR='') if disabled else env
+            current = dict(env, NO_COLOR="") if disabled else env
             master, slave = pty.openpty()
             try:
                 code = 'source "$1"; log_section Title; log_info Info; log_success Success; log_change removed Removed; log_warning Warning'
-                result = subprocess.run(['bash', '-c', code, 'test', str(ROOT / 'scripts/logger.sh')], env=current,
-                                        stdout=slave, stderr=slave)
+                result = subprocess.run(
+                    ["bash", "-c", code, "test", str(ROOT / "scripts/logger.sh")],
+                    env=current,
+                    stdout=slave,
+                    stderr=slave,
+                )
                 os.close(slave)
-                data = b''
+                data = b""
                 while True:
                     try:
                         chunk = os.read(master, 4096)
@@ -82,24 +128,61 @@ class StyleTests(unittest.TestCase):
             finally:
                 os.close(master)
             self.assertEqual(result.returncode, 0)
+
             class Terminal(io.StringIO):
                 def isatty(self):
                     return True
+
             stream = Terminal()
             with patch.dict(os.environ, current, clear=True):
-                expected = '\n'.join(style.paint('CYAN', line, stream, True) for line in style.section('Title').splitlines()) + '\n'
-                for color, text in [('BLUE', 'Info'), ('GREEN', 'Success'), ('RED', 'Removed'), ('YELLOW', 'Warning')]:
-                    expected += style.paint(color, text, stream) + '\n'
-            self.assertEqual(data.decode().replace('\r\n', '\n'), expected)
+                expected = (
+                    "\n".join(
+                        style.paint("CYAN", line, stream, True)
+                        for line in style.section("Title").splitlines()
+                    )
+                    + "\n"
+                )
+                for color, text in [
+                    ("BLUE", "Info"),
+                    ("GREEN", "Success"),
+                    ("RED", "Removed"),
+                    ("YELLOW", "Warning"),
+                ]:
+                    expected += style.paint(color, text, stream) + "\n"
+            self.assertEqual(data.decode().replace("\r\n", "\n"), expected)
         with patch.dict(os.environ, env, clear=True):
-            self.assertEqual(style.paint('RED', 'Error', io.StringIO()), 'Error')
+            self.assertEqual(style.paint("RED", "Error", io.StringIO()), "Error")
 
     def test_unexpected_error_is_plain_and_nonzero(self):
-        result = subprocess.run([sys.executable, '-c',
-                                 'from pathlib import Path; import sys,style; '
-                                 'sys.exit(style.run_cli(lambda: 1/0, Path(".")))'],
-                                env=dict(os.environ, PYTHONPATH=str(ROOT / 'scripts')), text=True, capture_output=True)
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                "from pathlib import Path; import sys,style; "
+                'sys.exit(style.run_cli(lambda: 1/0, Path(".")))',
+            ],
+            env=dict(os.environ, PYTHONPATH=str(ROOT / "scripts")),
+            text=True,
+            capture_output=True,
+        )
         self.assertEqual(result.returncode, 1)
-        self.assertTrue(result.stderr.startswith('Error:'))
-        self.assertNotIn('Traceback', result.stderr)
-        self.assertEqual(result.stdout, '')
+        self.assertTrue(result.stderr.startswith("Error:"))
+        self.assertNotIn("Traceback", result.stderr)
+        self.assertEqual(result.stdout, "")
+
+
+def usage():
+    """Describe this module when help is requested directly."""
+    import argparse
+
+    argument_parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    argument_parser.parse_args()
+
+
+if __name__ == "__main__":
+    import sys
+
+    if any(argument in ("--help", "-h") for argument in sys.argv[1:]):
+        usage()

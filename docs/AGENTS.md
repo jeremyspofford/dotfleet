@@ -54,5 +54,6 @@ The generator reports this limit; it invents no file or skill loader.
 
 Never recursively delete an agent directory. It can contain credentials or user-created skills.
 
-The generator reads the local Dotfleet profile. Optional `[agents]` values can disable individual agents.
+The generator reads the local Dotfleet profile. Use `dotfleet configure` to turn individual agents on or off.
+Turning an agent off skips future generation. Existing outputs remain for review.
 Existing output records from `~/.local/state/dotfiles/agents.json` remain readable during migration.

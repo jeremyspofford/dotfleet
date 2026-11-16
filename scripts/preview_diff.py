@@ -1,4 +1,10 @@
-"""Render pending file patches with isolated chezmoi sources and state."""
+"""Render pending file patches with isolated chezmoi sources and state.
+
+Usage: import this module from Dotfleet.
+Help: python3 scripts/preview_diff.py --help.
+Direct execution without help keeps its existing behavior.
+"""
+
 from common import atomic, read_toml, run, toml
 from convert import source_name
 from installation import COMMAND, launcher
@@ -7,44 +13,77 @@ import agent_configs
 
 def patches(home, profile, plan, folder, root):
     """Return real chezmoi patches, including files written directly by the manager."""
-    extra = folder / 'extra'
+    extra = folder / "extra"
     extra.mkdir()
     payloads = {
-        '.config/chezmoi/chezmoi.toml': toml(plan['config']),
-        '.config/dotfleet/profile.toml': toml(profile),
+        ".config/chezmoi/chezmoi.toml": toml(plan["config"]),
+        ".config/dotfleet/profile.toml": toml(profile),
         COMMAND: launcher(root),
     }
-    if plan['native']:
-        payloads.update(plan['generated'])
-    manifest = read_toml(root / 'agents/manifest.toml')
-    for agent in manifest['agents'].values():
-        name = agent.get('config_paths', {}).get(agent_configs.native_os())
-        if name in plan['agents']:
-            payloads[name] = agent['content']
+    if plan["native"]:
+        payloads.update(plan["generated"])
+    manifest = read_toml(root / "agents/manifest.toml")
+    for agent in manifest["agents"].values():
+        name = agent.get("config_paths", {}).get(agent_configs.native_os())
+        if name in plan["agents"]:
+            payloads[name] = agent["content"]
     extra_names = set()
-    for name in sorted(plan['changed'] | plan['removed']):
-        if name.startswith('.local/state/dotfleet/'):
+    for name in sorted(plan["changed"] | plan["removed"]):
+        if name.startswith(".local/state/dotfleet/"):
             continue  # Inventories describe writes; they are not rendered settings.
-        target = extra / source_name(name, '100755' if name == COMMAND else '100644')
-        if name in plan['stale']:
-            target = target.with_name('remove_' + target.name)
-            atomic(target, '')
-        elif name in plan['agents'] and 'link' in plan['agents'][name]:
-            target = extra / source_name(name, '120000')
-            atomic(target, plan['agents'][name]['link'])
+        target = extra / source_name(name, "100755" if name == COMMAND else "100644")
+        if name in plan["stale"]:
+            target = target.with_name("remove_" + target.name)
+            atomic(target, "")
+        elif name in plan["agents"] and "link" in plan["agents"][name]:
+            target = extra / source_name(name, "120000")
+            atomic(target, plan["agents"][name]["link"])
         elif name in payloads:
             atomic(target, payloads[name])
         else:
             continue
         extra_names.add(name)
-    extra_config = folder / 'extra.toml'
-    atomic(extra_config, toml({'sourceDir': str(extra), 'destDir': str(home), 'umask': 0o077}))
+    extra_config = folder / "extra.toml"
+    atomic(extra_config, toml({"sourceDir": str(extra), "destDir": str(home), "umask": 0o077}))
     result = []
-    for name in sorted((plan['changed'] | plan['removed']) - {'.local/state/dotfleet/agents.json'}):
-        config = extra_config if name in extra_names else folder / 'preview.toml'
-        patch = run('chezmoi', '--config', str(config), '--persistent-state', str(folder / 'diff-state.db'),
-                    '--cache', str(folder / 'diff-cache'), '--no-pager', '--use-builtin-diff', '--color=false',
-                    'diff', str(home / name))
+    for name in sorted((plan["changed"] | plan["removed"]) - {".local/state/dotfleet/agents.json"}):
+        config = extra_config if name in extra_names else folder / "preview.toml"
+        patch = run(
+            "chezmoi",
+            "--config",
+            str(config),
+            "--persistent-state",
+            str(folder / "diff-state.db"),
+            "--cache",
+            str(folder / "diff-cache"),
+            "--no-pager",
+            "--use-builtin-diff",
+            "--color=false",
+            "diff",
+            str(home / name),
+        )
         if patch:
             result.append((name, patch))
     return result
+
+
+def usage():
+    """Describe this module when help is requested directly."""
+    import argparse
+
+    from style import ArgumentParser
+
+    argument_parser = ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    argument_parser.parse_args()
+
+
+if __name__ == "__main__":
+    import sys
+
+    if any(argument in ("--help", "-h") for argument in sys.argv[1:]):
+        from pathlib import Path
+        from style import run_cli
+
+        sys.exit(run_cli(usage, Path(__file__).resolve().parents[1]))
