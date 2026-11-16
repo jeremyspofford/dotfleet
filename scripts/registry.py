@@ -1,5 +1,7 @@
 """Keep recorded machine facts in the manager store. Never query other machines.
 
+Internal module. Use dotfleet machines --help for the command interface.
+
 The installer refreshes this machine after a backed-up run. Read-only commands
 read the file without refreshing timestamps. Profile identity and secrets stay out.
 """

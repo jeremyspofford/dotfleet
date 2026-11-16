@@ -26,8 +26,8 @@ PROFILE = '.config/dotfleet/profile.toml'
 CONTROLS = {registry.REGISTRY, PROFILE, '.config/chezmoi/chezmoi.toml', '.local/state/dotfleet/outputs.json',
             '.local/state/dotfleet/agents.json', '.local/state/dotfleet/last-run.json', COMMAND}
 DESCRIPTIONS = {
-    'machines': 'Show recorded machine facts from fleet.toml, the manager’s local registry. Other records are saved snapshots, not live network results.',
-    'addons': 'List installed add-ons, optional manager extensions with validated manifests and ownership receipts. No add-ons ship with Dotfleet.',
+    'machines': 'Show recorded machine facts from fleet.toml. The registry is the manager’s file of saved machine records. This command makes no live network queries.',
+    'addons': 'List installed add-ons, optional manager extensions. A manifest declares an extension’s actions. A receipt records its owned outputs. No add-ons ship with Dotfleet.',
     'update': 'Pull the manager and content repositories, then apply your saved choices. A repository stores versioned files.',
     'status': 'Show this machine’s profile, saved choices, installed pins, groups, checkout state, drift, and recent backups. Drift means managed files differ.',
     'diff': 'Preview an update in temporary storage. Apply nothing and keep your home unchanged. File markers show added, changed, or removed paths.',
