@@ -31,8 +31,8 @@
 # set_verbose: enable set -x command tracing for debugging. set_quiet: disable tracing.
 #
 # Environment:
-# NO_COLOR: a nonempty value disables colors. Nonterminal output also disables colors.
-# The original header promised any set value; this implementation treats empty as unset.
+# NO_COLOR: any set value disables colors, including an empty value.
+# Nonterminal output and TERM=dumb also disable colors.
 # LOG_TIMESTAMP=1: prefix log lines with [HH:MM:SS].
 # DEBUG=1 or DOTFILES_DEBUG=1: enable debug lines.
 #
@@ -65,7 +65,7 @@ unset _LOGGER_DIR
 
 # --- Colors -------------------------------------------------------------------
 # Enabled only on a real terminal and only when NO_COLOR is unset.
-if [[ -t 1 && -z "${NO_COLOR:-}" ]]; then
+if [[ -t 1 && -z ${NO_COLOR+x} && ${TERM:-} != dumb ]]; then
 	RED=$'\033[31m'
 	GREEN=$'\033[32m'
 	YELLOW=$'\033[33m'
@@ -264,7 +264,8 @@ Strict mode stops on failed commands, unset variables, and failed pipeline comma
 Environment:
   DEBUG=1 or DOTFILES_DEBUG=1  Enable debug messages.
   LOG_TIMESTAMP=1             Prefix log lines with [HH:MM:SS].
-  NO_COLOR=1                  Disable colors; any nonempty value works.
+  NO_COLOR                    Disable colors when set, including an empty value.
+  TERM=dumb                   Disable colors for a basic terminal.
 Nonterminal output disables colors automatically.
 
 Examples:

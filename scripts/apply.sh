@@ -49,9 +49,13 @@ show_apply_output() {
 			suffix=" ($choices)? "
 			if [[ $line != *"$suffix" ]]; then continue; fi
 			message=${line%"$suffix"}
+			log_info ''
+			log_info 'File conflict'
+			log_info '-------------'
 			log_info "$message."
 			log_info 'Type one letter, then press Enter.'
 			if [[ $choices == */Skip-conflicts/* ]]; then log_info 'Uppercase S differs from lowercase s.'; fi
+			log_info ''
 			if [[ $choices == diff/* ]]; then log_info '  d  Show changes for this file, then ask again.'; fi
 			if [[ $choices == *yes/no/all/quit ]]; then
 				log_info '  y  Apply the proposed change to this file.'
@@ -75,6 +79,7 @@ show_apply_output() {
 			choices=${choices//yes/y}
 			choices=${choices//no/n}
 			choices=${choices//all/a}
+			log_info ''
 			log_info "Choose [$choices]:"
 			line=''
 			break
