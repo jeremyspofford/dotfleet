@@ -328,6 +328,8 @@ def select_profile(home, args, workspace):
         args.found, args.excluded = wizard.welcome(home, sources)
         profile, checkout, manifest, warnings = wizard.steps(home, args, workspace, profile, args.found, args.excluded)
         return profile, sources, checkout, manifest, warnings
+    if getattr(args, 'edit', None):
+        args.edit(profile)
     require_complete_profile(profile)
     repo = args.repo or profile.get('content_repo', DEFAULT_REPO)
     if args.adopt:
@@ -560,6 +562,11 @@ def prepare(home, checkout, profile, manifest, folder):
         if os.environ.get('DOTFLEET_STAGED_' + tool.upper()):
             all_paths.add('.local/bin/' + tool)
             changed.add('.local/bin/' + tool)
+    from installation import COMMAND, launcher
+    all_paths.add(COMMAND)
+    target = home / COMMAND
+    if not target.is_file() or target.read_bytes() != launcher(ROOT) or target.stat().st_mode & 0o777 != 0o700:
+        changed.add(COMMAND)
     if agents:
         all_paths.add('.local/state/dotfleet/agents.json')
         changed.add('.local/state/dotfleet/agents.json')
@@ -591,7 +598,7 @@ def publish_checkout(home, checkout, profile, backup_path):
     return canonical
 
 
-def main():
+def main(argv=None, edit=None, software=None, before_apply=None):
     import enrollment as wizard
     import agent_configs
     from run_account import RunAccount, RECORD
@@ -609,7 +616,8 @@ def main():
     parser.add_argument('--group', action='append', type=group_argument, default=[], metavar='NAME=on|off', help='include or exclude a named content group; repeat for more groups')
     parser.add_argument('--agents', help='comma-separated detected agent names, or none to skip configuration')
     parser.add_argument('--format', choices=['plain', 'chezmoi'], help='plain=real names; chezmoi=native sources')
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
+    args.edit = edit
     home = Path.home()
     # Git status must not refresh the real checkout's index before confirmation.
     os.environ['GIT_OPTIONAL_LOCKS'] = '0'
@@ -628,6 +636,8 @@ def main():
             os.environ['MISE_CACHE_DIR'] = str(workspace / 'mise-cache')
             os.environ['MISE_STATE_DIR'] = str(workspace / 'mise-state')
             account = RunAccount(home, ROOT)
+            if software:
+                account.software.extend(software)
             profile, carried, checkout, manifest, warnings = select_profile(home, args, workspace)
             print('Carried from: ' + (', '.join(carried) or 'new profile'))
             attempt = 0
@@ -659,8 +669,15 @@ def main():
                 Path(os.environ['DOTFLEET_APPLY_MARKER']).touch()
             print(f'Backup: {backup_path}', flush=True)
             checkout = publish_checkout(home, checkout, profile, backup_path)
-            account.applied_checkouts.update(['Manager', 'Content'])
+            account.applied_checkouts.add('Content')
+            account.save()
+            from installation import publish
+            publish(home, ROOT, backup_path)
+            account.applied_checkouts.add('Manager')
             atomic(home / RECORD, json.dumps({'manager_commit': account.checkouts[0]['new']}) + '\n')
+            account.applied_software.add('dotfleet')
+            if before_apply:
+                before_apply(account)
             account.save()
             # Temporary downloads become local tools only after review and backup.
             for tool in ['chezmoi', 'mise']:
@@ -691,6 +708,9 @@ def main():
                     retired = backup_path / 'retired' / name
                     retired.parent.mkdir(parents=True, exist_ok=True)
                     path.rename(retired)
+                # This deletion was requested by the group selection, not a local edit.
+                # Retire only this path's remembered entry; preserve all other conflict state.
+                run('chezmoi', 'state', 'delete', '--bucket=entryState', '--key=' + str(path))
             result = subprocess.run(['bash', str(ROOT / 'scripts/apply.sh')])
             account.confirm_files(fingerprint)
             if result.returncode:

@@ -6,8 +6,8 @@ Use future=True for the wizard's planned actions. See install.sh --help.
 import re
 import textwrap
 
-UPDATE = 'curl -fsSL https://raw.githubusercontent.com/jeremyspofford/dotfleet/main/install.sh | bash'
-WIZARD = UPDATE + ' -s -- --configure'
+UPDATE = 'dotfleet update'
+WIZARD = 'dotfleet configure'
 WIDTH = 100
 
 
@@ -46,7 +46,7 @@ def block(pairs, home):
         else:
             lines.extend(wrap(key, '  '))
             # Shell pipelines can wrap after | without changing the copyable command.
-            if text in (UPDATE, WIZARD):
+            if text in (UPDATE, WIZARD) and ' | ' in text:
                 left, right = text.split(' | ', 1)
                 lines += ['    ' + left + ' |', '    ' + right]
             else:
@@ -57,7 +57,7 @@ def block(pairs, home):
 def profile_key(name):
     labels = {'git_name': 'Git name', 'git_email': 'Git email', 'domain': 'Domain',
               'domain_chosen': 'Domain confirmed', 'content_repo': 'Content repo', 'format': 'Content format'}
-    for prefix, label in [('pins.', 'Pin'), ('groups.', 'Group'), ('agents.', 'Agent')]:
+    for prefix, label in [('pins.', 'Pin'), ('groups.', 'Group'), ('agents.', 'Agent'), ('defaults.', 'Content pin')]:
         if name.startswith(prefix):
             return label + ' ' + name[len(prefix):]
     return labels.get(name, name.replace('_', ' '))
@@ -146,3 +146,8 @@ def render(record, future=False):
     record_path = str(backup) + '/RUN.json' if backup else None
     lines.append('Run record: ' + human(record_path, home) if record_path else 'Run record: not created; nothing applied.')
     return '\n'.join(lines) + '\n'
+
+
+def render_view(title, pairs, home=''):
+    """Use the same width, path, and column rules for read-only command results."""
+    return '\n'.join(wrap(title) + block(pairs, home)) + '\n'

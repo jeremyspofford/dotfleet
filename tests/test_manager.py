@@ -279,7 +279,7 @@ class EnrollmentTests(unittest.TestCase):
                                             (rb'Pins \[accept\]:', b'accept\n'),
                                             (rb'Agents \[[^]]+\]:', b'none\n'),
                                             (rb'Review \[quit\]:', b'confirm\n'),
-                                            (rb'(?:docker|terraform|kubectl|python|npm) \[(?:on|off)\]:', b'\n')]:
+                                            (rb'(?:docker|terraform|kubectl|python|npm|helpers) \[(?:on|off)\]:', b'\n')]:
                         if re.search(pattern, pending):
                             os.write(master, answer)
                             cursor = len(transcript)
@@ -301,7 +301,7 @@ class EnrollmentTests(unittest.TestCase):
                    "git_name": "Fixture Person" if complete else "",
                    "git_email": "fixture@example.invalid" if complete else "",
                    "pins": {"node": "24.14.1" if complete else "latest"},
-                   "groups": {group: True for group in ["docker", "terraform", "kubectl", "python", "npm"]}}
+                   "groups": {group: True for group in list(tomllib.loads((Path(os.environ["DOTFLEET_CONTENT_FIXTURE"]) / "dotfleet.toml").read_text())["groups"])}}
         if complete:
             profile["domain_chosen"] = True
         name = ".config/dotfiles/profile.toml" if legacy else ".config/dotfleet/profile.toml"
@@ -448,7 +448,7 @@ class EnrollmentTests(unittest.TestCase):
     def test_terminal_profile_and_update(self):
         responses = [(b"[core]:", b"invalid\n"), (b"[core]:", b"personal\n"),
                      (b"Git author name", b"Fixture Person\n"), (b"Git author email", b"fixture@example.invalid\n")]
-        responses += [(f"{group} [".encode(), b"\n") for group in ["docker", "terraform", "kubectl", "python", "npm"]]
+        responses += [(f"{group} [".encode(), b"\n") for group in list(tomllib.loads((Path(os.environ["DOTFLEET_CONTENT_FIXTURE"]) / "dotfleet.toml").read_text())["groups"])]
         self.terminal(responses)
         path = self.home / ".config/dotfleet/profile.toml"
         profile = path.read_bytes()
@@ -460,7 +460,7 @@ class EnrollmentTests(unittest.TestCase):
     def test_first_domain_prompt_explains_choices_and_saves_core_default(self):
         answers = [(b"Domain [core]:", b"\n"), (b"Git author name", b"Fixture Person\n"),
                    (b"Git author email", b"fixture@example.invalid\n")]
-        answers += [(f"{group} [".encode(), b"\n") for group in ["docker", "terraform", "kubectl", "python", "npm"]]
+        answers += [(f"{group} [".encode(), b"\n") for group in list(tomllib.loads((Path(os.environ["DOTFLEET_CONTENT_FIXTURE"]) / "dotfleet.toml").read_text())["groups"])]
         output = self.terminal(answers)
         for description in ["Base configuration only. No domain additions.",
                             "Choosing a domain does not install software or create accounts.",
@@ -503,7 +503,7 @@ class EnrollmentTests(unittest.TestCase):
                     self.env["NO_COLOR"] = no_color
                 self.env["TERM"] = term
                 answers = [(b"Domain [core]:", b"\n"), (b"Git author name", b"\n"), (b"Git author email", b"\n")]
-                answers += [(f"{group} [".encode(), b"\n") for group in ["docker", "terraform", "kubectl", "python", "npm"]]
+                answers += [(f"{group} [".encode(), b"\n") for group in list(tomllib.loads((Path(os.environ["DOTFLEET_CONTENT_FIXTURE"]) / "dotfleet.toml").read_text())["groups"])]
                 before = path.read_bytes()
                 output = self.terminal(answers, configure=True, raw=True)
                 self.assertNotIn("\x1b[", output)
@@ -526,7 +526,7 @@ class EnrollmentTests(unittest.TestCase):
                 before = path.read_bytes()
                 answers = [(f"Domain [{domain}]:".encode(), b"\n"), (b"Git author name", b"\n"),
                            (b"Git author email", b"\n")]
-                answers += [(f"{group} [".encode(), b"\n") for group in ["docker", "terraform", "kubectl", "python", "npm"]]
+                answers += [(f"{group} [".encode(), b"\n") for group in list(tomllib.loads((Path(os.environ["DOTFLEET_CONTENT_FIXTURE"]) / "dotfleet.toml").read_text())["groups"])]
                 self.terminal(answers, configure=True)
                 self.assertEqual(path.read_bytes(), before)
                 self.assertEqual((self.home / ".config/dotfiles/domain").read_text(), domain + "\n")

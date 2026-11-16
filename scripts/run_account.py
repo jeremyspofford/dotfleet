@@ -13,9 +13,8 @@ import subprocess
 
 from common import atomic, read_toml, run
 from render_run import render
+from installation import command_software, MANAGER
 
-UPDATE = 'curl -fsSL https://raw.githubusercontent.com/jeremyspofford/dotfleet/main/install.sh | bash'
-CONFIGURE = UPDATE + ' -s -- --configure'
 RECORD = '.local/state/dotfleet/last-run.json'
 
 
@@ -43,6 +42,9 @@ def profile_changes(old, new):
             before, after = old.get(field, {}).get(key), new.get(field, {}).get(key)
             if before != after:
                 changes.append({'name': f'{field}.{key}', 'old': before, 'new': after})
+    for tool in sorted(set(old.get('unpinned_tools', [])) ^ set(new.get('unpinned_tools', []))):
+        changes.append({'name': 'defaults.' + tool, 'old': tool not in old.get('unpinned_tools', []),
+                        'new': tool not in new.get('unpinned_tools', [])})
     return changes
 
 
@@ -63,8 +65,9 @@ class RunAccount:
             self.software.append({'name': 'Mise' if name == 'mise' else name, 'version': version(executable),
                                   'path': str(destination), 'old': old,
                                   'action': 'upgraded' if old else 'installed' if staged else 'present'})
+        self.software.append(command_software(home, root))
         self.checkouts = [
-            {'name': 'Manager', 'path': str(root), 'old': previous.get('manager_commit'), 'new': commit(root)},
+            {'name': 'Manager', 'path': str(home / MANAGER), 'old': previous.get('manager_commit'), 'new': commit(root)},
             {'name': 'Content', 'path': str(home / 'dotfiles'), 'old': commit(home / 'dotfiles'), 'new': None}]
         self.locations = {'Content checkout': str(home / 'dotfiles'),
                           'Profile file': str(home / '.config/dotfleet/profile.toml'),

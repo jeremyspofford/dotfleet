@@ -25,7 +25,7 @@ class WizardTests(unittest.TestCase):
         result += [(b'Domain [core]:', b'\n'), (b'Git author name [', b'Wizard Person\n'),
                    (b'Git author email [', b'wizard@example.invalid\n'), (b'Pins [accept]:', b'\n')]
         if door != 'adopt' and repo != os.environ['DOTFLEET_ARCHIVE_FIXTURE']:
-            result += [(f'{name} [on]:'.encode(), b'\n') for name in ['docker', 'terraform', 'kubectl', 'python', 'npm']]
+            result += [(f'{name} [on]:'.encode(), b'\n') for name in list(tomllib.loads((Path(os.environ['DOTFLEET_CONTENT_FIXTURE']) / 'dotfleet.toml').read_text())['groups'])]
         result += [(b'Agents [none]:', b'none\n'), (b'Review [quit]:', b'confirm\n')]
         return result
 
@@ -110,7 +110,7 @@ class WizardTests(unittest.TestCase):
         answers[-1] = (b'Review [quit]:', b'identity\n')
         answers += [(b'Git author name [Wizard Person]:', b'Changed Person\n'),
                     (b'Git author email [wizard@example.invalid]:', b'\n'), (b'Pins [accept]:', b'\n')]
-        answers += [(f'{name} [on]:'.encode(), b'\n') for name in ['docker', 'terraform', 'kubectl', 'python', 'npm']]
+        answers += [(f'{name} [on]:'.encode(), b'\n') for name in list(tomllib.loads((Path(os.environ['DOTFLEET_CONTENT_FIXTURE']) / 'dotfleet.toml').read_text())['groups'])]
         answers += [(b'Agents [none]:', b'\n'), (b'Review [quit]:', b'confirm\n')]
         self.terminal(answers, flags=[], auto_wizard=False)
         profile = tomllib.loads((self.home / '.config/dotfleet/profile.toml').read_text())
