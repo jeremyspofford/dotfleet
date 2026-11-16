@@ -14,12 +14,8 @@ from common import atomic, read_toml, run, toml
 from render_run import human
 from convert import FURNITURE, detect
 import manager as m
-<<<<<<< HEAD
 import agent_detection
-||||||| 4b83ee3
-=======
 import scan_view
->>>>>>> fix/wizard-scan-door
 
 STEPS = ['source', 'domain', 'identity', 'pins', 'groups', 'agents']
 PRIVATE_NAMES = re.compile(r'(^|/)(?:\.secrets(?:\..*)?|\.env(?:\..*)?|\.netrc|\.npmrc|\.pypirc|credentials[^/]*|.*_history|.*\.(?:key|pem|secret)|id_(?:rsa|ed25519).*)$', re.I)
