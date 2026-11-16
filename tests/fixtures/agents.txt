@@ -1,0 +1,21 @@
+
+8. Agents
+An agent is a coding assistant. Only detected agents can be configured.
+
+Agent: claude
+on: generate settings and skill links. off: skip configuration.
+Existing unmanaged settings stop setup before writes.
+Press Enter to keep the shown choice.
+claude [on]:
+
+Agent: codex
+on: generate settings and skill links. off: skip configuration.
+Existing unmanaged settings stop setup before writes.
+Press Enter to keep the shown choice.
+codex [off]:
+
+Agent: gemini
+on: generate settings and skill links. off: skip configuration.
+Existing unmanaged settings stop setup before writes.
+Press Enter to keep the shown choice.
+gemini [off]:

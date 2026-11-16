@@ -14,6 +14,7 @@ from common import atomic, read_toml, run, toml
 from render_run import human
 from convert import FURNITURE, detect
 import manager as m
+import agent_detection
 import scan_view
 
 STEPS = ['source', 'domain', 'identity', 'pins', 'groups', 'agents']
@@ -69,8 +70,8 @@ def agent_manifest():
     return read_toml(m.ROOT / 'agents/manifest.toml')['agents']
 
 
-def detected_agents():
-    return {name: spec for name, spec in agent_manifest().items() if shutil.which(spec['command'])}
+def detected_agents(home=None, tools=None):
+    return agent_detection.detected(home or Path.home(), agent_manifest(), tools)
 
 
 def stage_repo(home, repo, workspace):
@@ -138,7 +139,7 @@ def welcome(home, sources, profile=None, record=None):
                'candidates': [name for name in found if name not in excluded], 'excluded': excluded}
     if record is not None:
         record.update(details)
-    print('\n' + '\n'.join(scan_view.lines(details, (profile or {}).get('pins', {}), detected_agents())))
+    print('\n' + '\n'.join(scan_view.lines(details, (profile or {}).get('pins', {}), detected_agents(home, tools))))
     return found, excluded
 
 
@@ -173,7 +174,7 @@ def agent_flags(profile, value):
     for name in chosen:
         if not known[name]['supported']:
             raise ValueError(f'{name}: {known[name]["reason"]}')
-        if not shutil.which(known[name]['command']):
+        if name not in detected_agents():
             raise ValueError(f'{name} is not installed. Install it separately before configuring it.')
     profile['agents'] = {name: name in chosen for name in known}
 
@@ -279,30 +280,37 @@ def steps(home, args, workspace, profile, found, excluded, start=0, checkout=Non
         group_flags(profile, args.group, manifest)
         supplied = dict(args.group)
         selections = profile.setdefault('groups', {})
+        print('\n7. Content groups')
         for group, spec in manifest.get('groups', {}).items():
             if group in supplied:
                 continue
             new = ' NEW' if group not in selections else ''
             selections[group] = m.ask(f'{group}', 'on' if selections.get(group, True) else 'off', ['on', 'off'],
-                                      heading=f'7. Group: {group}{new}', detail=f'{spec["description"]}\non: include these files or commands.\noff: exclude them.\nPress Enter to keep the shown choice.') == 'on'
+                                      heading=f'Group: {group}{new}', detail=f'{spec["description"]}\non: include these files or commands.\noff: exclude them.\nPress Enter to keep the shown choice.') == 'on'
     if start <= 5:
-        detected = detected_agents()
-        print('\n8. Agents\nAn agent is a coding assistant. Only detected agents can be configured.')
-        for name, spec in detected.items():
-            print(f'{name}: ' + ('generate native settings and skill links' if spec['supported'] else spec['reason']))
         if args.agents is not None:
             agent_flags(profile, args.agents)
         else:
-            default = ','.join(name for name in detected if profile.get('agents', {}).get(name)) or 'none'
-            while True:
-                value = m.ask('Agents', default, detail='Enter detected names separated by commas, or none to skip. Press Enter to submit.\nExisting unmanaged settings cause a stop; the generator never silently overwrites them.')
-                try:
-                    agent_flags(profile, value)
-                    break
-                except ValueError as error:
-                    print(error)
+            choose_agents(home, profile)
     warnings += gap_warnings(profile)
     return profile, checkout, manifest, list(dict.fromkeys(warnings))
+
+
+def choose_agents(home, profile):
+    detected = detected_agents(home)
+    print('\n8. Agents\nAn agent is a coding assistant. Only detected agents can be configured.')
+    if not detected:
+        print('No agents detected. No configuration selected.')
+    selections = profile.setdefault('agents', {})
+    for name, spec in detected.items():
+        if not spec['supported']:
+            print(f"{name}: {spec['reason']}")
+            continue
+        selections[name] = m.ask(name, 'on' if selections.get(name, False) else 'off', ['on', 'off'],
+                                 heading='Agent: ' + name,
+                                 detail='on: generate settings and skill links. off: skip configuration.\n'
+                                        'Existing unmanaged settings stop setup before writes.\n'
+                                        'Press Enter to keep the shown choice.') == 'on'
 
 
 def gap_warnings(profile):
