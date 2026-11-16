@@ -167,17 +167,17 @@ A missing field means UNCHOSEN, including profiles saved before the wizard exist
 Status and doctor show that gap. Run `dotfleet domain` to read the choices, then `dotfleet domain NAME` to confirm one.
 `unpinned_tools` records skipped tools, so content defaults cannot select them later. Remove a tool there to allow its defaults again.
 Content defaults fill gaps only when the requested versions are installed. The summary lists other defaults as available, without installing them.
-The manager creates Git identity, domain, Mise settings, and a private secrets file. Keep secret references in the profile, never values.
+The manager creates Git identity, domain, Mise settings, and a private secrets file. Keep secret references in the content manifest, never values. Imported profile references remain valid.
 A reference such as `op://Vault/Item/field` names a secret in 1Password. References are disabled unless explicitly enabled.
 
 Old Layer 0 enrollment migrates automatically. Setup reads old chezmoi data, rendered Mise pins, and saved installer data before applying files.
 Migration also saves existing Mise settings in the profile. Existing Dotfleet profiles remain authoritative. Backups preserve replaced files and prior staged sources.
 Conflict menus explain letter keys and require Enter. Skipping changes can leave differences; the summary reports that as incomplete enrollment.
 
-1. Edit files in `~/dotfiles` or edit your profile.
-2. Commit content changes before updating. Setup refuses a checkout with uncommitted edits.
-3. Rerun the one-liner to convert and apply.
-4. Run `chezmoi status` to check for differences.
+1. Edit content files in `~/dotfiles`. Change profile choices through `dotfleet domain`, `pins`, `groups`, or `configure`.
+2. Commit and push content changes before updating. Setup refuses a checkout with uncommitted edits.
+3. Run `dotfleet update` to convert and apply. The one-liner remains available for manager recovery.
+4. Run `dotfleet status` to check for differences.
 
 To roll back, restore saved `home/` files and external targets from the backup. Remove only new paths marked absent.
 Restore the saved profile too. Keep the backup and rerun setup when you want to regenerate files.
