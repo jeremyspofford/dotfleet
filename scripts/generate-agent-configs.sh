@@ -34,7 +34,7 @@ Examples:
   bash scripts/generate-agent-configs.sh --dry-run
   bash scripts/generate-agent-configs.sh --home /tmp/demo --os linux
 
-Outputs are recorded in ~/.local/state/dotfiles/agents.json.
+Outputs are recorded in ~/.local/state/dotfleet/agents.json.
 Ollama has no portable settings-file or skill contract. Report it without writing files.
 Exit codes: 0 success/help; 1 runtime failure or conflict; 2 invalid arguments.
 Author: Jeremy Spofford / Aria Labs; Version: $DOTFILES_VERSION (VERSION).

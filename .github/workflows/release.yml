@@ -26,6 +26,5 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: bash scripts/release.sh
-# Owner approval is required for the scaffold migration.
-# Subsequent release PRs can use GitHub auto-merge with required CI checks.
+# Release proposals stay open for owner review.
 # A bot token is needed for release PRs to trigger additional Actions runs.
