@@ -31,6 +31,43 @@ else
 fi
 # shellcheck source=scripts/logger.sh
 source "$logger"
+export DOTFLEET_SUMMARY_MARKER="$work_dir/summary-reported"
+export DOTFLEET_APPLY_MARKER="$work_dir/apply-started"
+summary_expected=1
+finish_run() {
+	local result=$?
+	trap - EXIT
+	if [[ $summary_expected == 1 && ! -e $DOTFLEET_SUMMARY_MARKER ]]; then
+		log_section 'END SUMMARY'
+		log_error "Result: FAILED (exit $result; setup stopped before a run record was available)"
+		local outcome='None (setup stopped before apply)'
+		local backup='None (not created)'
+		if [[ -e $DOTFLEET_APPLY_MARKER ]]; then
+			outcome='Unknown (run interrupted; inspect the backup run record)'
+			backup="$HOME/dotfleet-backups (inspect the latest run)"
+		fi
+		log_info '1. Software'
+		log_info "Changes: $outcome"
+		log_info '2. Manager and content'
+		log_info "Changes: $outcome"
+		log_info '3. Files'
+		log_info "Changes: $outcome"
+		log_info '4. Profile changes'
+		log_info "$outcome"
+		log_info '5. Locations'
+		log_info "Content checkout: $HOME/dotfiles"
+		log_info "Profile file: $HOME/.config/dotfleet/profile.toml"
+		log_info 'Converted source: None (not prepared)'
+		log_info "Backup folder: $backup"
+		log_info '6. Next steps'
+		log_info "Update: curl -fsSL $raw/install.sh | bash"
+		log_info "Rollback: $backup"
+		log_info "Reopen the wizard: curl -fsSL $raw/install.sh | bash -s -- --configure"
+	fi
+	rm -rf -- "$work_dir"
+	exit "$result"
+}
+trap finish_run EXIT
 usage() {
 	log_heredoc '' <<EOF
 Dotfleet $DOTFILES_VERSION manages home configuration with a saved machine profile.
@@ -69,11 +106,12 @@ Steps: welcome, scan, source, domain, identity, pins, groups, agents, review, ap
 Source choices: adopt keeps existing files; defaults uses our examples; repo uses your Git URL.
 Adoption scans root dotfiles and .config files. It excludes credential and shell-history names, secret patterns, binary files, and files above 2 MiB.
 The scan cannot prove a file contains no secrets. Review the local repository before pushing it.
-Review shows the backup path and changed files. Type confirm to apply, quit to cancel, or a step name to go back.
+Review lists planned software, checkout, file, and profile changes, plus locations and next steps. Type confirm to apply, quit to cancel, or a step name to go back.
 Nothing in your home changes before confirmation. Temporary tool downloads stay outside your home.
 Adopted file contents stay unchanged, including existing Mise files. Profile choices do not rewrite adopted files.
 Pins use full versions. Enter accepts the prompt's stated action; skip leaves a choice incomplete.
-Complete profiles need no profile prompts. The summary lists skipped gaps under Warnings.
+Complete profiles need no profile prompts. Every summary prints all six categories, including scripted runs.
+Empty change categories say None. File changes use full paths. Skipped gaps appear under Warnings.
 Without a terminal, missing identity, an unconfirmed domain, or floating pins stop setup with exit 1.
 Supply the listed flags to complete those values. New group defaults are printed before applying files.
 Prompts read /dev/tty, the terminal device, never piped input.
@@ -95,6 +133,7 @@ arguments=("$@")
 while [[ $# -gt 0 ]]; do
 	case $1 in
 	-h | --help)
+		summary_expected=0
 		usage
 		exit 0
 		;;

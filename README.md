@@ -26,7 +26,7 @@ Prompts read the terminal, never piped input. Complete profiles update without e
 6. Compare installed tools, content defaults, and saved pins. Accept them or enter exact versions.
 7. Choose groups. On includes their content; off excludes it. New groups say NEW.
 8. Select detected agents, which are coding assistants. Choose names or `none` to skip configuration.
-9. Review all choices, the backup location, and the number of changed files. Type `confirm`, `quit`, or a step name to return.
+9. Review all choices and the full planned change account. Type `confirm`, `quit`, or a step name to return.
 10. Read the apply result and summary warnings.
 
 **Start with `core` unless you want a domain's examples.** It includes shared shell, Git, aliases, and prompt settings.
@@ -77,6 +77,79 @@ Without a terminal, incomplete profiles stop and list their gaps. No prompt or d
 | `--format plain\|chezmoi` | Choose real names or native sources when detection is unclear. The manifest takes priority. |
 
 Read `--help` for examples, limits, and exit codes.
+
+## Run account
+
+Every run prints all six categories below, including scripted runs. Empty change categories print None.
+The wizard shows the same account before apply, with future-tense actions. The end summary uses past tense for confirmed changes.
+Installed prerequisite versions and unchanged checkout commits remain visible when nothing changed.
+A commit identifies a saved Git version. Manager updates compare the running commit with the last confirmed run.
+The first audited run prints None when no earlier manager commit was recorded.
+The one-liner uses a temporary manager checkout. Its printed path can disappear when the run ends.
+
+File lists cover managed home settings, including agent files and generated configuration. Pin removal changes rendered settings; it does not uninstall software.
+Backups, staged sources, and internal state records are not counted as setting changes.
+Profile keys identify saved choices. For example, groups.extra names the extra group; true means on and false means off.
+
+The backup contains MANIFEST.json, a list of original files, and RUN.json, the planned actions and confirmed results.
+CHEZMOI-DIFF.patch holds the diff captured before apply. A diff describes content and permission changes.
+These records stay private because the diff can contain secret values. Reports show paths, never diff contents.
+Failed runs report confirmed changes only. An interrupted run directs you to its backup record when completion is unknown.
+
+This complete example comes from a test run. Its temporary paths show one addition, one content change, and one group removal.
+
+```text
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  END SUMMARY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Result: SUCCESS
+A profile saves machine choices. Pins select tool versions; groups select optional content.
+Commit IDs identify saved Git versions. None means no change or no recorded value.
+
+1. Software
+Software changes: None
+Installed new:
+  None
+Already present:
+  chezmoi 2.74.1
+  Mise 2026.8.5
+Upgraded:
+  None
+
+2. Manager and content
+Checkout changes:
+  Updated Content: b92bbc8bfb512e7a23316dac4efd0c8a49e5179f → 95e79b79628a4953bf25e828043a6b537afa9786 — /tmp/tmpcyx1dwc4/home/dotfiles
+Manager: unchanged, 3f51ebb825e9be7bda7070b89e17efecbb76abb9 — /tmp/dotfleet-config-state-fix
+
+3. Files
+Added:
+  /tmp/tmpcyx1dwc4/home/.added
+Changed:
+  /tmp/tmpcyx1dwc4/home/.changed
+  /tmp/tmpcyx1dwc4/home/.config/dotfleet/profile.toml
+Removed:
+  /tmp/tmpcyx1dwc4/home/.removed
+
+4. Profile changes
+  Changed groups.extra: true → false
+
+5. Locations
+Content checkout: /tmp/tmpcyx1dwc4/home/dotfiles
+Profile file: /tmp/tmpcyx1dwc4/home/.config/dotfleet/profile.toml
+Converted source: /tmp/tmpcyx1dwc4/home/.local/share/dotfleet/chezmoi-source
+Backup folder: /tmp/tmpcyx1dwc4/home/dotfleet-backups/20261116-135923
+
+6. Next steps
+Update: curl -fsSL https://raw.githubusercontent.com/jeremyspofford/dotfleet/main/install.sh | bash
+Rollback: /tmp/tmpcyx1dwc4/home/dotfleet-backups/20261116-135923/MANIFEST.json
+Restore saved home/ files and recorded external targets. Remove only new paths marked absent.
+Keep user edits and the backup. Restore the profile before running setup again.
+Reopen the wizard: curl -fsSL https://raw.githubusercontent.com/jeremyspofford/dotfleet/main/install.sh | bash -s -- --configure
+chezmoi status: CLEAN (no differences)
+Warnings:
+  None.
+Run record: /tmp/tmpcyx1dwc4/home/dotfleet-backups/20261116-135923/RUN.json
+```
 
 ## How it works
 

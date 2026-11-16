@@ -57,6 +57,22 @@ jobs:
             chezmoi status > "$RUNNER_TEMP/status-$attempt.log" 2>&1
             test ! -s "$RUNNER_TEMP/status-$attempt.log"
           done
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          folder = Path(os.environ['RUNNER_TEMP'])
+          first = (folder / 'install-first.log').read_text()
+          second = (folder / 'install-second.log').read_text()
+          for number, name in enumerate(['Software', 'Manager and content', 'Files', 'Profile changes', 'Locations', 'Next steps'], 1):
+              assert f'{number}. {name}' in first and f'{number}. {name}' in second
+          assert 'Installed new:' in first
+          assert str(Path.home() / '.local/bin/chezmoi') in first
+          assert str(Path.home() / '.local/bin/mise') in first
+          assert 'Software changes: None' in second
+          assert 'Checkout changes:\n  None' in second
+          assert 'Added:\n  None\nChanged:\n  None\nRemoved:\n  None' in second
+          assert '4. Profile changes\n  None' in second
+          PY
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: Test real content, archive, native source, prompts, and repeat runs
         working-directory: manager

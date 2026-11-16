@@ -1,0 +1,159 @@
+"""Check complete change accounts from actual enrollment runs and saved evidence."""
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import unittest
+
+import test_manager as helpers
+from test_manager import ROOT, command, repository
+from common import toml
+from run_account import profile_changes
+
+
+def summary(output):
+    output = output.replace('\r\n', '\n')
+    start = output.index('  END SUMMARY\n')
+    return output[output.rfind('\n', 0, start - 1) + 1:]
+
+
+def category(text, number):
+    start = text.index(f'{number}. ')
+    return text[start:text.index(f'{number + 1}. ', start)] if number < 6 else text[start:]
+
+
+class RunAccountTests(unittest.TestCase):
+    setUp = helpers.EnrollmentTests.setUp
+    terminal = helpers.EnrollmentTests.terminal
+    assert_quiet_status = helpers.EnrollmentTests.assert_quiet_status
+
+    def enroll(self, repo=None, extra=(), root=ROOT):
+        flags = ['--defaults', '--domain', 'core', '--git-name', 'Audit Example', '--git-email', 'audit@example.invalid', '--agents', 'none']
+        if repo:
+            flags += ['--repo', str(repo)]
+        return command('bash', str(root / 'install.sh'), *flags, *extra, env=self.env, cwd=self.home)
+
+    def fixture(self):
+        return repository(self.base / 'content', {'.changed': 'before\n', '.removed': 'optional file\n',
+                          'dotfleet.toml': 'format = "plain"\n[groups.extra]\ndescription="An optional example file"\nfiles=[".removed"]\n'})
+
+    def test_file_changes_match_diff_and_backup_records(self):
+        repo = self.fixture()
+        self.enroll(repo)
+        old = command('git', '-C', str(repo), 'rev-parse', 'HEAD').strip()
+        (repo / '.changed').write_text('after\n')
+        (repo / '.added').write_text('new file\n')
+        command('git', '-C', str(repo), 'add', '.')
+        command('git', '-C', str(repo), '-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-m', 'fix: update test content')
+        new = command('git', '-C', str(repo), 'rev-parse', 'HEAD').strip()
+        text = summary(self.enroll(extra=['--group', 'extra=off']))
+        self.assertIn(f'Added:\n  {self.home}/.added\n', text)
+        self.assertIn(f'  {self.home}/.changed\n', category(text, 3).split('Changed:', 1)[1].split('Removed:', 1)[0])
+        self.assertIn(f'Removed:\n  {self.home}/.removed\n', text)
+        self.assertIn('Changed groups.extra: true → false', text)
+        self.assertIn(f'Updated Content: {old} → {new} — {self.home}/dotfiles', text)
+        latest = sorted((self.home / 'dotfleet-backups').iterdir())[-1]
+        record = json.loads((latest / 'RUN.json').read_text())
+        self.assertEqual(record['backup_manifest'], json.loads((latest / 'MANIFEST.json').read_text()))
+        planned = {item['relative']: item['action'] for item in record['files']}
+        self.assertEqual({name: planned[name] for name in ['.added', '.changed', '.removed']},
+                         {'.added': 'added', '.changed': 'changed', '.removed': 'removed'})
+        diff = (latest / 'CHEZMOI-DIFF.patch').read_text()
+        self.assertIn('.added', diff)
+        self.assertIn('.changed', diff)
+        self.assertEqual((latest / 'home/.changed').read_text(), 'before\n')
+        self.assertEqual((latest / 'retired/.removed').read_text(), 'optional file\n')
+        self.assertEqual((latest / 'RUN.json').stat().st_mode & 0o777, 0o600)
+        self.assert_quiet_status()
+        if os.environ.get('DOTFLEET_TEST_REPORT'):
+            Path(os.environ['DOTFLEET_TEST_REPORT']).write_text(text)
+
+    def test_no_change_run_prints_none_and_locations_and_commands(self):
+        self.enroll(self.fixture())
+        text = summary(self.enroll())
+        for number in range(1, 5):
+            self.assertIn('None', category(text, number))
+        for label in ['Added', 'Changed', 'Removed']:
+            self.assertIn(label + ':\n  None', category(text, 3))
+        self.assertEqual(category(text, 4).strip(), '4. Profile changes\n  None')
+        self.assertIn('Already present:', category(text, 1))
+        self.assertIn('Manager: unchanged,', category(text, 2))
+        self.assertIn('Content: unchanged,', category(text, 2))
+        self.assertIn(str(self.home / '.config/dotfleet/profile.toml'), category(text, 5))
+        self.assertIn('MANIFEST.json', category(text, 6))
+        self.assertIn('| bash -s -- --configure', category(text, 6))
+        self.assert_quiet_status()
+
+    def test_manager_update_uses_last_confirmed_commit(self):
+        files = {'install.sh': (ROOT / 'install.sh').read_text(), 'VERSION': (ROOT / 'VERSION').read_text()}
+        files.update({str(path.relative_to(ROOT)): path.read_text() for path in (ROOT / 'scripts').glob('*.py')})
+        files.update({str(path.relative_to(ROOT)): path.read_text() for path in (ROOT / 'scripts').glob('*.sh')})
+        files['agents/manifest.toml'] = (ROOT / 'agents/manifest.toml').read_text()
+        manager = repository(self.base / 'manager', files)
+        self.enroll(self.fixture(), root=manager)
+        old = command('git', '-C', str(manager), 'rev-parse', 'HEAD').strip()
+        (manager / 'VERSION').write_text('0.2.1\n')
+        command('git', '-C', str(manager), 'add', '.')
+        command('git', '-C', str(manager), '-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-m', 'fix: record a manager update')
+        new = command('git', '-C', str(manager), 'rev-parse', 'HEAD').strip()
+        text = summary(self.enroll(root=manager))
+        self.assertIn(f'Updated Manager: {old} → {new} — {manager}', text)
+        self.assertIn('Content: unchanged,', text)
+
+    def test_review_has_full_future_account_and_cancel_has_no_changes(self):
+        repo = self.fixture()
+        self.enroll(repo)
+        snapshot = {str(path.relative_to(self.home)): (os.readlink(path) if path.is_symlink() else path.read_bytes())
+                    for path in self.home.rglob('*') if path.is_file() or path.is_symlink()}
+        answers = [(b'Content door [', b'repo\n'), (b'Content repository [', b'\n'),
+                   (b'Domain [core]:', b'personal\n'), (b'Git author name [', b'\n'),
+                   (b'Git author email [', b'\n'), (b'Pins [accept]:', b'\n'), (b'extra [on]:', b'off\n'),
+                   (b'Agents [none]:', b'none\n'), (b'Review [quit]:', b'quit\n')]
+        output = self.terminal(answers, flags=['--configure'], auto_wizard=False)
+        review = output.split('9. Review before apply', 1)[1].split('Review [quit]:', 1)[0]
+        for number, label in enumerate(['Software', 'Manager and content', 'Files', 'Profile changes', 'Locations', 'Next steps'], 1):
+            self.assertIn(f'{number}. {label}', review)
+        self.assertIn('Will be removed:', review)
+        self.assertIn(str(self.home / '.removed'), review)
+        self.assertIn('Will change groups.extra: true → false', review)
+        text = summary(output)
+        for number in range(1, 5):
+            self.assertIn('None', category(text, number))
+        after = {str(path.relative_to(self.home)): (os.readlink(path) if path.is_symlink() else path.read_bytes())
+                 for path in self.home.rglob('*') if path.is_file() or path.is_symlink()}
+        self.assertEqual(set(after), set(snapshot))
+        for name in snapshot:
+            self.assertTrue(after[name] == snapshot[name], name)
+
+    def test_failed_unattended_conflict_does_not_claim_file_changed(self):
+        self.enroll(self.fixture())
+        (self.home / '.changed').write_text('local edit\n')
+        result = subprocess.run(['bash', str(ROOT / 'install.sh'), '--defaults'], env=self.env, cwd=self.home,
+                                capture_output=True, text=True, start_new_session=True)
+        self.assertEqual(result.returncode, 1)
+        text = summary(result.stdout)
+        self.assertIn('Result: FAILED', text)
+        self.assertNotIn(str(self.home / '.changed'), category(text, 3))
+        self.assertEqual((self.home / '.changed').read_text(), 'local edit\n')
+
+    def test_pin_removal_lists_each_rendered_file_changed(self):
+        repo = self.fixture()
+        self.enroll(repo, extra=['--pin', 'node=24.14.1'])
+        answers = [(b'Pins [accept]:', b'edit\n'), (b'Tool versions [none]:', b'none\n'),
+                   (b'extra [on]:', b'\n'), (b'Agents [none]:', b'none\n'), (b'Review [quit]:', b'confirm\n')]
+        output = self.terminal(answers, flags=['--configure', '--repo', str(repo), '--domain', 'core',
+                                              '--git-name', 'Audit Example', '--git-email', 'audit@example.invalid'], auto_wizard=False)
+        text = summary(output)
+        self.assertIn('Changed pins.node: "24.14.1" → None', text)
+        for name in ['.config/mise/config.toml', '.config/chezmoi/chezmoi.toml', '.config/dotfleet/profile.toml']:
+            self.assertIn(str(self.home / name), category(text, 3).split('Changed:', 1)[1].split('Removed:', 1)[0])
+        self.assert_quiet_status()
+
+    def test_pin_removal_is_an_explicit_profile_change(self):
+        self.assertEqual(profile_changes({'pins': {'node': '24.14.1'}}, {'pins': {}}),
+                         [{'name': 'pins.node', 'old': '24.14.1', 'new': None}])
+
+
+if __name__ == '__main__':
+    unittest.main()

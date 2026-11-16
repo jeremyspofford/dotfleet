@@ -300,13 +300,11 @@ def gap_warnings(profile):
     return result
 
 
-def review(profile, backup_path, changed, warnings):
-    details = ['Source: ' + profile['content_repo'], 'Domain: ' + profile['domain'],
-               'Identity: ' + profile.get('git_name', '') + ' <' + profile.get('git_email', '') + '>']
-    details.append('Pins: ' + (', '.join(f'{name}={value}' for name, value in profile.get('pins', {}).items()) or 'none'))
-    details.append('Groups: ' + (', '.join(f'{name}={"on" if value else "off"}' for name, value in profile.get('groups', {}).items()) or 'none'))
-    details.append('Agents: ' + (', '.join(name for name, value in profile.get('agents', {}).items() if value) or 'none'))
-    details += [f'Backup: {backup_path}', f'Files that will change: {len(changed)}']
+def review(profile, account, warnings):
+    details = ['Selected source: ' + profile['content_repo']]
+    for key in ['domain', 'git_name', 'git_email', 'pins', 'groups', 'agents']:
+        details.append(key + ': ' + json.dumps(profile.get(key)))
+    details += [''] + account.lines(future=True)
     details += ['Warning: ' + warning for warning in warnings]
     details += ['Excluded from adoption: ' + name for name in profile.get('adoption_excluded', [])]
     if profile.get('adopted'):
