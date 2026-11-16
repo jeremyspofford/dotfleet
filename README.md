@@ -41,7 +41,8 @@ Set `NO_COLOR` to disable colors, including an empty value. Redirected output st
 ### Adopt existing files
 
 Adoption is recommended when the scan finds home dotfiles. It scans root dotfiles and `.config` files, excluding manager state and cache directories.
-It excludes credential and shell-history filenames, detected secret patterns, binary files, and files above 2 MiB. Excluded paths appear in review and summary.
+It excludes credential filenames, detected secrets, binary files, and files above 2 MiB. Logs, histories, caches, telemetry, session files, and receipts are not candidates.
+The scan shows counts and up to 15 relevant file lines. RUN.json keeps the full scan and private exclusion list.
 The scan cannot prove that remaining files contain no secrets. Review your local repository before pushing it.
 Adopted files keep their exact contents, including existing Mise files. Profile choices do not rewrite adopted files.
 Only accepted files enter the first local Git commit. Nothing is uploaded.
