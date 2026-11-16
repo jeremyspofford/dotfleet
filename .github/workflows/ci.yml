@@ -64,14 +64,13 @@ jobs:
           first = (folder / 'install-first.log').read_text()
           second = (folder / 'install-second.log').read_text()
           for number, name in enumerate(['Software', 'Manager and content', 'Files', 'Profile changes', 'Locations', 'Next steps'], 1):
-              assert f'{number}. {name}' in first and f'{number}. {name}' in second
-          assert 'Installed new:' in first
-          assert str(Path.home() / '.local/bin/chezmoi') in first
-          assert str(Path.home() / '.local/bin/mise') in first
-          assert 'Software changes: None' in second
-          assert 'Checkout changes:\n  None' in second
-          assert 'Added:\n  None\nChanged:\n  None\nRemoved:\n  None' in second
-          assert '4. Profile changes\n  None' in second
+              assert f'{number} · {name}' in first and f'{number} · {name}' in second
+          assert '2 installed.' in first
+          assert '~/.local/bin/chezmoi' in first
+          assert '~/.local/bin/mise' in first
+          for number, name in enumerate(['Software', 'Manager and content', 'Files', 'Profile changes'], 1):
+              assert f'{number} · {name} — no changes.' in second
+          assert 'chezmoi status: clean · warnings: none' in second
           PY
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: Test real content, archive, native source, prompts, and repeat runs

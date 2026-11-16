@@ -115,7 +115,7 @@ class EnrollmentTests(unittest.TestCase):
         external.write_text("# external aliases\n")
         (self.home / ".aliases").symlink_to(external)
         output = self.install(repo)
-        self.assertIn("Result: SUCCESS", output)
+        self.assertIn("chezmoi status: clean", output)
         self.assert_clean()
         backups = list((self.home / "dotfleet-backups").iterdir())
         saved = backups[0] / "home"
@@ -130,15 +130,15 @@ class EnrollmentTests(unittest.TestCase):
         self.install(defaults=False)
         before = state.read_bytes()
         profile = (self.home / ".config/dotfleet/profile.toml").read_bytes()
-        self.assertIn("Result: SUCCESS", self.install(defaults=False))
+        self.assertIn("chezmoi status: clean", self.install(defaults=False))
         self.assertEqual(state.read_bytes(), before)
         self.assertEqual((self.home / ".config/dotfleet/profile.toml").read_bytes(), profile)
         self.assert_clean()
 
     def test_fresh_install_and_rerun_have_no_config_warning(self):
-        self.assertIn("Result: SUCCESS", self.install(Path(os.environ["DOTFLEET_CONTENT_FIXTURE"])))
+        self.assertIn("chezmoi status: clean", self.install(Path(os.environ["DOTFLEET_CONTENT_FIXTURE"])))
         self.assert_quiet_status()
-        self.assertIn("Result: SUCCESS", self.install())
+        self.assertIn("chezmoi status: clean", self.install())
         self.assert_quiet_status()
 
     def test_legacy_template_state_is_retired_without_resetting_other_state(self):
@@ -350,7 +350,7 @@ class EnrollmentTests(unittest.TestCase):
         self.assertNotIn("Git author", output)
         self.assertNotIn("Domain:", output)
         self.assertNotIn("node pin:", output)
-        self.assertIn("Warnings:\n  None.", output)
+        self.assertIn("warnings: none", output)
         self.check_completed_gap_profile()
 
     def test_skipped_gaps_warn_and_do_not_repin_from_content_defaults(self):
@@ -402,7 +402,7 @@ class EnrollmentTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         for prompt in ["Git author name;", "Git author email;", "Domain:", "node pin:", "Press Enter"]:
             self.assertNotIn(prompt, result.stdout + result.stderr)
-        self.assertIn("Warnings:\n  None.", result.stdout)
+        self.assertIn("warnings: none", result.stdout)
         profile = tomllib.loads((self.home / ".config/dotfleet/profile.toml").read_text())
         self.assertEqual(profile["domain"], "personal")
         self.assertTrue(profile["domain_chosen"])
@@ -419,7 +419,7 @@ class EnrollmentTests(unittest.TestCase):
                                 text=True, capture_output=True, start_new_session=True)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("Group docker: using on", result.stdout)
-        self.assertIn("Warnings:\n  None.", result.stdout)
+        self.assertIn("warnings: none", result.stdout)
         self.assert_quiet_status()
         self.install(defaults=False)
 

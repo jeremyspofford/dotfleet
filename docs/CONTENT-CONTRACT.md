@@ -124,8 +124,8 @@ Back up agent outputs and their inventory before generation. Keep outputs for de
 
 Capture the chezmoi diff and backup inventory before apply. Use those records for both review and summary.
 The review uses future tense. The summary reports confirmed results in past tense, including failures and scripted runs.
-Print software, checkout changes, file changes, profile changes, locations, and next steps every time. Empty changes say None.
-List full paths for additions, changes, and removals. Include deselected outputs and settings changed by removed pins.
+Print software, checkout changes, file changes, profile changes, locations, and next steps every time. Empty categories say no changes.
+Print home-relative paths for additions, changes, and removals. Keep full paths in RUN.json. Include deselected outputs and settings changed by removed pins.
 Preserve installed prerequisite versions and unchanged checkout commits in the report.
 
 Save RUN.json and CHEZMOI-DIFF.patch beside the backup MANIFEST.json, with owner-only permissions.

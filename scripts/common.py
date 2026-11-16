@@ -81,16 +81,15 @@ class LoggerStream:
     def emit(self, line):
         import sys
         level = 'log_error' if self.error else 'log_info'
-        if line == 'END SUMMARY':
-            level = 'log_section'
-        elif line.startswith(('Result: SUCCESS', 'chezmoi status: CLEAN')):
+        arguments = [line]
+        marker = line.lstrip()[:1]
+        if line.startswith('  ') and marker in {'+', '−', '~'}:
+            level = 'log_change'
+            arguments = [{'+': 'added', '−': 'removed', '~': 'changed'}[marker], line]
+        elif line.startswith('chezmoi status: clean'):
             level = 'log_success'
         elif line.startswith('Warning:'):
             level = 'log_warn'
-        elif self.in_warnings and line.startswith('  '):
-            level = 'log_success' if line.strip() == 'None.' else 'log_warn'
-        if not line.startswith('  '):
-            self.in_warnings = line == 'Warnings:'
-        subprocess.run(['bash', '-c', 'source "$1"; "$2" "$3"', 'dotfleet-log',
-                        str(self.root / 'scripts/logger.sh'), level, line], check=True,
+        subprocess.run(['bash', '-c', 'source "$1"; shift; "$@"', 'dotfleet-log',
+                        str(self.root / 'scripts/logger.sh'), level, *arguments], check=True,
                        stdout=sys.__stdout__, stderr=sys.__stderr__)
