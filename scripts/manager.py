@@ -4,11 +4,13 @@ Usage: bash install.sh [OPTIONS]
 Parameters: --repo selects content; --configure asks again; --defaults skips prompts only for complete profiles.
 --format chooses plain (real names) or chezmoi (native source names).
 --domain, --git-name, and --git-email record explicit profile choices.
---pin TOOL=VERSION records a full version; repeat it for multiple tools. -h/--help prints help.
+--pin TOOL=VERSION records a full version; repeat it for multiple tools.
+--adopt seeds a local repository. --group NAME=on|off selects content. --agents selects coding assistants.
+-h/--help prints help.
 Example: bash install.sh --domain core --git-name Example --git-email example@example.invalid
 Exit codes: 0 success/help; 1 setup failure; 2 invalid arguments.
 Author: Jeremy Spofford / Aria Labs; Version: read from ../VERSION.
-The Bash entry point sends messages through logger.sh. Prompts use /dev/tty.
+Messages use logger.sh. Prompts use /dev/tty.
 """
 import argparse
 import datetime
@@ -85,7 +87,10 @@ def domain_details(checkout):
                 base.append(label)
         if base:
             lines += ['Base files in this checkout: ' + ', '.join(base) + '.', '']
+    descriptions = read_toml(checkout / 'dotfleet.toml').get('domains', {}) if checkout else {}
     lines.append('  core      Base configuration only. No domain additions.')
+    if descriptions.get('core'):
+        lines.append('            ' + descriptions['core'])
     empty = 0
     for domain in ['personal', 'work', 'client']:
         name = f'.config/dotfiles/aliases/{domain}.zsh'
@@ -95,7 +100,7 @@ def domain_details(checkout):
             content = run('git', '-C', str(checkout), 'show', ':' + name)
             active = [line for line in content.splitlines() if line.strip() and not line.lstrip().startswith('#')]
             if not active:
-                summary = 'No extra commands. The domain alias file is empty.'
+                summary = 'Adds nothing yet. Add your own settings here.'
                 empty += 1
             else:
                 names = re.findall(r'^\s*alias\s+([A-Za-z_][A-Za-z_0-9-]*)=', content, re.M)
@@ -103,6 +108,8 @@ def domain_details(checkout):
                 summary = 'Command names: ' + ', '.join(dict.fromkeys(names)) + '.' if names else 'Contains custom shell settings.'
                 summary += f' Review .config/dotfiles/aliases/{domain}.zsh for their behavior.'
         lines.append(f'  {domain:<9} {summary}')
+        if descriptions.get(domain):
+            lines.append('            ' + descriptions[domain])
     if empty == 3:
         lines += ['', 'Personal, work, and client currently add no domain commands. Start with core.']
     lines += ['', 'Names describe intended use: personal for yourself, work for an employer, client for a customer.',
@@ -116,22 +123,6 @@ def domain_details(checkout):
 
 def repo_id(url):
     return url.removesuffix('.git').rstrip('/').replace('git@github.com:', 'https://github.com/').replace('ssh://git@github.com/', 'https://github.com/')
-
-
-def checkout_content(home, repo):
-    checkout = home / 'dotfiles'
-    if checkout.exists() or checkout.is_symlink():
-        if checkout.is_symlink() or not (checkout / '.git').is_dir():
-            raise ValueError(f'{checkout} already exists and is not the selected clone. Move it aside before setup.')
-        remote = run('git', '-C', str(checkout), 'config', '--get', 'remote.origin.url').strip()
-        if repo_id(remote) != repo_id(repo):
-            raise ValueError(f'{checkout} belongs to another repository. Nothing was overwritten.')
-        if run('git', '-C', str(checkout), 'status', '--porcelain').strip():
-            raise ValueError(f'{checkout} has local edits. Preserve them before updating.')
-        run('git', '-C', str(checkout), 'pull', '--ff-only')
-    else:
-        run('git', 'clone', repo, str(checkout))
-    return checkout
 
 
 def old_profile(home):
@@ -149,8 +140,8 @@ def old_profile(home):
         'git_email': saved.get('git_email', saved.get('gitEmail', data.get('gitEmail', ''))),
         'pins': pins, 'groups': saved.get('groups', {}),
     }
-    if 'domain_chosen' in saved:
-        profile['domain_chosen'] = saved['domain_chosen']
+    # Carry-over is not evidence of a choice in this wizard.
+    profile['domain_chosen'] = False
     if 'settings' in current_mise:
         profile['mise_settings'] = current_mise['settings']
     if data.get('secretsEnabled'):
@@ -211,7 +202,7 @@ def has_terminal():
 
 def profile_gaps(profile):
     gaps = []
-    if not profile.get('domain_chosen', profile.get('domain', 'core') != 'core'):
+    if not profile.get('domain_chosen', False):
         gaps.append(f"Domain was never explicitly chosen (recorded: {profile.get('domain', 'core')}). Supply --domain.")
     for field, label, flag in [('git_name', 'Git name', '--git-name'), ('git_email', 'Git email', '--git-email')]:
         if not profile.get(field, '').strip():
@@ -238,13 +229,20 @@ def pin_argument(text):
     return tool, version.strip()
 
 
+def group_argument(text):
+    name, separator, choice = text.partition('=')
+    if not separator or not name or choice not in ('on', 'off'):
+        raise argparse.ArgumentTypeError('--group needs NAME=on or NAME=off')
+    return name, choice
+
+
 def validate_profile(home, profile, defaults=False, configure=False, checkout=None):
     """Ask about gaps and return warnings for choices left incomplete."""
     warnings = []
     if defaults:
         require_complete_profile(profile)
     # Old core defaults have no proof of an explicit choice. Ask once and record it.
-    profile.setdefault('domain_chosen', profile.get('domain', 'core') != 'core')
+    profile.setdefault('domain_chosen', False)
     if not defaults and (configure or not profile['domain_chosen']):
         domain = ask('Domain', profile.get('domain', 'core'), ['core', 'personal', 'work', 'client', 'skip'], defaults,
                      heading='Choose your domain', detail=domain_details(checkout))
@@ -306,11 +304,12 @@ def validate_profile(home, profile, defaults=False, configure=False, checkout=No
     return warnings
 
 
-def select_profile(home, args):
+def select_profile(home, args, workspace):
+    import enrollment as wizard
     path = home / '.config/dotfleet/profile.toml'
     exists = path.exists()
     profile, sources = (read_toml(path), ['existing Dotfleet profile']) if exists else old_profile(home)
-    # Explicit flags update saved values before checking whether prompts are needed.
+    profile.setdefault('domain_chosen', False)
     if args.domain is not None:
         profile.update(domain=args.domain, domain_chosen=True)
     for field in ('git_name', 'git_email'):
@@ -320,40 +319,39 @@ def select_profile(home, args):
         previous = profile.setdefault('pins', {}).get(tool)
         profile['pins'][tool] = dict(previous, version=version) if isinstance(previous, dict) else version
     unattended = args.defaults or not has_terminal()
-    if unattended:
-        require_complete_profile(profile)
-    # A complete saved profile stays authoritative. Migration reads every legacy source first.
+    args.wizard = not unattended and (not exists or bool(profile_gaps(profile)) or args.configure or args.adopt)
+    profile.setdefault('pins', {})
+    profile.setdefault('secrets', {})
+    if args.wizard:
+        args.found, args.excluded = wizard.welcome(home, sources)
+        profile, checkout, manifest, warnings = wizard.steps(home, args, workspace, profile, args.found, args.excluded)
+        return profile, sources, checkout, manifest, warnings
+    require_complete_profile(profile)
     repo = args.repo or profile.get('content_repo', DEFAULT_REPO)
-    if not args.repo and (args.configure or not exists and not sources):
-        repo = ask('Content repository', repo, defaults=unattended,
-                   detail='Enter a Git repository URL. Press Enter to keep the shown repository.')
-        if unattended:
-            print(f'Using content repository: {repo}')
-    checkout = checkout_content(home, repo)
-    try:
-        kind, manifest = detect(checkout, args.format or profile.get('format'))
-    except ValueError as error:
-        if 'Unknown content format' not in str(error):
-            raise
-        kind = ask('Format', 'plain', ['plain', 'chezmoi'], defaults=args.defaults, heading='Content format',
-                   detail='plain: files use their real home names.\nchezmoi: files use native chezmoi source names.\nType a format and press Enter. Enter alone keeps plain.')
-        kind, manifest = detect(checkout, kind)
-    profile.update(content_repo=repo, format=kind)
-    warnings = validate_profile(home, profile, unattended, args.configure, checkout)
-    if profile.get('domain') not in ('core', 'personal', 'work', 'client'):
-        raise ValueError('Profile domain must be core, personal, work, or client.')
+    if args.adopt:
+        found, excluded = wizard.scan(home)
+        for name, reason in excluded.items():
+            print(f'Excluded from adoption: {name} ({reason})')
+        checkout = wizard.adopt(home, workspace, found, excluded)
+        repo = str(home / 'dotfiles')
+        profile.update(adopted=True, adoption_excluded=sorted(excluded), source_door='adopt')
+    else:
+        checkout = wizard.stage_repo(home, repo, workspace)
+    kind, manifest = detect(checkout, args.format or profile.get('format'))
+    profile.update(content_repo=repo, format=kind, adopted=bool(manifest.get('adopted', False)))
+    warnings = validate_profile(home, profile, True, checkout=checkout)
+    wizard.group_flags(profile, args.group, manifest)
     selections = profile.setdefault('groups', {})
     for group, spec in manifest.get('groups', {}).items():
-        if args.configure or group not in selections:
-            # Legacy migration carries defaults only with explicit --defaults, just like a new install.
-            choice = ask(f'{group}:', 'on' if selections.get(group, True) else 'off', ['on', 'off'], unattended,
-                         heading=f'Optional group: {group}',
-                         detail=f'{spec["description"]}.\non: include this group.\noff: leave this group out.\nType on or off and press Enter. Enter alone keeps the shown choice.')
+        if group not in selections:
+            choice = ask(group, 'on', ['on', 'off'], unattended,
+                         detail=f'{spec["description"]}. on: include; off: exclude. Press Enter to submit.')
             if unattended:
                 print(f'Group {group}: using {choice} ({spec["description"]}).')
             selections[group] = choice == 'on'
-    profile.setdefault('pins', {})
-    profile.setdefault('secrets', {})
+    if args.agents is not None:
+        wizard.agent_flags(profile, args.agents)
+    profile.setdefault('agents', {name: False for name in wizard.agent_manifest()})
     return profile, sources, checkout, manifest, warnings
 
 
@@ -374,9 +372,10 @@ def installed_defaults(defaults, pins, home):
             if not isinstance(version, str) or not version:
                 matches.append(False)
                 continue
-            matches.append(bool(run('mise', 'latest', '--installed', '--cd', str(home), f'{tool}@{version}').strip()))
+            resolved = resolve_installed_pin(home, tool, version)
+            matches.append(dict(item, version=resolved) if isinstance(item, dict) and resolved else resolved)
         if all(matches):
-            effective[tool] = request
+            effective[tool] = matches if isinstance(request, list) else matches[0]
         else:
             available[tool] = request
     return effective, available
@@ -390,15 +389,20 @@ def fingerprint(path):
     return None
 
 
-def backup(home, paths):
+def backup_location(home):
     root = home / 'dotfleet-backups'
-    root.mkdir(exist_ok=True, mode=0o700)
     stamp = datetime.datetime.now().strftime('%Y%m%d-%H%M%S')
     destination = root / stamp
     suffix = 0
     while destination.exists():
         suffix += 1
         destination = root / f'{stamp}-{suffix}'
+    return destination
+
+
+def backup(home, paths, destination=None):
+    destination = destination or backup_location(home)
+    destination.parent.mkdir(exist_ok=True, mode=0o700)
     destination.mkdir(mode=0o700)
     entries = []
     for name in sorted(set(paths)):
@@ -471,116 +475,213 @@ def generated_files(home, profile, manifest, defaults):
     }, pins, available
 
 
+def prepare(home, checkout, profile, manifest, folder):
+    import enrollment as wizard
+    import agent_configs
+    folder.mkdir()
+    defaults = wizard.content_defaults(checkout)
+    generated, pins, available = generated_files(home, profile, manifest, defaults)
+    source, items, _ = convert(checkout, folder / 'source', profile, profile['format'])
+    native = items is None
+    old_config = read_toml(home / '.config/chezmoi/chezmoi.toml')
+    data = dict(old_config.get('data', {}))
+    data.update(domain=profile['domain'], gitName=profile.get('git_name', ''), gitEmail=profile.get('git_email', ''), miseTools=pins)
+    config = {'sourceDir': str(source), 'destDir': str(home), 'umask': 0o077, 'data': data}
+    config_path = folder / 'preview.toml'
+    atomic(config_path, toml(config))
+    command = ['chezmoi', '--config', str(config_path), '--persistent-state', str(folder / 'state.db'),
+               '--cache', str(folder / 'cache')]
+    if native:
+        names = set(filter(None, run(*command, 'managed', '--include', 'files,symlinks', '--path-style', 'relative', '-0').split('\0')))
+        if names & GENERATED:
+            raise ValueError('Native content owns a manager-reserved path: ' + ', '.join(sorted(names & GENERATED)))
+    else:
+        names = set(items)
+        for name, content in list(generated.items()):
+            if profile.get('adopted') and name in items:
+                # Adoption preserves authored bytes, including existing Mise settings.
+                del generated[name]
+                if name == '.config/mise/config.toml':
+                    pins = defaults.get('tools', {})
+                continue
+            if name in items:
+                _, mode = items[name]
+                authored = source / source_name(name, mode)
+                for old_target in (authored, authored.with_name('empty_' + authored.name)):
+                    if old_target.exists() or old_target.is_symlink():
+                        old_target.unlink()
+            target = source / source_name(name)
+            if name == '.secrets':
+                target = target.with_name('private_' + target.name)
+            atomic(target, content)
+        names |= set(generated)
+    state_path = home / '.local/state/dotfleet/outputs.json'
+    previous = json.loads(state_path.read_text()) if state_path.exists() else {}
+    stale = set(previous) - names - set(generated)
+    for name in stale:
+        if fingerprint(home / name) not in (None, previous[name]):
+            raise ValueError(f'Excluded output has local edits; preserve it before applying: {name}')
+    # Status reads destination files but writes its cache and state only in scratch.
+    changes = run(*command, 'status', '--include', 'files,symlinks')
+    changed = {line[3:] for line in changes.splitlines() if line.strip()}
+    for name, content in generated.items():
+        path = home / name
+        if not path.is_file() or path.read_bytes() != content or path.stat().st_mode & 0o777 != 0o600:
+            changed.add(name)
+    agents = agent_configs.generate(home, agent_configs.native_os(), True, profile=profile, content_root=checkout) if any(profile.get('agents', {}).values()) else {}
+    changed |= {name for name, item in agents.items() if not fingerprint(home / name) or any(fingerprint(home / name).get(key) != value for key, value in item.items())}
+    changed |= stale
+    controls = {'.config/chezmoi/chezmoi.toml', '.config/dotfleet/profile.toml', '.local/state/dotfleet/outputs.json'}
+    stable_source = home / 'dotfiles' if native else home / '.local/share/dotfleet/chezmoi-source'
+    final_config = {'sourceDir': str(stable_source), 'umask': 0o077, 'data': data}
+    for name, content in [('.config/chezmoi/chezmoi.toml', toml(final_config)), ('.config/dotfleet/profile.toml', toml(profile))]:
+        if not (home / name).exists() or (home / name).read_text() != content:
+            changed.add(name)
+    # The output inventory is written after applying, including files from older runs.
+    changed.add('.local/state/dotfleet/outputs.json')
+    all_paths = names | set(generated) | stale | controls | set(agents)
+    for tool in ['chezmoi', 'mise']:
+        if os.environ.get('DOTFLEET_STAGED_' + tool.upper()):
+            all_paths.add('.local/bin/' + tool)
+            changed.add('.local/bin/' + tool)
+    if agents:
+        all_paths.add('.local/state/dotfleet/agents.json')
+        changed.add('.local/state/dotfleet/agents.json')
+    return dict(source=source, native=native, names=names, generated=generated, pins=pins, available=available,
+                stale=stale, all_paths=all_paths, changed=changed, config=final_config, agents=agents,
+                baseline={name: fingerprint(home / name) for name in all_paths})
+
+
+def publish_checkout(home, checkout, profile, backup_path):
+    canonical = home / 'dotfiles'
+    if canonical.exists():
+        # Recheck local edits after review. Fetch exactly the reviewed commit, never a newer remote tip.
+        if run('git', '-C', str(canonical), 'status', '--porcelain').strip():
+            raise ValueError('Content changed during review. Preserve edits and run setup again.')
+        commit = run('git', '-C', str(checkout), 'rev-parse', 'HEAD').strip()
+        if profile.get('source_door') == 'adopt' and not subprocess.run(
+                ['git', '-C', str(checkout), 'config', '--get', 'remote.origin.url'], capture_output=True).stdout:
+            canonical.rename(backup_path / 'previous-content')
+            shutil.copytree(checkout, canonical, symlinks=True)
+        else:
+            run('git', '-C', str(canonical), 'fetch', str(checkout), commit)
+            run('git', '-C', str(canonical), 'merge', '--ff-only', commit)
+    else:
+        shutil.copytree(checkout, canonical, symlinks=True)
+    # A newly adopted repository intentionally has no remote or saved credentials.
+    if profile.get('adopted'):
+        print('Adopted repository: ~/dotfiles. Create an empty remote, then run git remote add origin URL and git push -u origin main.')
+    return canonical
+
+
 def main():
+    import enrollment as wizard
+    import agent_configs
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter,
                                      epilog='Version: ' + (ROOT / 'VERSION').read_text().strip())
-    parser.add_argument('--repo', help='content Git URL or absolute local repository')
-    parser.add_argument('--configure', action='store_true', help='ask profile questions again, with saved answers shown')
-    parser.add_argument('--defaults', action='store_true', help='skip prompts only with complete profile values; accept group defaults')
-    parser.add_argument('--domain', choices=['core', 'personal', 'work', 'client'], help='core=base settings only; personal/work/client add settings for your own use, employer, or customer')
+    doors = parser.add_mutually_exclusive_group()
+    doors.add_argument('--repo', help='content Git URL or absolute local repository')
+    doors.add_argument('--adopt', action='store_true', help='seed a local repository from scanned home files; exclude secret matches')
+    parser.add_argument('--configure', action='store_true', help='review all wizard steps with saved choices')
+    parser.add_argument('--defaults', action='store_true', help='use recorded complete values without prompts; new groups default on')
+    parser.add_argument('--domain', choices=['core', 'personal', 'work', 'client'], help='record a human domain choice; content defines its additions')
     parser.add_argument('--git-name', help='Git author name; required when missing without a terminal')
     parser.add_argument('--git-email', help='Git author email; required when missing without a terminal')
-    parser.add_argument('--pin', action='append', type=pin_argument, default=[], metavar='TOOL=VERSION',
-                        help='record a full tool version; repeat for more tools, for example node=24.14.1')
+    parser.add_argument('--pin', action='append', type=pin_argument, default=[], metavar='TOOL=VERSION', help='record an exact version; repeat for more tools')
+    parser.add_argument('--group', action='append', type=group_argument, default=[], metavar='NAME=on|off', help='include or exclude a named content group; repeat for more groups')
+    parser.add_argument('--agents', help='comma-separated detected agent names, or none to skip configuration')
     parser.add_argument('--format', choices=['plain', 'chezmoi'], help='plain=real names; chezmoi=native sources')
     args = parser.parse_args()
     home = Path.home()
     backup_path = 'not created'
-    summary = {}
     try:
-        profile, carried, checkout, manifest, warnings = select_profile(home, args)
-        base = home / '.local/share/dotfleet'
-        base.mkdir(parents=True, exist_ok=True)
-        config_path = home / '.config/chezmoi/chezmoi.toml'
-        old_config = read_toml(config_path)
-        state_path = home / '.local/state/dotfleet/outputs.json'
-        previous = json.loads(state_path.read_text()) if state_path.exists() else {}
-        defaults_path = checkout / '.config/mise/config.toml'
-        if not defaults_path.exists() and (checkout / 'packages/mise/.config/mise/config.toml').exists():
-            defaults_path = checkout / 'packages/mise/.config/mise/config.toml'
-        defaults = read_toml(defaults_path)
-        generated, pins, available = generated_files(home, profile, manifest, defaults)
-        with tempfile.TemporaryDirectory(prefix='prepare-', dir=base) as temporary:
-            candidate = Path(temporary) / 'source'
-            source, items, _ = convert(checkout, candidate, profile, profile['format'])
-            native = items is None
-            if native:
-                inventory = run('chezmoi', '--source', str(source), '--destination', str(home),
-                                'managed', '--include', 'files,symlinks', '--path-style', 'relative', '-0').split('\0')
-                names = {name for name in inventory if name}
-                if names & GENERATED:
-                    raise ValueError('Native content owns a manager-reserved path: ' + ', '.join(sorted(names & GENERATED)))
-            else:
-                names = set(items)
-                for name, content in generated.items():
-                    # Manager-owned outputs replace any plain default source at the same path.
-                    if name in items:
-                        _, mode = items[name]
-                        authored = source / source_name(name, mode)
-                        empty = authored.with_name('empty_' + authored.name)
-                        for old_target in (authored, empty):
-                            if old_target.exists():
-                                old_target.unlink()
-                    target = source / source_name(name)
-                    if name == '.secrets':
-                        target = target.with_name('private_' + target.name)
-                    atomic(target, content)
-                names |= set(generated)
-            stale = set(previous) - names - set(generated)
-            for name in stale:
-                if fingerprint(home / name) not in (None, previous[name]):
-                    raise ValueError(f'Excluded output has local edits; preserve it before applying: {name}')
-            all_paths = names | set(generated) | stale | {
-                '.config/chezmoi/chezmoi.toml', '.config/dotfleet/profile.toml', '.local/state/dotfleet/outputs.json'}
-            backup_path = backup(home, all_paths)
+        with tempfile.TemporaryDirectory(prefix='dotfleet-plan-') as temporary:
+            workspace = Path(temporary)
+            # Tool queries must not populate the real home's cache before confirmation.
+            original_data = Path(os.environ.get('MISE_DATA_DIR', str(Path(os.environ.get('XDG_DATA_HOME', str(home / '.local/share'))) / 'mise')))
+            os.environ.setdefault('MISE_INSTALLS_DIR', str(original_data / 'installs'))
+            os.environ.setdefault('MISE_PLUGINS_DIR', str(original_data / 'plugins'))
+            os.environ['MISE_DATA_DIR'] = str(workspace / 'mise-data')
+            os.environ['MISE_CACHE_DIR'] = str(workspace / 'mise-cache')
+            os.environ['MISE_STATE_DIR'] = str(workspace / 'mise-state')
+            profile, carried, checkout, manifest, warnings = select_profile(home, args, workspace)
+            attempt = 0
+            while True:
+                plan = prepare(home, checkout, profile, manifest, workspace / f'plan-{attempt}')
+                proposed_backup = backup_location(home)
+                if not args.wizard:
+                    break
+                choice = wizard.review(profile, proposed_backup, plan['changed'], warnings)
+                if choice == 'quit':
+                    print('END SUMMARY\nResult: CANCELLED\nBackup: not created\nHome unchanged; nothing applied.')
+                    return 0
+                if choice == 'confirm':
+                    break
+                # Going back permits edits even when the original step had a flag.
+                for field in {'source': ['repo', 'adopt'], 'domain': ['domain'], 'identity': ['git_name', 'git_email'],
+                              'pins': ['pin'], 'groups': ['group'], 'agents': ['agents']}[choice]:
+                    setattr(args, field, [] if field in ('pin', 'group') else False if field == 'adopt' else None)
+                profile, checkout, manifest, warnings = wizard.steps(home, args, workspace, profile, args.found, args.excluded,
+                                                                    wizard.STEPS.index(choice), checkout, manifest)
+                attempt += 1
+            if any(fingerprint(home / name) != before for name, before in plan['baseline'].items()):
+                raise ValueError('Home files changed during review. Nothing applied; run setup again to review those changes.')
+            backup_path = backup(home, plan['all_paths'], proposed_backup)
             print(f'Backup: {backup_path}', flush=True)
-            stable_source = source if native else base / 'chezmoi-source'
-            if not native:
+            checkout = publish_checkout(home, checkout, profile, backup_path)
+            # Temporary downloads become local tools only after review and backup.
+            for tool in ['chezmoi', 'mise']:
+                supplied = os.environ.get('DOTFLEET_STAGED_' + tool.upper())
+                if supplied:
+                    atomic(home / '.local/bin' / tool, Path(supplied).read_bytes(), 0o700)
+            stable_source = Path(plan['config']['sourceDir'])
+            if not plan['native']:
+                stable_source.parent.mkdir(parents=True, exist_ok=True)
                 if stable_source.exists():
-                    archived = backup_path / 'previous-chezmoi-source'
-                    stable_source.rename(archived)
-                source.rename(stable_source)
-            # Preserve old machine data for native templates, but make the profile authoritative.
-            data = dict(old_config.get('data', {}))
-            data.update(domain=profile['domain'], gitName=profile.get('git_name', ''), gitEmail=profile.get('git_email', ''), miseTools=pins)
-            config = {'sourceDir': str(stable_source), 'umask': 0o077, 'data': data}
-            atomic(config_path, toml(config))
+                    stable_source.rename(backup_path / 'previous-chezmoi-source')
+                shutil.copytree(plan['source'], stable_source, symlinks=True)
+            atomic(home / '.config/chezmoi/chezmoi.toml', toml(plan['config']))
             reconcile_config_template_state()
             profile_path = home / '.config/dotfleet/profile.toml'
             if not profile_path.exists() or read_toml(profile_path) != profile:
                 atomic(profile_path, toml(profile))
-            if native:
-                for name, content in generated.items():
+            if plan['native']:
+                for name, content in plan['generated'].items():
                     atomic(home / name, content)
-            for name in stale:
+            for name in plan['stale']:
                 path = home / name
                 if path.exists() or path.is_symlink():
-                    path.unlink()
+                    retired = backup_path / 'retired' / name
+                    retired.parent.mkdir(parents=True, exist_ok=True)
+                    path.rename(retired)
             result = subprocess.run(['bash', str(ROOT / 'scripts/apply.sh')])
             if result.returncode:
                 raise RuntimeError(f'chezmoi apply failed with exit {result.returncode}; restore from {backup_path}')
+            if any(profile.get('agents', {}).values()):
+                agent_configs.generate(home, agent_configs.native_os(), False)
             status = run('chezmoi', 'status')
             if status.strip():
                 raise ValueError('Managed files still differ:\n' + status)
-            names |= set(generated)
-            atomic(state_path, json.dumps({name: fingerprint(home / name) for name in sorted(names)}, indent=2) + '\n')
+            names = plan['names'] | set(plan['generated'])
+            atomic(home / '.local/state/dotfleet/outputs.json', json.dumps({name: fingerprint(home / name) for name in sorted(names)}, indent=2) + '\n')
+            print('END SUMMARY\nResult: SUCCESS')
+            print(f'Backup: {backup_path}')
             summary = {'Content': profile['content_repo'], 'Commit': run('git', '-C', str(checkout), 'rev-parse', 'HEAD').strip(),
                        'Carried from': ', '.join(carried) or 'new profile', 'Profile': {k: profile.get(k) for k in ['domain', 'git_name', 'git_email']},
-                       'Profile pins': profile['pins'], 'Applied pins': pins, 'Groups': profile['groups'],
-                       'Available defaults (not applied)': available, 'chezmoi status': 'CLEAN (no differences)'}
-        print('END SUMMARY')
-        print('Result: SUCCESS')
-        print(f'Backup: {backup_path}')
-        for name, val in summary.items():
-            print(f'{name}: {json.dumps(val, sort_keys=True) if isinstance(val, dict) else val}')
-        print('Warnings:')
-        for warning in warnings or ['None.']:
-            print(f'  {warning}')
-        print('Your content lives in: ~/dotfiles. Your profile lives in: ~/.config/dotfleet/profile.toml')
-        print('Update: curl -fsSL https://raw.githubusercontent.com/jeremyspofford/dotfleet/main/install.sh | bash')
-        print('Rollback: review the backup MANIFEST.json. Restore home/ files and recorded external targets.')
-        print('Remove only new files marked absent. Keep user edits and the backup. Run the installer after restoring a profile.')
-        return 0
+                       'Profile pins': profile['pins'], 'Applied pins': plan['pins'], 'Groups': profile['groups'], 'Agents': profile.get('agents', {}),
+                       'Available defaults (not applied)': plan['available'], 'chezmoi status': 'CLEAN (no differences)'}
+            for name, val in summary.items():
+                print(f'{name}: {json.dumps(val, sort_keys=True) if isinstance(val, dict) else val}')
+            print('Warnings:')
+            for warning in warnings or ['None.']:
+                print(f'  {warning}')
+            for name in profile.get('adoption_excluded', []):
+                print(f'Excluded from adoption: {name}')
+            print('Your content lives in: ~/dotfiles. Your profile lives in: ~/.config/dotfleet/profile.toml')
+            print('Update: curl -fsSL https://raw.githubusercontent.com/jeremyspofford/dotfleet/main/install.sh | bash')
+            print('Rollback: review the backup MANIFEST.json. Restore home/ files and recorded external targets.')
+            print('Remove only new files marked absent. Keep user edits and the backup. Run the installer after restoring a profile.')
+            return 0
     except (OSError, ValueError, RuntimeError, KeyError) as error:
         print(f'Setup failed: {error}', file=sys.stderr)
         print(f'END SUMMARY\nResult: FAILED\nBackup: {backup_path}\nNo successful enrollment was reported.')
@@ -588,4 +689,7 @@ def main():
 
 
 if __name__ == '__main__':
+    from common import LoggerStream
+    sys.stdout = LoggerStream(ROOT)
+    sys.stderr = LoggerStream(ROOT, error=True)
     sys.exit(main())

@@ -41,6 +41,12 @@ format = "plain"
 paths = ["agents/skills"]
 overlays = ["core", "personal", "work", "client"]
 
+[domains]
+core = "Shared settings, without extra domain commands."
+personal = "Settings for your own use."
+work = "Settings for employer work."
+client = "Settings for customer work."
+
 [groups.docker]
 description = "Docker container shortcuts"
 blocks = [".config/dotfiles/aliases/core.zsh"]
@@ -52,7 +58,8 @@ enabled = false
 ```
 
 `paths` adds non-dot content paths. `overlays` lists supported domains; core means shared settings only.
-Personal adds personal settings; work adds employer settings; client adds client settings. Core always applies.
+The optional `domains` table gives one plain description per domain. The wizard combines these descriptions with inspected overlay commands.
+Core always applies. Empty overlay files add nothing; descriptions must not promise absent behavior.
 Each group declares a description and optional `files` or `blocks` paths.
 `files` selects whole files or directory trees. Disabled groups omit those outputs.
 A block starts with `# dotfleet:group NAME begin` and ends with `# dotfleet:group NAME end`.
@@ -86,7 +93,7 @@ During legacy adoption, merge old chezmoi pins, current Mise tools, and saved in
 Carry existing Mise settings into `mise_settings` too. This preserves settings beyond tool versions.
 Validate carried and existing profiles before applying files. Ask about missing identity, unconfirmed domains, and floating tool versions.
 Store full tool versions, resolving floating requests against installed versions only. Never install a tool to resolve a profile pin.
-Record explicit domain choices in `domain_chosen`. Older core defaults need confirmation once.
+Record explicit domain choices in `domain_chosen`. Carried and defaulted domains remain unchosen until a human confirms them.
 Record skipped tools in `unpinned_tools`; content defaults must not select them.
 Warn about choices skipped in a terminal. Without a terminal, stop and list every missing identity value, unconfirmed domain, and floating pin.
 Accept explicit `--domain`, `--git-name`, `--git-email`, and repeated `--pin TOOL=VERSION` values before validation.
@@ -97,3 +104,18 @@ The manager records output hashes, identifiers used to compare contents. Remove 
 Stop on edited deselected outputs. Never delete unrelated files.
 A second run must preserve selections and managed contents. New backups and chezmoi database changes are expected.
 Report nonempty chezmoi status as incomplete enrollment. Keep all changes recoverable from backups.
+
+## Enrollment review and adoption
+
+Terminal enrollment stages content, conversion, and generated files outside home. Review lists choices, warnings, the changed-file count, and the proposed backup path.
+Confirm before any home writes. Returning to a step rebuilds the plan; quitting discards it without changing home.
+Scripted flags keep their existing behavior. `--defaults` cannot bypass incomplete identity, domain confirmation, or floating pins.
+
+Adoption scans root dotfiles and `.config` files without following directory links. File links are scanned through their targets.
+Exclude credential and shell-history filenames, private keys, recognized tokens, and secret assignments. Exclude binary files and files above 2 MiB.
+Report excluded paths without printing their contents. The scan is conservative but cannot guarantee secret detection.
+Only accepted files enter the local repository. Review its contents before adding a remote and pushing.
+An adopted manifest records `adopted = true`. Its authored files keep their exact bytes, including otherwise reserved generated paths.
+Manager outputs fill absent paths; they do not rewrite adopted content. This exception preserves the adoption promise.
+Agent selections are stored under `agents`. Generation remains optional and refuses unmanaged or modified outputs.
+Back up agent outputs and their inventory before generation. Keep outputs for deselected agents; report them for manual review.

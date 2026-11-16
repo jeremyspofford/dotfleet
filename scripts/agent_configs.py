@@ -56,13 +56,14 @@ def write_atomic(path, data):
             os.unlink(temporary)
 
 
-def generate(home, os_name, dry_run):
+def generate(home, os_name, dry_run, *, profile=None, content_root=None):
     manifest = tomllib.loads((ROOT / "agents/manifest.toml").read_text())
     if manifest["schema_version"] != 1:
         raise ValueError("Unsupported manifest schema")
     profile_path = home / ".config/dotfleet/profile.toml"
-    profile = tomllib.loads(profile_path.read_text()) if profile_path.exists() else {}
-    content_root = (home / "dotfiles").resolve()
+    if profile is None:
+        profile = tomllib.loads(profile_path.read_text()) if profile_path.exists() else {}
+    content_root = (content_root or home / "dotfiles").resolve()
     source = (content_root / manifest["skills_source"]).resolve()
     if not source.is_relative_to(content_root):
         raise ValueError("Skills source must be inside the repository")
@@ -99,7 +100,7 @@ def generate(home, os_name, dry_run):
             relative = str(Path(agent["skills_paths"][os_name]) / skill.name)
             if relative in planned:
                 raise ValueError(f"Two sources own one output: {relative}")
-            planned[relative] = {"link": str(skill), "agent": name}
+            planned[relative] = {"link": str(home / "dotfiles" / skill.relative_to(content_root)), "agent": name}
     # Preflight every target before changing any file.
     for relative, item in planned.items():
         path = target(home, relative)
@@ -114,7 +115,7 @@ def generate(home, os_name, dry_run):
     for relative in previous.keys() - planned.keys():
         print(f"Retained output (agent absent or manifest changed): {relative}")
     if dry_run:
-        return
+        return {name: {key: value for key, value in item.items() if key != "agent"} for name, item in planned.items()}
     # Record intent before writes so partial failures are still inventoried.
     updated = {**previous, **planned}
     write_atomic(state_path, (json.dumps(updated, indent=2, sort_keys=True) + "\n").encode())

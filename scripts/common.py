@@ -56,3 +56,41 @@ def relative(name):
     if path.is_absolute() or not path.parts or '..' in path.parts:
         raise ValueError(f"Unsafe content path: {name}")
     return path
+
+
+class LoggerStream:
+    """Send whole lines through the owner's logger before displaying the next prompt."""
+    def __init__(self, root, error=False):
+        self.root = root
+        self.error = error
+        self.pending = ''
+        self.in_warnings = False
+
+    def write(self, text):
+        self.pending += text
+        while '\n' in self.pending:
+            line, self.pending = self.pending.split('\n', 1)
+            self.emit(line)
+        return len(text)
+
+    def flush(self):
+        if self.pending:
+            self.emit(self.pending)
+            self.pending = ''
+
+    def emit(self, line):
+        import sys
+        level = 'log_error' if self.error else 'log_info'
+        if line == 'END SUMMARY':
+            level = 'log_section'
+        elif line.startswith(('Result: SUCCESS', 'chezmoi status: CLEAN')):
+            level = 'log_success'
+        elif line.startswith('Warning:'):
+            level = 'log_warn'
+        elif self.in_warnings and line.startswith('  '):
+            level = 'log_success' if line.strip() == 'None.' else 'log_warn'
+        if not line.startswith('  '):
+            self.in_warnings = line == 'Warnings:'
+        subprocess.run(['bash', '-c', 'source "$1"; "$2" "$3"', 'dotfleet-log',
+                        str(self.root / 'scripts/logger.sh'), level, line], check=True,
+                       stdout=sys.__stdout__, stderr=sys.__stderr__)

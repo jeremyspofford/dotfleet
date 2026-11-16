@@ -5,7 +5,10 @@ The manifest, a configuration list at `agents/manifest.toml`, owns content, disc
 `PATH` lists directories searched for commands. Only commands found there get configuration.
 It installs and starts no agent. Agent login remains separate.
 
-To generate settings from `~/.local/share/dotfleet/manager`:
+Select agents during enrollment, or use `--agents claude,codex` for detected agents. Use `--agents none` to skip.
+The wizard previews agent outputs before confirmation. Existing unmanaged settings stop setup before writes.
+
+To generate settings from a separate Dotfleet checkout:
 
 1. Run `bash scripts/generate-agent-configs.sh --dry-run`. This validates inputs and reports proposed paths without writing.
 2. Review the paths and resolve any conflicts.
