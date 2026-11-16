@@ -1,0 +1,13 @@
+2. Scan
+OS: Linux
+Existing enrollment: none
+Installed tools: 3
+Pinned tools: node 24.14.1
+Detected agents: codex
+Home configuration candidates: 5
+  Shell  ~/.bashrc
+  Shell  ~/.zshrc
+  Git    ~/.gitconfig
+  Tools  ~/.config/mise/config.toml
+  Tools  ~/.config/starship.toml
+Sensitive files are excluded.

@@ -70,7 +70,7 @@ class WizardTests(unittest.TestCase):
         before = {name: (self.home / name).read_bytes() for name in scan(self.home)[0]}
         output = self.terminal(self.answers('adopt'), flags=[], auto_wizard=False)
         self.assertIn('Recommended: adopt.', output)
-        self.assertIn('Excluded from adoption: .service-config', output)
+        self.assertIn('Sensitive files are excluded.', output)
         self.assertNotIn('fake-secret-for-this-test', output)
         checkout = self.home / 'dotfiles'
         names = command('git', '-C', str(checkout), 'ls-files').splitlines()

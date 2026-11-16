@@ -326,7 +326,8 @@ def select_profile(home, args, workspace):
     profile.setdefault('pins', {})
     profile.setdefault('secrets', {})
     if args.wizard:
-        args.found, args.excluded = wizard.welcome(home, sources)
+        args.scan_record = {}
+        args.found, args.excluded = wizard.welcome(home, sources, profile, args.scan_record)
         profile, checkout, manifest, warnings = wizard.steps(home, args, workspace, profile, args.found, args.excluded)
         return profile, sources, checkout, manifest, warnings
     if getattr(args, 'edit', None):
@@ -335,8 +336,8 @@ def select_profile(home, args, workspace):
     repo = args.repo or profile.get('content_repo', DEFAULT_REPO)
     if args.adopt:
         found, excluded = wizard.scan(home)
-        for name, reason in excluded.items():
-            print(f'Excluded from adoption: {name} ({reason})')
+        for line in wizard.scan_view.exclusions(excluded):
+            print(line)
         checkout = wizard.adopt(home, workspace, found, excluded)
         repo = str(home / 'dotfiles')
         profile.update(adopted=True, adoption_excluded=sorted(excluded), source_door='adopt')
@@ -643,6 +644,7 @@ def main(argv=None, edit=None, software=None, before_apply=None):
             if software:
                 account.software.extend(software)
             profile, carried, checkout, manifest, warnings = select_profile(home, args, workspace)
+            account.scan = getattr(args, 'scan_record', {})
             print('Carried from: ' + (', '.join(carried) or 'new profile'))
             attempt = 0
             while True:
