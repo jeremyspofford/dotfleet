@@ -386,6 +386,8 @@ def main(argv=None):
         if args.command == 'diff':
             return preview(home, p)
         if args.command == 'configure':
+            if not m.has_terminal():
+                raise ValueError('Configure needs a terminal. Run dotfleet configure in an interactive shell.')
             return m.main(['--configure'])
         if args.command == 'rollback':
             return restore_command(args, home)

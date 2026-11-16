@@ -129,6 +129,7 @@ class CommandTests(unittest.TestCase):
         self.assertIn('0 behind last fetched upstream', status)
         Path('/tmp/dotfleet-command-status.txt').write_text(status)
         self.assertIn('Content commit', self.cli('version'))
+        self.assertIn('needs a terminal', self.cli('configure', expected=1))
         self.assertIn('no changes.', self.cli('update'))
 
     def test_domain_and_groups_use_saved_profile(self):
