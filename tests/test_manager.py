@@ -73,10 +73,21 @@ class EnrollmentTests(unittest.TestCase):
         self.assertEqual((self.home / ".secrets").stat().st_mode & 0o777, 0o600)
         for shell in ["bash", "zsh"]:
             env = dict(self.env, SHELL=f"/bin/{shell}")
-            result = subprocess.run([shell, "-lc", "printf shell-ok"], cwd=self.home, env=env, text=True, capture_output=True)
-            self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertEqual(result.stderr, "")
-            self.assertTrue(result.stdout.endswith("shell-ok"))
+            master, slave = pty.openpty()
+            def controlling_terminal():
+                os.setsid()
+                fcntl.ioctl(slave, termios.TIOCSCTTY, 0)
+            process = subprocess.Popen([shell, "-lic", "printf shell-ok"], cwd=self.home, env=env,
+                                       stdin=slave, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                       text=True, preexec_fn=controlling_terminal)
+            os.close(slave)
+            try:
+                stdout, stderr = process.communicate(timeout=20)
+            finally:
+                os.close(master)
+            self.assertEqual(process.returncode, 0, stderr)
+            self.assertEqual(stderr, "")
+            self.assertTrue(stdout.endswith("shell-ok"))
 
     def exercise(self, repo):
         (self.home / ".zshrc").write_text("# existing configuration\n")
