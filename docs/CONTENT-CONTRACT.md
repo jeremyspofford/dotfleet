@@ -64,6 +64,9 @@ All groups default to on. Later runs keep choices; new groups prompt with on pre
 Dotfleet reserves `~/.config/git/local.gitconfig`, `~/.config/dotfiles/domain`, `~/.config/mise/config.toml`, and `~/.secrets`.
 Plain content can provide Mise defaults. The manager replaces that output with defaults merged under profile pins.
 Native chezmoi content must leave reserved paths unmanaged. Other native outputs still use the original checkout.
+Dotfleet also owns `~/.config/chezmoi/chezmoi.toml`. Content config templates never write that file.
+After writing it, Dotfleet updates chezmoi's saved template checksum, an identifier for template contents.
+Without a template, it removes the obsolete checksum. It preserves file history and script history.
 
 The local Git file holds profile identity and retains other existing local settings.
 The domain file contains one domain name. Shell code reads it at startup.
@@ -81,7 +84,14 @@ Back up every target before replacement. Preserve symbolic links and copy extern
 Save profile data at `~/.config/dotfleet/profile.toml`. Saved selections win over later defaults.
 During legacy adoption, merge old chezmoi pins, current Mise tools, and saved installer pins, in that order.
 Carry existing Mise settings into `mise_settings` too. This preserves settings beyond tool versions.
-A saved Dotfleet profile then becomes authoritative. Carry identity and domain from saved data too.
+Validate carried and existing profiles before applying files. Ask about missing identity, unconfirmed domains, and floating tool versions.
+Store full tool versions, resolving floating requests against installed versions only. Never install a tool to resolve a profile pin.
+Record explicit domain choices in `domain_chosen`. Older core defaults need confirmation once.
+Record skipped tools in `unpinned_tools`; content defaults must not select them.
+Warn about choices skipped in a terminal. Without a terminal, stop and list every missing identity value, unconfirmed domain, and floating pin.
+Accept explicit `--domain`, `--git-name`, `--git-email`, and repeated `--pin TOOL=VERSION` values before validation.
+The `--defaults` option cannot bypass incomplete values. Print new group defaults during scripted setup.
+Complete saved choices remain authoritative. Carry identity and domain from saved data too.
 
 The manager records output hashes, identifiers used to compare contents. Remove deselected outputs only when they still match their recorded state.
 Stop on edited deselected outputs. Never delete unrelated files.

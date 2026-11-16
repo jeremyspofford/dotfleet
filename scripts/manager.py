@@ -1,9 +1,11 @@
 """Enroll a machine with a saved profile and a content checkout.
 
-Usage: bash install.sh [--repo URL] [--configure] [--defaults] [--format FORMAT]
-Parameters: --repo selects content; --configure asks again; --defaults accepts saved/default answers.
---format chooses plain (real names) or chezmoi (native source names). -h/--help prints help.
-Example: bash install.sh --repo https://github.com/jeremyspofford/dotfiles --defaults
+Usage: bash install.sh [OPTIONS]
+Parameters: --repo selects content; --configure asks again; --defaults skips prompts only for complete profiles.
+--format chooses plain (real names) or chezmoi (native source names).
+--domain, --git-name, and --git-email record explicit profile choices.
+--pin TOOL=VERSION records a full version; repeat it for multiple tools. -h/--help prints help.
+Example: bash install.sh --domain core --git-name Example --git-email example@example.invalid
 Exit codes: 0 success/help; 1 setup failure; 2 invalid arguments.
 Author: Jeremy Spofford / Aria Labs; Version: read from ../VERSION.
 The Bash entry point sends messages through logger.sh. Prompts use /dev/tty.
@@ -83,6 +85,8 @@ def old_profile(home):
         'git_email': saved.get('git_email', saved.get('gitEmail', data.get('gitEmail', ''))),
         'pins': pins, 'groups': saved.get('groups', {}),
     }
+    if 'domain_chosen' in saved:
+        profile['domain_chosen'] = saved['domain_chosen']
     if 'settings' in current_mise:
         profile['mise_settings'] = current_mise['settings']
     if data.get('secretsEnabled'):
@@ -99,14 +103,166 @@ def old_profile(home):
     return profile, sources
 
 
+def reconcile_config_template_state():
+    """Acknowledge templates without letting them write the manager's config."""
+    # source-path accounts for a native repository's .chezmoiroot.
+    source = Path(run('chezmoi', 'source-path').strip())
+    templates = [source / f'.chezmoi.{extension}.tmpl'
+                 for extension in ('json', 'jsonc', 'toml', 'yaml', 'yml')
+                 if (source / f'.chezmoi.{extension}.tmpl').exists()]
+    if len(templates) > 1:
+        raise ValueError('Multiple chezmoi config templates exist; keep only one in the content repository.')
+    # Match chezmoi's configState record. Leave file and script history intact.
+    # https://github.com/twpayne/chezmoi/blob/v2.74.1/internal/cmd/config.go
+    args = ['chezmoi', 'state']
+    if templates:
+        state = {'configTemplateContentsSHA256': hashlib.sha256(templates[0].read_bytes()).hexdigest()}
+        run(*args, 'set', '--bucket=configState', '--key=configState', '--value=' + json.dumps(state))
+    else:
+        run(*args, 'delete', '--bucket=configState', '--key=configState')
+
+
+def exact_version(version):
+    """Require a full numeric release or a complete Git commit identifier."""
+    return isinstance(version, str) and bool(re.fullmatch(
+        r'(?:[A-Za-z][A-Za-z0-9_-]*-)?v?\d+(?:\.\d+){2,}(?:[a-zA-Z][0-9A-Za-z._-]*|[-+][0-9A-Za-z][0-9A-Za-z.+-]*)?'
+        r'|\d{4}-\d{2}-\d{2}|[0-9a-f]{40}', version))
+
+
+def resolve_installed_pin(home, tool, request):
+    result = subprocess.run(['mise', 'latest', '--installed', '--cd', str(home), f'{tool}@{request}'],
+                            text=True, capture_output=True)
+    version = result.stdout.strip()
+    return version if result.returncode == 0 and exact_version(version) else None
+
+
+def has_terminal():
+    try:
+        descriptor = os.open('/dev/tty', os.O_RDWR)
+    except OSError:
+        return False
+    os.close(descriptor)
+    return True
+
+
+def profile_gaps(profile):
+    gaps = []
+    if not profile.get('domain_chosen', profile.get('domain', 'core') != 'core'):
+        gaps.append(f"Domain was never explicitly chosen (recorded: {profile.get('domain', 'core')}). Supply --domain.")
+    for field, label, flag in [('git_name', 'Git name', '--git-name'), ('git_email', 'Git email', '--git-email')]:
+        if not profile.get(field, '').strip():
+            gaps.append(f'{label} is empty. Supply {flag}.')
+    for tool, request in profile.get('pins', {}).items():
+        for item in request if isinstance(request, list) else [request]:
+            version = item.get('version', '') if isinstance(item, dict) else item
+            if not exact_version(version):
+                gaps.append(f'{tool} pin is floating (recorded: {version}). Supply --pin {tool}=VERSION with a full version.')
+    return gaps
+
+
+def require_complete_profile(profile):
+    gaps = profile_gaps(profile)
+    if gaps:
+        raise ValueError('Non-interactive setup needs a complete profile:\n- ' + '\n- '.join(gaps)
+                         + '\nProvide these flags, or run in a terminal without --defaults.')
+
+
+def pin_argument(text):
+    tool, separator, version = text.partition('=')
+    if not separator or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9:._@/-]*', tool) or not version.strip():
+        raise argparse.ArgumentTypeError('--pin needs TOOL=VERSION, for example node=24.14.1')
+    return tool, version.strip()
+
+
+def validate_profile(home, profile, defaults=False, configure=False):
+    """Ask about gaps and return warnings for choices left incomplete."""
+    warnings = []
+    if defaults:
+        require_complete_profile(profile)
+    # Old core defaults have no proof of an explicit choice. Ask once and record it.
+    profile.setdefault('domain_chosen', profile.get('domain', 'core') != 'core')
+    if not defaults and (configure or not profile['domain_chosen']):
+        domain = ask('Domain: core=shared; personal=personal+shared; work=employer+shared; client=client+shared; '
+                     'skip=keep without confirming; press Enter to confirm the shown domain',
+                     profile.get('domain', 'core'), ['core', 'personal', 'work', 'client', 'skip'], defaults)
+        if domain != 'skip':
+            profile['domain'] = domain
+            if not defaults:
+                profile['domain_chosen'] = True
+    if not profile['domain_chosen']:
+        warnings.append('No domain choice confirmed. The recorded domain remains in use.')
+    if not defaults and (configure or not profile.get('git_name', '').strip() or not profile.get('git_email', '').strip()):
+        for field, label in [('git_name', 'Git author name'), ('git_email', 'Git author email')]:
+            recorded = profile.get(field, '')
+            answer = ask(f'{label}; Enter keeps the shown value; skip leaves it unchanged', recorded, defaults=defaults)
+            if answer != 'skip':
+                profile[field] = answer
+    if not profile.get('git_name', '').strip() or not profile.get('git_email', '').strip():
+        warnings.append('No complete git identity recorded. Git commits will fail until one is set.')
+    pins = profile.setdefault('pins', {})
+    unpinned = set(profile.get('unpinned_tools', []))
+    for tool, request in list(pins.items()):
+        entries = request if isinstance(request, list) else [request]
+        resolved = []
+        for item in entries:
+            version = item.get('version', '') if isinstance(item, dict) else item
+            if not exact_version(version):
+                recorded = str(version)
+                installed = resolve_installed_pin(home, tool, recorded)
+                action = f'uses installed {installed}' if installed else 'leaves this tool unpinned; no matching version is installed'
+                label = f'{tool} pin: recorded {recorded}; Enter {action}; type a full version (24.14.1) or skip, then Enter'
+                while True:
+                    answer = ask(label, recorded, defaults=defaults)
+                    if answer == 'skip':
+                        version = None
+                        break
+                    if answer == recorded:
+                        version = installed
+                        break
+                    if exact_version(answer):
+                        version = answer
+                        break
+                    print('Use a full version, such as 24.14.1, or type skip.')
+                if version is None:
+                    warnings.append(f'{tool}: skipped floating pin {recorded}. No version was recorded for this entry.')
+                    continue
+                print(f'Recorded exact pin: {tool} = {version}')
+            resolved.append(dict(item, version=version) if isinstance(item, dict) else version)
+        if resolved:
+            unpinned.discard(tool)
+            pins[tool] = resolved if isinstance(request, list) else resolved[0]
+        else:
+            del pins[tool]
+            unpinned.add(tool)
+    if unpinned or 'unpinned_tools' in profile:
+        profile['unpinned_tools'] = sorted(unpinned)
+    for tool in sorted(unpinned):
+        warnings.append(f'{tool} is unpinned. Content defaults will not select it.')
+    return warnings
+
+
 def select_profile(home, args):
     path = home / '.config/dotfleet/profile.toml'
     exists = path.exists()
     profile, sources = (read_toml(path), ['existing Dotfleet profile']) if exists else old_profile(home)
+    # Explicit flags update saved values before checking whether prompts are needed.
+    if args.domain is not None:
+        profile.update(domain=args.domain, domain_chosen=True)
+    for field in ('git_name', 'git_email'):
+        if getattr(args, field) is not None:
+            profile[field] = getattr(args, field).strip()
+    for tool, version in args.pin:
+        previous = profile.setdefault('pins', {}).get(tool)
+        profile['pins'][tool] = dict(previous, version=version) if isinstance(previous, dict) else version
+    unattended = args.defaults or not has_terminal()
+    if unattended:
+        require_complete_profile(profile)
     # A complete saved profile stays authoritative. Migration reads every legacy source first.
     repo = args.repo or profile.get('content_repo', DEFAULT_REPO)
     if not args.repo and (args.configure or not exists and not sources):
-        repo = ask('Content Git URL; Enter keeps the shown repository', repo, defaults=args.defaults)
+        repo = ask('Content Git URL; Enter keeps the shown repository', repo, defaults=unattended)
+        if unattended:
+            print(f'Using content repository: {repo}')
     checkout = checkout_content(home, repo)
     try:
         kind, manifest = detect(checkout, args.format or profile.get('format'))
@@ -116,14 +272,8 @@ def select_profile(home, args):
         kind = ask('Format: plain=real names; chezmoi=native sources; Enter keeps plain',
                    'plain', ['plain', 'chezmoi'], defaults=args.defaults)
         kind, manifest = detect(checkout, kind)
-    fresh = not exists and not sources
     profile.update(content_repo=repo, format=kind)
-    if fresh or args.configure:
-        print('Profile questions: type an answer, then press Enter. Empty input keeps the displayed value.')
-        profile['domain'] = ask('Domain: core=shared; personal=personal+shared; work=employer+shared; client=client+shared',
-                                profile.get('domain', 'core'), ['core', 'personal', 'work', 'client'], args.defaults)
-        profile['git_name'] = ask('Git author name; blank means unset', profile.get('git_name', ''), defaults=args.defaults)
-        profile['git_email'] = ask('Git author email; blank means unset', profile.get('git_email', ''), defaults=args.defaults)
+    warnings = validate_profile(home, profile, unattended, args.configure)
     if profile.get('domain') not in ('core', 'personal', 'work', 'client'):
         raise ValueError('Profile domain must be core, personal, work, or client.')
     selections = profile.setdefault('groups', {})
@@ -131,11 +281,13 @@ def select_profile(home, args):
         if args.configure or group not in selections:
             # Legacy migration carries defaults only with explicit --defaults, just like a new install.
             choice = ask(f'{group}: {spec["description"]}; on=include, off=exclude; Enter keeps the shown choice',
-                         'on' if selections.get(group, True) else 'off', ['on', 'off'], args.defaults)
+                         'on' if selections.get(group, True) else 'off', ['on', 'off'], unattended)
+            if unattended:
+                print(f'Group {group}: using {choice} ({spec["description"]}).')
             selections[group] = choice == 'on'
     profile.setdefault('pins', {})
     profile.setdefault('secrets', {})
-    return profile, sources, checkout, manifest
+    return profile, sources, checkout, manifest, warnings
 
 
 def installed_defaults(defaults, pins, home):
@@ -212,7 +364,9 @@ def backup(home, paths):
 
 
 def generated_files(home, profile, manifest, defaults):
-    pins, available = installed_defaults(defaults.get('tools', {}), profile['pins'], home)
+    allowed_defaults = {tool: version for tool, version in defaults.get('tools', {}).items()
+                        if tool not in profile.get('unpinned_tools', [])}
+    pins, available = installed_defaults(allowed_defaults, profile['pins'], home)
     mise = dict(defaults)
     mise['tools'] = pins
     if 'mise_settings' in profile:
@@ -255,14 +409,19 @@ def main():
                                      epilog='Version: ' + (ROOT / 'VERSION').read_text().strip())
     parser.add_argument('--repo', help='content Git URL or absolute local repository')
     parser.add_argument('--configure', action='store_true', help='ask profile questions again, with saved answers shown')
-    parser.add_argument('--defaults', action='store_true', help='accept saved/default answers without a terminal')
+    parser.add_argument('--defaults', action='store_true', help='skip prompts only with complete profile values; accept group defaults')
+    parser.add_argument('--domain', choices=['core', 'personal', 'work', 'client'], help='explicit domain: shared, personal, employer, or client')
+    parser.add_argument('--git-name', help='Git author name; required when missing without a terminal')
+    parser.add_argument('--git-email', help='Git author email; required when missing without a terminal')
+    parser.add_argument('--pin', action='append', type=pin_argument, default=[], metavar='TOOL=VERSION',
+                        help='record a full tool version; repeat for more tools, for example node=24.14.1')
     parser.add_argument('--format', choices=['plain', 'chezmoi'], help='plain=real names; chezmoi=native sources')
     args = parser.parse_args()
     home = Path.home()
     backup_path = 'not created'
     summary = {}
     try:
-        profile, carried, checkout, manifest = select_profile(home, args)
+        profile, carried, checkout, manifest, warnings = select_profile(home, args)
         base = home / '.local/share/dotfleet'
         base.mkdir(parents=True, exist_ok=True)
         config_path = home / '.config/chezmoi/chezmoi.toml'
@@ -319,6 +478,7 @@ def main():
             data.update(domain=profile['domain'], gitName=profile.get('git_name', ''), gitEmail=profile.get('git_email', ''), miseTools=pins)
             config = {'sourceDir': str(stable_source), 'umask': 0o077, 'data': data}
             atomic(config_path, toml(config))
+            reconcile_config_template_state()
             profile_path = home / '.config/dotfleet/profile.toml'
             if not profile_path.exists() or read_toml(profile_path) != profile:
                 atomic(profile_path, toml(profile))
@@ -346,6 +506,9 @@ def main():
         print(f'Backup: {backup_path}')
         for name, val in summary.items():
             print(f'{name}: {json.dumps(val, sort_keys=True) if isinstance(val, dict) else val}')
+        print('Warnings:')
+        for warning in warnings or ['None.']:
+            print(f'  {warning}')
         print('Your content lives in: ~/dotfiles. Your profile lives in: ~/.config/dotfleet/profile.toml')
         print('Update: curl -fsSL https://raw.githubusercontent.com/jeremyspofford/dotfleet/main/install.sh | bash')
         print('Rollback: review the backup MANIFEST.json. Restore home/ files and recorded external targets.')
