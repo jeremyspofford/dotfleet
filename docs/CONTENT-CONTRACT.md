@@ -107,7 +107,7 @@ Report nonempty chezmoi status as incomplete enrollment. Keep all changes recove
 
 ## Enrollment review and adoption
 
-Terminal enrollment stages content, conversion, and generated files outside home. Review lists choices, warnings, the changed-file count, and the proposed backup path.
+Terminal enrollment stages content, conversion, and generated files outside home. Review lists choices, warnings, full changed paths, and the proposed backup path.
 Confirm before any home writes. Returning to a step rebuilds the plan; quitting discards it without changing home.
 Scripted flags keep their existing behavior. `--defaults` cannot bypass incomplete identity, domain confirmation, or floating pins.
 
@@ -119,3 +119,17 @@ An adopted manifest records `adopted = true`. Its authored files keep their exac
 Manager outputs fill absent paths; they do not rewrite adopted content. This exception preserves the adoption promise.
 Agent selections are stored under `agents`. Generation remains optional and refuses unmanaged or modified outputs.
 Back up agent outputs and their inventory before generation. Keep outputs for deselected agents; report them for manual review.
+
+## Run accounts
+
+Capture the chezmoi diff and backup inventory before apply. Use those records for both review and summary.
+The review uses future tense. The summary reports confirmed results in past tense, including failures and scripted runs.
+Print software, checkout changes, file changes, profile changes, locations, and next steps every time. Empty changes say None.
+List full paths for additions, changes, and removals. Include deselected outputs and settings changed by removed pins.
+Preserve installed prerequisite versions and unchanged checkout commits in the report.
+
+Save RUN.json and CHEZMOI-DIFF.patch beside the backup MANIFEST.json, with owner-only permissions.
+RUN.json records planned actions and completion checks. The diff stays private and never appears in terminal reports.
+Check recorded file operations after apply; do not rebuild their categories or discover new paths afterward.
+Keep the last confirmed manager commit in ~/.local/state/dotfleet/last-run.json. Back it up before replacing it.
+Internal state records, staged source copies, and backup copies are not rendered setting changes.

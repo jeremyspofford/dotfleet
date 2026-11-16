@@ -400,10 +400,7 @@ def backup_location(home):
     return destination
 
 
-def backup(home, paths, destination=None):
-    destination = destination or backup_location(home)
-    destination.parent.mkdir(exist_ok=True, mode=0o700)
-    destination.mkdir(mode=0o700)
+def backup_inventory(home, paths):
     entries = []
     for name in sorted(set(paths)):
         path = home / relative(name)
@@ -412,7 +409,26 @@ def backup(home, paths, destination=None):
         if not path.exists() and not path.is_symlink():
             entries.append({'path': name, 'state': 'absent'})
             continue
-        target = destination / 'home' / name
+        item = {'path': name, 'state': 'saved', 'fingerprint': fingerprint(path)}
+        if path.is_symlink():
+            item['link'] = os.readlink(path)
+            resolved = path.resolve()
+            if resolved.is_file() and not resolved.is_relative_to(home.resolve()):
+                item['external'] = str(resolved)
+        entries.append(item)
+    return entries
+
+
+def backup(home, paths, destination=None):
+    entries = backup_inventory(home, paths)
+    destination = destination or backup_location(home)
+    destination.parent.mkdir(exist_ok=True, mode=0o700)
+    destination.mkdir(mode=0o700)
+    for item in entries:
+        if item['state'] == 'absent':
+            continue
+        path = home / item['path']
+        target = destination / 'home' / item['path']
         target.parent.mkdir(parents=True, exist_ok=True)
         if path.is_symlink():
             target.symlink_to(os.readlink(path))
@@ -420,16 +436,10 @@ def backup(home, paths, destination=None):
             shutil.copytree(path, target, symlinks=True, dirs_exist_ok=True)
         else:
             shutil.copy2(path, target)
-        item = {'path': name, 'state': 'saved'}
-        if path.is_symlink():
-            item['link'] = os.readlink(path)
-            resolved = path.resolve()
-            if resolved.is_file() and not resolved.is_relative_to(home.resolve()):
-                external = destination / 'external' / str(resolved).lstrip('/')
-                external.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(resolved, external)
-                item['external'] = str(resolved)
-        entries.append(item)
+        if 'external' in item:
+            external = destination / 'external' / item['external'].lstrip('/')
+            external.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(item['external'], external)
     atomic(destination / 'MANIFEST.json', json.dumps(entries, indent=2) + '\n')
     return destination
 
@@ -522,24 +532,28 @@ def prepare(home, checkout, profile, manifest, folder):
         if fingerprint(home / name) not in (None, previous[name]):
             raise ValueError(f'Excluded output has local edits; preserve it before applying: {name}')
     # Status reads destination files but writes its cache and state only in scratch.
-    changes = run(*command, 'status', '--include', 'files,symlinks')
-    changed = {line[3:] for line in changes.splitlines() if line.strip()}
+    changes = run(*command, 'status', '--include', 'files,symlinks', '--path-style', 'relative')
+    diff_path = folder / 'chezmoi.diff'
+    atomic(diff_path, run(*command, '--no-pager', '--use-builtin-diff', '--color=false', 'diff', '--include', 'files,symlinks'))
+    changed = {line[3:] for line in changes.splitlines() if len(line) > 3 and line[1] != ' '}
+    removed = {line[3:] for line in changes.splitlines() if len(line) > 3 and line[1] == 'D'}
     for name, content in generated.items():
         path = home / name
         if not path.is_file() or path.read_bytes() != content or path.stat().st_mode & 0o777 != 0o600:
             changed.add(name)
     agents = agent_configs.generate(home, agent_configs.native_os(), True, profile=profile, content_root=checkout) if any(profile.get('agents', {}).values()) else {}
     changed |= {name for name, item in agents.items() if not fingerprint(home / name) or any(fingerprint(home / name).get(key) != value for key, value in item.items())}
-    changed |= stale
-    controls = {'.config/chezmoi/chezmoi.toml', '.config/dotfleet/profile.toml', '.local/state/dotfleet/outputs.json'}
+    changed |= {name for name in stale if fingerprint(home / name) is not None}
+    controls = {'.config/chezmoi/chezmoi.toml', '.config/dotfleet/profile.toml', '.local/state/dotfleet/outputs.json', '.local/state/dotfleet/last-run.json'}
     stable_source = home / 'dotfiles' if native else home / '.local/share/dotfleet/chezmoi-source'
     final_config = {'sourceDir': str(stable_source), 'umask': 0o077, 'data': data}
     for name, content in [('.config/chezmoi/chezmoi.toml', toml(final_config)), ('.config/dotfleet/profile.toml', toml(profile))]:
-        if not (home / name).exists() or (home / name).read_text() != content:
+        path = home / name
+        matches = (read_toml(path) == profile) if name == '.config/dotfleet/profile.toml' and path.is_file() else path.is_file() and path.read_text() == content
+        if not matches or path.is_symlink() or path.stat().st_mode & 0o777 != 0o600:
             changed.add(name)
-    # The output inventory is written after applying, including files from older runs.
-    changed.add('.local/state/dotfleet/outputs.json')
-    all_paths = names | set(generated) | stale | controls | set(agents)
+    # Output inventories are bookkeeping, not rendered home settings.
+    all_paths = names | set(generated) | stale | controls | set(agents) | changed | removed
     for tool in ['chezmoi', 'mise']:
         if os.environ.get('DOTFLEET_STAGED_' + tool.upper()):
             all_paths.add('.local/bin/' + tool)
@@ -549,6 +563,7 @@ def prepare(home, checkout, profile, manifest, folder):
         changed.add('.local/state/dotfleet/agents.json')
     return dict(source=source, native=native, names=names, generated=generated, pins=pins, available=available,
                 stale=stale, all_paths=all_paths, changed=changed, config=final_config, agents=agents,
+                removed=removed, diff_path=diff_path, status=changes,
                 baseline={name: fingerprint(home / name) for name in all_paths})
 
 
@@ -577,6 +592,7 @@ def publish_checkout(home, checkout, profile, backup_path):
 def main():
     import enrollment as wizard
     import agent_configs
+    from run_account import RunAccount, RECORD
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter,
                                      epilog='Version: ' + (ROOT / 'VERSION').read_text().strip())
     doors = parser.add_mutually_exclusive_group()
@@ -593,7 +609,12 @@ def main():
     parser.add_argument('--format', choices=['plain', 'chezmoi'], help='plain=real names; chezmoi=native sources')
     args = parser.parse_args()
     home = Path.home()
+    # Git status must not refresh the real checkout's index before confirmation.
+    os.environ['GIT_OPTIONAL_LOCKS'] = '0'
     backup_path = 'not created'
+    account = None
+    writes_started = False
+    warnings = []
     try:
         with tempfile.TemporaryDirectory(prefix='dotfleet-plan-') as temporary:
             workspace = Path(temporary)
@@ -604,16 +625,20 @@ def main():
             os.environ['MISE_DATA_DIR'] = str(workspace / 'mise-data')
             os.environ['MISE_CACHE_DIR'] = str(workspace / 'mise-cache')
             os.environ['MISE_STATE_DIR'] = str(workspace / 'mise-state')
+            account = RunAccount(home, ROOT)
             profile, carried, checkout, manifest, warnings = select_profile(home, args, workspace)
+            print('Carried from: ' + (', '.join(carried) or 'new profile'))
             attempt = 0
             while True:
                 plan = prepare(home, checkout, profile, manifest, workspace / f'plan-{attempt}')
                 proposed_backup = backup_location(home)
+                account.plan(plan, checkout, profile, proposed_backup, backup_inventory(home, plan['all_paths']))
                 if not args.wizard:
                     break
-                choice = wizard.review(profile, proposed_backup, plan['changed'], warnings)
+                choice = wizard.review(profile, account, warnings)
                 if choice == 'quit':
-                    print('END SUMMARY\nResult: CANCELLED\nBackup: not created\nHome unchanged; nothing applied.')
+                    account.finish('CANCELLED', warnings)
+                    print('Home unchanged; nothing applied.')
                     return 0
                 if choice == 'confirm':
                     break
@@ -627,13 +652,22 @@ def main():
             if any(fingerprint(home / name) != before for name, before in plan['baseline'].items()):
                 raise ValueError('Home files changed during review. Nothing applied; run setup again to review those changes.')
             backup_path = backup(home, plan['all_paths'], proposed_backup)
+            account.bind_backup(backup_path)
+            writes_started = True
+            if os.environ.get('DOTFLEET_APPLY_MARKER'):
+                Path(os.environ['DOTFLEET_APPLY_MARKER']).touch()
             print(f'Backup: {backup_path}', flush=True)
             checkout = publish_checkout(home, checkout, profile, backup_path)
+            account.applied_checkouts.update(['Manager', 'Content'])
+            atomic(home / RECORD, json.dumps({'manager_commit': account.checkouts[0]['new']}) + '\n')
+            account.save()
             # Temporary downloads become local tools only after review and backup.
             for tool in ['chezmoi', 'mise']:
                 supplied = os.environ.get('DOTFLEET_STAGED_' + tool.upper())
                 if supplied:
                     atomic(home / '.local/bin' / tool, Path(supplied).read_bytes(), 0o700)
+                    account.applied_software.add('Mise' if tool == 'mise' else tool)
+                    account.save()
             stable_source = Path(plan['config']['sourceDir'])
             if not plan['native']:
                 stable_source.parent.mkdir(parents=True, exist_ok=True)
@@ -645,6 +679,8 @@ def main():
             profile_path = home / '.config/dotfleet/profile.toml'
             if not profile_path.exists() or read_toml(profile_path) != profile:
                 atomic(profile_path, toml(profile))
+            account.profile_written = True
+            account.save()
             if plan['native']:
                 for name, content in plan['generated'].items():
                     atomic(home / name, content)
@@ -655,36 +691,29 @@ def main():
                     retired.parent.mkdir(parents=True, exist_ok=True)
                     path.rename(retired)
             result = subprocess.run(['bash', str(ROOT / 'scripts/apply.sh')])
+            account.confirm_files(fingerprint)
             if result.returncode:
                 raise RuntimeError(f'chezmoi apply failed with exit {result.returncode}; restore from {backup_path}')
             if any(profile.get('agents', {}).values()):
                 agent_configs.generate(home, agent_configs.native_os(), False)
+            account.confirm_files(fingerprint)
             status = run('chezmoi', 'status')
             if status.strip():
                 raise ValueError('Managed files still differ:\n' + status)
             names = plan['names'] | set(plan['generated'])
             atomic(home / '.local/state/dotfleet/outputs.json', json.dumps({name: fingerprint(home / name) for name in sorted(names)}, indent=2) + '\n')
-            print('END SUMMARY\nResult: SUCCESS')
-            print(f'Backup: {backup_path}')
-            summary = {'Content': profile['content_repo'], 'Commit': run('git', '-C', str(checkout), 'rev-parse', 'HEAD').strip(),
-                       'Carried from': ', '.join(carried) or 'new profile', 'Profile': {k: profile.get(k) for k in ['domain', 'git_name', 'git_email']},
-                       'Profile pins': profile['pins'], 'Applied pins': plan['pins'], 'Groups': profile['groups'], 'Agents': profile.get('agents', {}),
-                       'Available defaults (not applied)': plan['available'], 'chezmoi status': 'CLEAN (no differences)'}
-            for name, val in summary.items():
-                print(f'{name}: {json.dumps(val, sort_keys=True) if isinstance(val, dict) else val}')
-            print('Warnings:')
-            for warning in warnings or ['None.']:
-                print(f'  {warning}')
+            account.finish('SUCCESS', warnings, 'CLEAN (no differences)')
+            if plan['available']:
+                print('Available defaults (not applied): ' + json.dumps(plan['available'], sort_keys=True))
             for name in profile.get('adoption_excluded', []):
                 print(f'Excluded from adoption: {name}')
-            print('Your content lives in: ~/dotfiles. Your profile lives in: ~/.config/dotfleet/profile.toml')
-            print('Update: curl -fsSL https://raw.githubusercontent.com/jeremyspofford/dotfleet/main/install.sh | bash')
-            print('Rollback: review the backup MANIFEST.json. Restore home/ files and recorded external targets.')
-            print('Remove only new files marked absent. Keep user edits and the backup. Run the installer after restoring a profile.')
             return 0
     except (OSError, ValueError, RuntimeError, KeyError) as error:
         print(f'Setup failed: {error}', file=sys.stderr)
-        print(f'END SUMMARY\nResult: FAILED\nBackup: {backup_path}\nNo successful enrollment was reported.')
+        if account:
+            if writes_started:
+                account.confirm_files(fingerprint)
+            account.finish('FAILED', [*warnings, str(error)])
         return 1
 
 
