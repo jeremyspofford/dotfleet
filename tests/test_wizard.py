@@ -26,7 +26,7 @@ class WizardTests(unittest.TestCase):
                    (b'Git author email [', b'wizard@example.invalid\n'), (b'Pins [accept]:', b'\n')]
         if door != 'adopt' and repo != os.environ['DOTFLEET_ARCHIVE_FIXTURE']:
             result += [(f'{name} [on]:'.encode(), b'\n') for name in list(tomllib.loads((Path(os.environ['DOTFLEET_CONTENT_FIXTURE']) / 'dotfleet.toml').read_text())['groups'])]
-        result += [(b'Agents [none]:', b'none\n'), (b'Review [quit]:', b'confirm\n')]
+        result += [(b'Review [quit]:', b'confirm\n')]
         return result
 
     def defaults_origin(self):
@@ -46,7 +46,9 @@ class WizardTests(unittest.TestCase):
         self.defaults_origin()
         output = self.terminal(self.answers(), flags=[], auto_wizard=False)
         self.assertIn('Recommended: defaults.', output)
-        self.assertIn('7. Group: docker NEW', output)
+        self.assertIn('7. Content groups', output)
+        self.assertIn('Group: docker NEW', output)
+        self.assertNotIn('7. Group:', output)
         self.assertIn('3 · Files', output)
         self.assertIn('will be', output)
         self.assertIn('chezmoi status: clean', output)
@@ -111,7 +113,7 @@ class WizardTests(unittest.TestCase):
         answers += [(b'Git author name [Wizard Person]:', b'Changed Person\n'),
                     (b'Git author email [wizard@example.invalid]:', b'\n'), (b'Pins [accept]:', b'\n')]
         answers += [(f'{name} [on]:'.encode(), b'\n') for name in list(tomllib.loads((Path(os.environ['DOTFLEET_CONTENT_FIXTURE']) / 'dotfleet.toml').read_text())['groups'])]
-        answers += [(b'Agents [none]:', b'\n'), (b'Review [quit]:', b'confirm\n')]
+        answers += [(b'Review [quit]:', b'confirm\n')]
         self.terminal(answers, flags=[], auto_wizard=False)
         profile = tomllib.loads((self.home / '.config/dotfleet/profile.toml').read_text())
         self.assertEqual(profile['git_name'], 'Changed Person')
@@ -165,7 +167,7 @@ class WizardTests(unittest.TestCase):
         executable.chmod(0o755)
         self.env['PATH'] = str(bin_dir) + ':' + self.env['PATH']
         answers = self.answers('repo', os.environ['DOTFLEET_CONTENT_FIXTURE'])
-        answers[-2] = (b'Agents [none]:', b'opencode\n')
+        answers.insert(-1, (b'opencode [off]:', b'on\n'))
         output = self.terminal(answers, flags=[], auto_wizard=False)
         self.assertIn('.config/opencode/opencode.json', output)
         self.assertEqual(json.loads((self.home / '.config/opencode/opencode.json').read_text()), {})
@@ -181,7 +183,7 @@ class WizardTests(unittest.TestCase):
         answers = [(b'Content door [', b'repo\n'), (b'Content repository [', (str(repo) + '\n').encode()),
                    (b'Format [plain]:', b'plain\n'), (b'Domain [core]:', b'\n'),
                    (b'Git author name [', b'Wizard Person\n'), (b'Git author email [', b'wizard@example.invalid\n'),
-                   (b'Pins [accept]:', b'\n'), (b'Agents [none]:', b'none\n'), (b'Review [quit]:', b'confirm\n')]
+                   (b'Pins [accept]:', b'\n'), (b'Review [quit]:', b'confirm\n')]
         self.terminal(answers, flags=[], auto_wizard=False)
         profile = tomllib.loads((self.home / '.config/dotfleet/profile.toml').read_text())
         self.assertEqual(profile['format'], 'plain')

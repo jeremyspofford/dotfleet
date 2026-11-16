@@ -16,7 +16,7 @@ import json
 import os
 from pathlib import Path
 import platform
-import shutil
+import agent_detection
 import sys
 import tempfile
 import tomllib
@@ -76,8 +76,9 @@ def generate(home, os_name, dry_run, *, profile=None, content_root=None):
     previous = json.loads(previous_path.read_text()) if previous_path.exists() else {}
     planned = {}
     payloads = {}
+    detected = agent_detection.detected(home, manifest["agents"])
     for name, agent in manifest["agents"].items():
-        if not shutil.which(agent["command"]):
+        if name not in detected:
             print(f"Absent: {name}")
             continue
         if not agent["supported"]:

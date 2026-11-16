@@ -2,10 +2,11 @@
 
 An agent is an installed coding assistant. A skill is a folder of instructions for an agent.
 The manifest, a configuration list at `agents/manifest.toml`, owns content, discovery commands, formats, and operating-system paths. Skills live in `~/dotfiles/agents/skills/`, inside the content checkout.
-`PATH` lists directories searched for commands. Only commands found there get configuration.
+`PATH` lists directories searched for commands. Detection checks PATH, installed Mise packages, and known configuration folders. Any match detects the agent.
 It installs and starts no agent. Agent login remains separate.
 
-Select agents during enrollment, or use `--agents claude,codex` for detected agents. Use `--agents none` to skip.
+Turn each detected agent on or off during enrollment. Press Enter to keep its current choice.
+For scripted runs, use `--agents claude,codex` for detected agents. Use `--agents none` to skip.
 The wizard previews agent outputs before confirmation. Existing unmanaged settings stop setup before writes.
 
 To generate settings from a separate Dotfleet checkout:

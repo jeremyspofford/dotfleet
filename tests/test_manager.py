@@ -55,7 +55,14 @@ class EnrollmentTests(unittest.TestCase):
         self.base = Path(self.temp.name)
         self.home = self.base / "home"
         self.home.mkdir()
-        self.env = dict(os.environ, HOME=str(self.home), SHELL="/bin/bash", GIT_CONFIG_GLOBAL="/dev/null", GIT_CONFIG_COUNT="1",
+        # Host agent commands must not affect a fixture's detected agents.
+        tools = self.base / "tools"
+        tools.mkdir()
+        for name in ('chezmoi', 'mise'):
+            location = shutil.which(name)
+            if location:
+                (tools / name).symlink_to(location)
+        self.env = dict(os.environ, PATH=str(tools) + ":/usr/bin:/bin:/usr/sbin:/sbin", HOME=str(self.home), SHELL="/bin/bash", GIT_CONFIG_GLOBAL="/dev/null", GIT_CONFIG_COUNT="1",
                         GIT_CONFIG_KEY_0="safe.directory", GIT_CONFIG_VALUE_0="*",
                         XDG_CONFIG_HOME=str(self.home / ".config"), XDG_DATA_HOME=str(self.home / ".local/share"),
                         XDG_STATE_HOME=str(self.home / ".local/state"), MISE_TRUSTED_CONFIG_PATHS=str(self.home))
@@ -277,7 +284,7 @@ class EnrollmentTests(unittest.TestCase):
                     for pattern, answer in [(rb'Content door \[[^]]+\]:', b'repo\n'),
                                             (rb'Content repository \[[^]]+\]:', b'\n'),
                                             (rb'Pins \[accept\]:', b'accept\n'),
-                                            (rb'Agents \[[^]]+\]:', b'none\n'),
+                                            (rb'(?:claude|codex|gemini|grok|pi|opencode) \[(?:on|off)\]:', b'\n'),
                                             (rb'Review \[quit\]:', b'confirm\n'),
                                             (rb'(?:docker|terraform|kubectl|python|npm|helpers) \[(?:on|off)\]:', b'\n')]:
                         if re.search(pattern, pending):

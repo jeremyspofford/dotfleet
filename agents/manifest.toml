@@ -6,6 +6,7 @@ skills_source = "agents/skills"
 
 [agents.claude]
 command = "claude"
+mise_packages = ["claude", "claude-code", "@anthropic-ai/claude-code"]
 format = "json"
 supported = true
 content = "{}\n"
@@ -23,6 +24,7 @@ wsl = ".claude/skills"
 
 [agents.codex]
 command = "codex"
+mise_packages = ["codex", "@openai/codex"]
 format = "toml"
 supported = true
 content = "# Generated from agents/manifest.toml. Edit the manifest, then regenerate.\n"
@@ -40,6 +42,7 @@ wsl = ".agents/skills"
 
 [agents.gemini]
 command = "gemini"
+mise_packages = ["gemini", "gemini-cli", "@google/gemini-cli"]
 format = "json"
 supported = true
 content = "{}\n"
@@ -57,6 +60,7 @@ wsl = ".gemini/skills"
 
 [agents.grok]
 command = "grok"
+mise_packages = ["grok", "grok-cli"]
 format = "toml"
 supported = true
 content = "# Generated from agents/manifest.toml. Edit the manifest, then regenerate.\n"
@@ -74,6 +78,7 @@ wsl = ".grok/skills"
 
 [agents.pi]
 command = "pi"
+mise_packages = ["pi", "pi-coding-agent", "@mariozechner/pi-coding-agent"]
 format = "json"
 supported = true
 content = "{}\n"
@@ -91,6 +96,7 @@ wsl = ".pi/agent/skills"
 
 [agents.opencode]
 command = "opencode"
+mise_packages = ["opencode", "opencode-ai"]
 format = "json"
 supported = true
 content = "{}\n"
@@ -107,7 +113,9 @@ windows = ".config/opencode/skills"
 wsl = ".config/opencode/skills"
 
 [agents.ollama]
+config_folders = [".ollama"]
 command = "ollama"
+mise_packages = ["ollama"]
 format = "environment"
 supported = false
 reason = "Ollama uses service/process environment variables and has no native SKILL.md loader."

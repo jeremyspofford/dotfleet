@@ -110,7 +110,7 @@ class RunAccountTests(unittest.TestCase):
         answers = [(b'Content door [', b'repo\n'), (b'Content repository [', b'\n'),
                    (b'Domain [core]:', b'personal\n'), (b'Git author name [', b'\n'),
                    (b'Git author email [', b'\n'), (b'Pins [accept]:', b'\n'), (b'extra [on]:', b'off\n'),
-                   (b'Agents [none]:', b'none\n'), (b'Review [quit]:', b'quit\n')]
+                   (b'Review [quit]:', b'quit\n')]
         output = self.terminal(answers, flags=['--configure'], auto_wizard=False)
         review = output.split('9. Review before apply', 1)[1].split('Review [quit]:', 1)[0]
         for number, label in enumerate(['Software', 'Manager and content', 'Files', 'Profile changes', 'Locations', 'Next steps'], 1):
@@ -143,7 +143,7 @@ class RunAccountTests(unittest.TestCase):
         repo = self.fixture()
         self.enroll(repo, extra=['--pin', 'node=24.14.1'])
         answers = [(b'Pins [accept]:', b'edit\n'), (b'Tool versions [none]:', b'none\n'),
-                   (b'extra [on]:', b'\n'), (b'Agents [none]:', b'none\n'), (b'Review [quit]:', b'confirm\n')]
+                   (b'extra [on]:', b'\n'), (b'Review [quit]:', b'confirm\n')]
         output = self.terminal(answers, flags=['--configure', '--repo', str(repo), '--domain', 'core',
                                               '--git-name', 'Audit Example', '--git-email', 'audit@example.invalid'], auto_wizard=False)
         text = summary(output)
