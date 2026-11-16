@@ -70,14 +70,17 @@ class RunAccountTests(unittest.TestCase):
         if os.environ.get('DOTFLEET_TEST_REPORT'):
             Path(os.environ['DOTFLEET_TEST_REPORT']).write_text(text)
 
-    def test_no_change_run_prints_none_and_locations_and_commands(self):
+    def test_no_change_run_is_compact_with_recorded_locations_and_commands(self):
         self.enroll(self.fixture())
         text = summary(self.enroll())
         for number in range(1, 5):
             self.assertIn('no changes.', category(text, number))
         self.assertEqual(category(text, 3).strip(), '3 · Files — no changes.')
         self.assertIn('Already present:', category(text, 1))
-        self.assertIn('~/.config/dotfleet/profile.toml', category(text, 5))
+        self.assertEqual(category(text, 5).strip(), '5 · Locations — recorded in RUN.json.')
+        self.assertEqual(len([line for line in text.splitlines() if line]), 12)
+        record = json.loads(sorted((self.home / 'dotfleet-backups').glob('*/RUN.json'))[-1].read_text())
+        self.assertEqual(record['locations']['Profile file'], str(self.home / '.config/dotfleet/profile.toml'))
         self.assertIn('MANIFEST.json', category(text, 6))
         self.assertIn('dotfleet configure', category(text, 6))
         self.assert_quiet_status()
