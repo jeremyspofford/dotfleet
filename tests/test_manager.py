@@ -441,6 +441,47 @@ class EnrollmentTests(unittest.TestCase):
         self.assertEqual(path.read_bytes(), profile)
         self.assert_clean()
 
+    def test_first_domain_prompt_explains_choices_and_saves_core_default(self):
+        answers = [(b"Domain [core]:", b"\n"), (b"Git author name", b"Fixture Person\n"),
+                   (b"Git author email", b"fixture@example.invalid\n")]
+        answers += [(f"{group}:".encode(), b"\n") for group in ["docker", "terraform", "kubectl", "python", "npm"]]
+        output = self.terminal(answers)
+        for description in ["Base settings only. Start here if you are unsure.",
+                            "additions for your own projects and everyday use",
+                            "additions for your employer's work",
+                            "additions for work you do for a customer",
+                            "Your dotfiles repository defines these additions",
+                            "Your choice is saved in ~/.config/dotfleet/profile.toml.",
+                            "Press Enter to confirm the value in brackets",
+                            "Type skip and press Enter"]:
+            self.assertIn(description, output)
+        self.assertNotIn("personal=personal+shared", output)
+        path = self.home / ".config/dotfleet/profile.toml"
+        saved = path.read_bytes()
+        profile = tomllib.loads(saved.decode())
+        self.assertEqual(profile["domain"], "core")
+        self.assertTrue(profile["domain_chosen"])
+        self.terminal([], plain=True)
+        self.assertEqual(path.read_bytes(), saved)
+        self.assert_clean()
+
+    def test_configure_defaults_to_each_saved_domain_and_keeps_tool_choices(self):
+        path = self.seed_profile(complete=True)
+        self.install(defaults=False)
+        for domain in ["personal", "work", "client", "core"]:
+            with self.subTest(domain=domain):
+                profile = tomllib.loads(path.read_text())
+                profile["domain"] = domain
+                path.write_text(toml(profile))
+                before = path.read_bytes()
+                answers = [(f"Domain [{domain}]:".encode(), b"\n"), (b"Git author name", b"\n"),
+                           (b"Git author email", b"\n")]
+                answers += [(f"{group}:".encode(), b"\n") for group in ["docker", "terraform", "kubectl", "python", "npm"]]
+                self.terminal(answers, configure=True)
+                self.assertEqual(path.read_bytes(), before)
+                self.assertEqual((self.home / ".config/dotfiles/domain").read_text(), domain + "\n")
+                self.assert_quiet_status()
+
     def test_terminal_conflict_decisions(self):
         self.install(Path(os.environ["DOTFLEET_CONTENT_FIXTURE"]))
         self.complete_profile()
