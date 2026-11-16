@@ -95,7 +95,7 @@ Manager updates compare the running commit with the last confirmed run. Missing 
 
 The backup contains MANIFEST.json, which lists original files, and RUN.json, which records planned actions and confirmed results.
 CHEZMOI-DIFF.patch records content and permission differences before apply. These private records can contain secret values.
-Reports show paths, never diff contents. Failed runs report confirmed changes only.
+Run reviews show paths. `dotfleet diff` shows patches, which can contain secret values. Failed runs report confirmed changes only.
 An interrupted run directs you to its backup record when completion is unknown.
 
 To roll back manually:
@@ -205,7 +205,7 @@ The one-line installer remains the first-install and recovery path.
 | --- | --- |
 | `dotfleet update` | Fetch the manager and content, then apply saved choices. Refuse dirty or diverged checkouts. |
 | `dotfleet status` | Show this machine's choices, installed pins, drift, last run, and last backup. |
-| `dotfleet diff` | Fetch into temporary storage and preview the update. Change no home files. |
+| `dotfleet diff` | Show pending patches. Use `--stat` for paths only. Exit 0 means clean; exit 1 means differences. |
 | `dotfleet rollback` | List backups and choose one in a terminal. Include the saved profile when restoring. |
 | `dotfleet rollback BACKUP` | Review one backup folder, then type restore to confirm. |
 | `dotfleet domain` | Show the current domain, its confirmation state, and each domain's description. |

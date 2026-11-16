@@ -11,8 +11,8 @@ local_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 if [[ -f $local_root/scripts/command.py ]]; then manager=$local_root; fi
 # shellcheck source=scripts/logger.sh
 source "$manager/scripts/logger.sh"
-usage() { python3 "$manager/scripts/command.py" --help; }
+usage() { python3 -B "$manager/scripts/command.py" --help; }
 case ${1:---help} in
 -h | --help) usage ;;
-*) python3 "$manager/scripts/command.py" "$@" ;;
+*) python3 -B "$manager/scripts/command.py" "$@" ;;
 esac
