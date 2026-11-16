@@ -43,7 +43,7 @@ def prompt_style(name, text):
     return color + bold + text + os.environ.get('CLEAR', '') if color else text
 
 
-def ask(label, default, choices=None, defaults=False, *, detail='', heading=None):
+def ask(label, default, choices=None, defaults=False, *, detail='', heading=None, formatted=False):
     if defaults:
         return default
     try:
@@ -55,8 +55,10 @@ def ask(label, default, choices=None, defaults=False, *, detail='', heading=None
                     width = max(30, min(os.get_terminal_size(terminal.fileno()).columns or 80, 100))
                     for line in detail.splitlines():
                         indent = ' ' * 12 if line.startswith('  ') else ''
-                        terminal.write(textwrap.fill(line, width, subsequent_indent=indent,
-                                                     break_long_words=False, break_on_hyphens=False) + '\n')
+                        value = line if formatted else textwrap.fill(line, width, subsequent_indent=indent,
+                                                     break_long_words=False, break_on_hyphens=False)
+                        palette = {'+': 'GREEN', '−': 'RED', '~': 'YELLOW'}.get(line.strip()[:1]) if formatted else None
+                        terminal.write((prompt_style(palette, value) if palette else value) + '\n')
                     terminal.write('\n')
                 terminal.write(prompt_style('GREEN', f'{label} [{default}]: '))
                 terminal.flush()
@@ -638,7 +640,6 @@ def main():
                 choice = wizard.review(profile, account, warnings)
                 if choice == 'quit':
                     account.finish('CANCELLED', warnings)
-                    print('Home unchanged; nothing applied.')
                     return 0
                 if choice == 'confirm':
                     break
@@ -703,10 +704,6 @@ def main():
             names = plan['names'] | set(plan['generated'])
             atomic(home / '.local/state/dotfleet/outputs.json', json.dumps({name: fingerprint(home / name) for name in sorted(names)}, indent=2) + '\n')
             account.finish('SUCCESS', warnings, 'CLEAN (no differences)')
-            if plan['available']:
-                print('Available defaults (not applied): ' + json.dumps(plan['available'], sort_keys=True))
-            for name in profile.get('adoption_excluded', []):
-                print(f'Excluded from adoption: {name}')
             return 0
     except (OSError, ValueError, RuntimeError, KeyError) as error:
         print(f'Setup failed: {error}', file=sys.stderr)

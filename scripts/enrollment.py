@@ -11,6 +11,7 @@ import shutil
 import subprocess
 
 from common import atomic, read_toml, run, toml
+from render_run import human
 from convert import FURNITURE, detect
 import manager as m
 
@@ -180,7 +181,7 @@ def pins(home, profile, checkout):
     print('\n6. Tool pins\nA pin selects an exact tool version. No tools are installed here.')
     print('Tool | Installed versions | Content default | Saved pin')
     for tool in sorted(set(tools) | set(defaults) | set(profile.get('pins', {}))):
-        print(f'{tool} | {versions(tools.get(tool, []))} | {defaults.get(tool, "none")} | {profile.get("pins", {}).get(tool, "none")}')
+        print(f'{tool} | {versions(tools.get(tool, []))} | {human(defaults.get(tool))} | {human(profile.get("pins", {}).get(tool))}')
     action = m.ask('Pins', 'accept', ['accept', 'edit'], detail='accept: keep saved pins and use installed versions for matching defaults.\nedit: enter TOOL=VERSION pairs, separated by commas. Type none to clear pins.\nPress Enter to submit.')
     if action == 'edit':
         while True:
@@ -301,15 +302,12 @@ def gap_warnings(profile):
 
 
 def review(profile, account, warnings):
-    details = ['Selected source: ' + profile['content_repo']]
-    for key in ['domain', 'git_name', 'git_email', 'pins', 'groups', 'agents']:
-        details.append(key + ': ' + json.dumps(profile.get(key)))
-    details += [''] + account.lines(future=True)
-    details += ['Warning: ' + warning for warning in warnings]
-    details += ['Excluded from adoption: ' + name for name in profile.get('adoption_excluded', [])]
+    account.warnings = warnings
+    details = account.lines(future=True)
     if profile.get('adopted'):
-        details += ['Adopted files stay byte-identical. Recorded identity, domain, and pins do not rewrite their existing content.']
+        details += ['Adopted files stay byte-identical. Recorded choices do not rewrite their existing content.']
     details += ['confirm: back up files and apply these choices.', 'quit: leave your home unchanged.',
                 'source, domain, identity, pins, groups, agents: return to that step, then review again.',
                 'Type a word and press Enter. Enter alone quits.']
-    return m.ask('Review', 'quit', ['confirm', 'quit', *STEPS], heading='9. Review before apply', detail='\n'.join(details))
+    return m.ask('Review', 'quit', ['confirm', 'quit', *STEPS], heading='9. Review before apply',
+                 detail='\n'.join(details), formatted=True)

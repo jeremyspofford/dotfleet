@@ -38,31 +38,13 @@ finish_run() {
 	local result=$?
 	trap - EXIT
 	if [[ $summary_expected == 1 && ! -e $DOTFLEET_SUMMARY_MARKER ]]; then
-		log_section 'END SUMMARY'
-		log_error "Result: FAILED (exit $result; setup stopped before a run record was available)"
-		local outcome='None (setup stopped before apply)'
-		local backup='None (not created)'
+		# No record exists yet. Do not invent an account of unknown operations.
+		log_error "Setup stopped (exit $result) before the run renderer completed."
 		if [[ -e $DOTFLEET_APPLY_MARKER ]]; then
-			outcome='Unknown (run interrupted; inspect the backup run record)'
-			backup="$HOME/dotfleet-backups (inspect the latest run)"
+			log_warn 'Inspect the latest ~/dotfleet-backups/ folder for RUN.json before retrying.'
+		else
+			log_info 'Run record: not created; setup stopped before apply.'
 		fi
-		log_info '1. Software'
-		log_info "Changes: $outcome"
-		log_info '2. Manager and content'
-		log_info "Changes: $outcome"
-		log_info '3. Files'
-		log_info "Changes: $outcome"
-		log_info '4. Profile changes'
-		log_info "$outcome"
-		log_info '5. Locations'
-		log_info "Content checkout: $HOME/dotfiles"
-		log_info "Profile file: $HOME/.config/dotfleet/profile.toml"
-		log_info 'Converted source: None (not prepared)'
-		log_info "Backup folder: $backup"
-		log_info '6. Next steps'
-		log_info "Update: curl -fsSL $raw/install.sh | bash"
-		log_info "Rollback: $backup"
-		log_info "Reopen the wizard: curl -fsSL $raw/install.sh | bash -s -- --configure"
 	fi
 	rm -rf -- "$work_dir"
 	exit "$result"
@@ -111,7 +93,8 @@ Nothing in your home changes before confirmation. Temporary tool downloads stay 
 Adopted file contents stay unchanged, including existing Mise files. Profile choices do not rewrite adopted files.
 Pins use full versions. Enter accepts the prompt's stated action; skip leaves a choice incomplete.
 Complete profiles need no profile prompts. Every summary prints all six categories, including scripted runs.
-Empty change categories say None. File changes use full paths. Skipped gaps appear under Warnings.
+Empty categories say no changes. Paths start with ~ for your home. RUN.json keeps full paths and commit IDs.
+Skipped gaps appear under Warnings. The last lines show status and the RUN.json location.
 Without a terminal, missing identity, an unconfirmed domain, or floating pins stop setup with exit 1.
 Supply the listed flags to complete those values. New group defaults are printed before applying files.
 Prompts read /dev/tty, the terminal device, never piped input.

@@ -14,13 +14,12 @@ from run_account import profile_changes
 
 def summary(output):
     output = output.replace('\r\n', '\n')
-    start = output.index('  END SUMMARY\n')
-    return output[output.rfind('\n', 0, start - 1) + 1:]
+    return output[output.rindex('1 · Software'):]
 
 
 def category(text, number):
-    start = text.index(f'{number}. ')
-    return text[start:text.index(f'{number + 1}. ', start)] if number < 6 else text[start:]
+    start = text.index(f'{number} · ')
+    return text[start:text.index(f'{number + 1} · ', start)] if number < 6 else text[start:]
 
 
 class RunAccountTests(unittest.TestCase):
@@ -48,13 +47,15 @@ class RunAccountTests(unittest.TestCase):
         command('git', '-C', str(repo), '-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-m', 'fix: update test content')
         new = command('git', '-C', str(repo), 'rev-parse', 'HEAD').strip()
         text = summary(self.enroll(extra=['--group', 'extra=off']))
-        self.assertIn(f'Added:\n  {self.home}/.added\n', text)
-        self.assertIn(f'  {self.home}/.changed\n', category(text, 3).split('Changed:', 1)[1].split('Removed:', 1)[0])
-        self.assertIn(f'Removed:\n  {self.home}/.removed\n', text)
-        self.assertIn('Changed groups.extra: true → false', text)
-        self.assertIn(f'Updated Content: {old} → {new} — {self.home}/dotfiles', text)
+        self.assertIn('  + ~/.added\n', text)
+        self.assertIn('  ~ ~/.changed\n', category(text, 3))
+        self.assertIn('  − ~/.removed\n', text)
+        self.assertIn('Group extra  on → off', text)
+        self.assertIn(f'Content  {old[:8]} → {new[:8]} · ~/dotfiles', text)
         latest = sorted((self.home / 'dotfleet-backups').iterdir())[-1]
         record = json.loads((latest / 'RUN.json').read_text())
+        from render_run import render
+        self.assertEqual(text, render(record))
         self.assertEqual(record['backup_manifest'], json.loads((latest / 'MANIFEST.json').read_text()))
         planned = {item['relative']: item['action'] for item in record['files']}
         self.assertEqual({name: planned[name] for name in ['.added', '.changed', '.removed']},
@@ -73,16 +74,12 @@ class RunAccountTests(unittest.TestCase):
         self.enroll(self.fixture())
         text = summary(self.enroll())
         for number in range(1, 5):
-            self.assertIn('None', category(text, number))
-        for label in ['Added', 'Changed', 'Removed']:
-            self.assertIn(label + ':\n  None', category(text, 3))
-        self.assertEqual(category(text, 4).strip(), '4. Profile changes\n  None')
+            self.assertIn('no changes.', category(text, number))
+        self.assertEqual(category(text, 3).strip(), '3 · Files — no changes.')
         self.assertIn('Already present:', category(text, 1))
-        self.assertIn('Manager: unchanged,', category(text, 2))
-        self.assertIn('Content: unchanged,', category(text, 2))
-        self.assertIn(str(self.home / '.config/dotfleet/profile.toml'), category(text, 5))
+        self.assertIn('~/.config/dotfleet/profile.toml', category(text, 5))
         self.assertIn('MANIFEST.json', category(text, 6))
-        self.assertIn('| bash -s -- --configure', category(text, 6))
+        self.assertIn('bash -s -- --configure', category(text, 6))
         self.assert_quiet_status()
 
     def test_manager_update_uses_last_confirmed_commit(self):
@@ -98,8 +95,9 @@ class RunAccountTests(unittest.TestCase):
         command('git', '-C', str(manager), '-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-m', 'fix: record a manager update')
         new = command('git', '-C', str(manager), 'rev-parse', 'HEAD').strip()
         text = summary(self.enroll(root=manager))
-        self.assertIn(f'Updated Manager: {old} → {new} — {manager}', text)
-        self.assertIn('Content: unchanged,', text)
+        self.assertIn(f'{old[:8]} → {new[:8]}', text)
+        self.assertIn(str(manager), text)
+        self.assertEqual(category(text, 2).count('→'), 1)
 
     def test_review_has_full_future_account_and_cancel_has_no_changes(self):
         repo = self.fixture()
@@ -113,13 +111,14 @@ class RunAccountTests(unittest.TestCase):
         output = self.terminal(answers, flags=['--configure'], auto_wizard=False)
         review = output.split('9. Review before apply', 1)[1].split('Review [quit]:', 1)[0]
         for number, label in enumerate(['Software', 'Manager and content', 'Files', 'Profile changes', 'Locations', 'Next steps'], 1):
-            self.assertIn(f'{number}. {label}', review)
-        self.assertIn('Will be removed:', review)
-        self.assertIn(str(self.home / '.removed'), review)
-        self.assertIn('Will change groups.extra: true → false', review)
+            self.assertIn(f'{number} · {label}', review)
+        self.assertIn('removed.', review)
+        self.assertIn('− ~/.removed', review)
+        self.assertIn('Group extra', review)
+        self.assertIn('on → off', review)
         text = summary(output)
         for number in range(1, 5):
-            self.assertIn('None', category(text, number))
+            self.assertIn('no changes.', category(text, number))
         after = {str(path.relative_to(self.home)): (os.readlink(path) if path.is_symlink() else path.read_bytes())
                  for path in self.home.rglob('*') if path.is_file() or path.is_symlink()}
         self.assertEqual(set(after), set(snapshot))
@@ -133,8 +132,8 @@ class RunAccountTests(unittest.TestCase):
                                 capture_output=True, text=True, start_new_session=True)
         self.assertEqual(result.returncode, 1)
         text = summary(result.stdout)
-        self.assertIn('Result: FAILED', text)
-        self.assertNotIn(str(self.home / '.changed'), category(text, 3))
+        self.assertIn('chezmoi status: failed', text)
+        self.assertNotIn('~/.changed', category(text, 3))
         self.assertEqual((self.home / '.changed').read_text(), 'local edit\n')
 
     def test_pin_removal_lists_each_rendered_file_changed(self):
@@ -145,9 +144,9 @@ class RunAccountTests(unittest.TestCase):
         output = self.terminal(answers, flags=['--configure', '--repo', str(repo), '--domain', 'core',
                                               '--git-name', 'Audit Example', '--git-email', 'audit@example.invalid'], auto_wizard=False)
         text = summary(output)
-        self.assertIn('Changed pins.node: "24.14.1" → None', text)
+        self.assertIn('Pin node  24.14.1 → not set', text)
         for name in ['.config/mise/config.toml', '.config/chezmoi/chezmoi.toml', '.config/dotfleet/profile.toml']:
-            self.assertIn(str(self.home / name), category(text, 3).split('Changed:', 1)[1].split('Removed:', 1)[0])
+            self.assertIn('~ ~/' + name, category(text, 3))
         self.assert_quiet_status()
 
     def test_pin_removal_is_an_explicit_profile_change(self):

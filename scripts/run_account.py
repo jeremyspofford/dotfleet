@@ -12,6 +12,7 @@ import shutil
 import subprocess
 
 from common import atomic, read_toml, run
+from render_run import render
 
 UPDATE = 'curl -fsSL https://raw.githubusercontent.com/jeremyspofford/dotfleet/main/install.sh | bash'
 CONFIGURE = UPDATE + ' -s -- --configure'
@@ -43,10 +44,6 @@ def profile_changes(old, new):
             if before != after:
                 changes.append({'name': f'{field}.{key}', 'old': before, 'new': after})
     return changes
-
-
-def display(value):
-    return 'None' if value is None else json.dumps(value, ensure_ascii=False)
 
 
 class RunAccount:
@@ -82,12 +79,21 @@ class RunAccount:
         self.diff_path = None
         self.status = ''
         self.backup = None
+        self.result = None
+        self.warnings = []
+        self.status_after = None
+        self.selected_profile = {}
+        self.available_defaults = {}
+        self.adoption_excluded = []
 
     def plan(self, plan, checkout, profile, backup_path, manifest):
         self.checkouts[1]['new'] = commit(checkout)
         self.locations['Converted source'] = str(plan['config']['sourceDir'])
         self.locations['Backup folder'] = str(backup_path)
         self.profile = profile_changes(self.old_profile, profile)
+        self.selected_profile = {key: profile.get(key) for key in ['content_repo', 'domain', 'git_name', 'git_email', 'pins', 'groups', 'agents']}
+        self.available_defaults = plan['available']
+        self.adoption_excluded = profile.get('adoption_excluded', [])
         self.manifest = copy.deepcopy(manifest)
         before = {item['path']: item for item in manifest}
         self.files = []
@@ -109,14 +115,20 @@ class RunAccount:
         atomic(path / 'CHEZMOI-DIFF.patch', self.diff_path.read_bytes())
         self.save()
 
+    def record(self):
+        return {
+            'home': str(self.home), 'software': self.software, 'checkouts': self.checkouts, 'files': self.files,
+            'profile_changes': self.profile, 'locations': self.locations, 'backup_manifest': self.manifest,
+            'chezmoi_status_before': self.status, 'completed_files': sorted(self.applied_files),
+            'completed_software': sorted(self.applied_software), 'completed_checkouts': sorted(self.applied_checkouts),
+            'profile_written': self.profile_written, 'backup_created': bool(self.backup),
+            'result': self.result, 'warnings': self.warnings, 'chezmoi_status_after': self.status_after,
+            'selected_profile': self.selected_profile, 'available_defaults': self.available_defaults,
+            'adoption_excluded': self.adoption_excluded}
+
     def save(self):
         if self.backup:
-            atomic(self.backup / 'RUN.json', json.dumps({
-                'software': self.software, 'checkouts': self.checkouts, 'files': self.files,
-                'profile_changes': self.profile, 'locations': self.locations, 'backup_manifest': self.manifest,
-                'chezmoi_status_before': self.status, 'completed_files': sorted(self.applied_files),
-                'completed_software': sorted(self.applied_software), 'completed_checkouts': sorted(self.applied_checkouts),
-                'profile_written': self.profile_written}, indent=2) + '\n')
+            atomic(self.backup / 'RUN.json', json.dumps(self.record(), indent=2) + '\n')
 
     def confirm_files(self, fingerprint):
         # Verify recorded operations, including partial apply. Never infer new paths or categories here.
@@ -127,73 +139,14 @@ class RunAccount:
         self.save()
 
     def lines(self, future=False):
-        lines = ['A profile saves machine choices. Pins select tool versions; groups select optional content.',
-                 'Commit IDs identify saved Git versions. None means no change or no recorded value.', '']
-        lines += ['1. Software']
-        changes = [item for item in self.software if item['action'] != 'present'
-                   and (future or item['name'] in self.applied_software)]
-        if not changes:
-            lines.append('Software changes: None')
-        for kind, label in [('installed', 'Will install' if future else 'Installed new'),
-                            ('present', 'Already present'), ('upgraded', 'Will upgrade' if future else 'Upgraded')]:
-            lines.append(label + ':')
-            selected = [item for item in self.software if item['action'] == kind
-                        and (kind == 'present' or future or item['name'] in self.applied_software)]
-            if not selected:
-                lines.append('  None')
-            for item in selected:
-                number = (item['old'] + ' → ' if item['old'] else '') + item['version']
-                path = ' — ' + item['path'] if kind != 'present' else ''
-                lines.append(f"  {item['name']} {number}{path}")
-        lines += ['', '2. Manager and content', 'Checkout changes:']
-        changes = [item for item in self.checkouts if item['new'] and item['old'] != item['new']
-                   and (future or item['name'] in self.applied_checkouts)]
-        if not changes:
-            lines.append('  None')
-        for item in changes:
-            verb = 'Will update' if future else 'Updated'
-            if item['old'] is None:
-                verb = 'Will record' if future else 'Recorded'
-            lines.append(f"  {verb} {item['name']}: {item['old'] or 'None'} → {item['new']} — {item['path']}")
-        for item in self.checkouts:
-            if item['new'] and item['old'] == item['new']:
-                lines.append(f"{item['name']}: unchanged, {item['new']} — {item['path']}")
-        lines += ['', '3. Files']
-        for action in ('added', 'changed', 'removed'):
-            label = ('Will be ' + action) if future else action.capitalize()
-            selected = [item['path'] for item in self.files if item['action'] == action and (future or item['path'] in self.applied_files)]
-            lines.append(label + ':')
-            lines += ['  ' + path for path in selected] or ['  None']
-        lines += ['', '4. Profile changes']
-        changes = self.profile if future or self.profile_written else []
-        if not changes:
-            lines.append('  None')
-        for item in changes:
-            lines.append(f"  {'Will change' if future else 'Changed'} {item['name']}: {display(item['old'])} → {display(item['new'])}")
-        lines += ['', '5. Locations']
-        for name, location in self.locations.items():
-            if name == 'Backup folder' and not future and not self.backup:
-                location = 'None (not created)'
-            lines.append(f'{name}: {location}')
-        lines += ['', '6. Next steps', 'Update: ' + UPDATE,
-                  'Rollback: ' + (str(self.backup or self.locations['Backup folder']) + '/MANIFEST.json' if future or self.backup else 'None (no files were applied)'),
-                  'Restore saved home/ files and recorded external targets. Remove only new paths marked absent.',
-                  'Keep user edits and the backup. Restore the profile before running setup again.',
-                  'Reopen the wizard: ' + CONFIGURE]
-        return lines
+        return render(self.record(), future=future).rstrip().splitlines()
 
     def finish(self, result, warnings=None, status=None):
-        print('END SUMMARY')
-        print('Result: ' + result)
-        print('\n'.join(self.lines()))
-        if status is not None:
-            print('chezmoi status: ' + status)
-        print('Warnings:')
-        for warning in warnings or ['None.']:
-            print('  ' + warning)
-        if self.backup:
-            print('Run record: ' + str(self.backup / 'RUN.json'))
-            self.save()
+        self.result = result
+        self.warnings = warnings or []
+        self.status_after = status
+        self.save()
+        print(render(self.record()), end='')
         marker = os.environ.get('DOTFLEET_SUMMARY_MARKER')
         if marker:
             Path(marker).touch()

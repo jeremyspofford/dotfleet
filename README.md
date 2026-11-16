@@ -80,75 +80,61 @@ Read `--help` for examples, limits, and exit codes.
 
 ## Run account
 
-Every run prints all six categories below, including scripted runs. Empty change categories print None.
-The wizard shows the same account before apply, with future-tense actions. The end summary uses past tense for confirmed changes.
-Installed prerequisite versions and unchanged checkout commits remain visible when nothing changed.
-A commit identifies a saved Git version. Manager updates compare the running commit with the last confirmed run.
-The first audited run prints None when no earlier manager commit was recorded.
-The one-liner uses a temporary manager checkout. Its printed path can disappear when the run ends.
+Every run prints six categories, including scripted runs. Empty categories collapse to one line.
+The wizard uses the same run record before apply. It describes planned actions; the end summary describes confirmed results.
+Paths use `~` for your home directory. Commit IDs identify saved Git versions and show eight characters.
+Full paths and commit IDs remain in RUN.json. Present software shares one quiet line.
+File markers mean added (+), removed (−), or changed (~). Color reinforces these markers when a terminal supports it.
+Set NO_COLOR to disable color. Redirected output stays plain.
 
-File lists cover managed home settings, including agent files and generated configuration. Pin removal changes rendered settings; it does not uninstall software.
-Backups, staged sources, and internal state records are not counted as setting changes.
-Profile keys identify saved choices. For example, groups.extra names the extra group; true means on and false means off.
+File lists include generated settings and agent files. Removing a pin does not uninstall software.
+Backups, converted sources, and internal state are not counted as setting changes.
+Manager updates compare the running commit with the last confirmed run. Missing earlier values say “not set.”
 
-The backup contains MANIFEST.json, a list of original files, and RUN.json, the planned actions and confirmed results.
-CHEZMOI-DIFF.patch holds the diff captured before apply. A diff describes content and permission changes.
-These records stay private because the diff can contain secret values. Reports show paths, never diff contents.
-Failed runs report confirmed changes only. An interrupted run directs you to its backup record when completion is unknown.
+The backup contains MANIFEST.json, which lists original files, and RUN.json, which records planned actions and confirmed results.
+CHEZMOI-DIFF.patch records content and permission differences before apply. These private records can contain secret values.
+Reports show paths, never diff contents. Failed runs report confirmed changes only.
+An interrupted run directs you to its backup record when completion is unknown.
 
-This complete example comes from a test run. Its temporary paths show one addition, one content change, and one group removal.
+To roll back manually:
+
+1. Read the backup's MANIFEST.json.
+2. Restore saved home/ files and recorded external targets. Remove only new paths marked absent.
+3. Keep later user edits and the backup. Restore the profile before running setup again.
+
+This example is checked against the renderer's recorded test fixture:
 
 ```text
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  END SUMMARY
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Result: SUCCESS
-A profile saves machine choices. Pins select tool versions; groups select optional content.
-Commit IDs identify saved Git versions. None means no change or no recorded value.
+1 · Software — no changes.
+  Already present: chezmoi 2.74.1, Mise 2026.8.5
 
-1. Software
-Software changes: None
-Installed new:
-  None
-Already present:
-  chezmoi 2.74.1
-  Mise 2026.8.5
-Upgraded:
-  None
+2 · Manager and content — no changes.
 
-2. Manager and content
-Checkout changes:
-  Updated Content: b92bbc8bfb512e7a23316dac4efd0c8a49e5179f → 95e79b79628a4953bf25e828043a6b537afa9786 — /tmp/tmpcyx1dwc4/home/dotfiles
-Manager: unchanged, 3f51ebb825e9be7bda7070b89e17efecbb76abb9 — /tmp/dotfleet-config-state-fix
+3 · Files — 1 added, 1 changed, 1 removed.
+  + ~/.zshrc
+  ~ ~/.aliases
+  − ~/.config/docker/aliases.zsh
 
-3. Files
-Added:
-  /tmp/tmpcyx1dwc4/home/.added
-Changed:
-  /tmp/tmpcyx1dwc4/home/.changed
-  /tmp/tmpcyx1dwc4/home/.config/dotfleet/profile.toml
-Removed:
-  /tmp/tmpcyx1dwc4/home/.removed
+4 · Profile changes — 1 changed.
+  Group docker  on → off
 
-4. Profile changes
-  Changed groups.extra: true → false
+5 · Locations
+  Content  ~/dotfiles
+  Profile  ~/.config/dotfleet/profile.toml
+  Source   ~/.local/share/dotfleet/chezmoi-source
+  Backup   ~/dotfleet-backups/20261116-140000
 
-5. Locations
-Content checkout: /tmp/tmpcyx1dwc4/home/dotfiles
-Profile file: /tmp/tmpcyx1dwc4/home/.config/dotfleet/profile.toml
-Converted source: /tmp/tmpcyx1dwc4/home/.local/share/dotfleet/chezmoi-source
-Backup folder: /tmp/tmpcyx1dwc4/home/dotfleet-backups/20261116-135923
+6 · Next steps
+  Update
+    curl -fsSL https://raw.githubusercontent.com/jeremyspofford/dotfleet/main/install.sh |
+    bash
+  Rollback  ~/dotfleet-backups/20261116-140000/MANIFEST.json
+  Wizard
+    curl -fsSL https://raw.githubusercontent.com/jeremyspofford/dotfleet/main/install.sh |
+    bash -s -- --configure
 
-6. Next steps
-Update: curl -fsSL https://raw.githubusercontent.com/jeremyspofford/dotfleet/main/install.sh | bash
-Rollback: /tmp/tmpcyx1dwc4/home/dotfleet-backups/20261116-135923/MANIFEST.json
-Restore saved home/ files and recorded external targets. Remove only new paths marked absent.
-Keep user edits and the backup. Restore the profile before running setup again.
-Reopen the wizard: curl -fsSL https://raw.githubusercontent.com/jeremyspofford/dotfleet/main/install.sh | bash -s -- --configure
-chezmoi status: CLEAN (no differences)
-Warnings:
-  None.
-Run record: /tmp/tmpcyx1dwc4/home/dotfleet-backups/20261116-135923/RUN.json
+chezmoi status: clean · warnings: none
+Run record: ~/dotfleet-backups/20261116-140000/RUN.json
 ```
 
 ## How it works

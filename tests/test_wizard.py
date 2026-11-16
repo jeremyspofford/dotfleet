@@ -47,9 +47,9 @@ class WizardTests(unittest.TestCase):
         output = self.terminal(self.answers(), flags=[], auto_wizard=False)
         self.assertIn('Recommended: defaults.', output)
         self.assertIn('7. Group: docker NEW', output)
-        self.assertIn('3. Files', output)
-        self.assertIn('Will be added:', output)
-        self.assertIn('Result: SUCCESS', output)
+        self.assertIn('3 · Files', output)
+        self.assertIn('will be', output)
+        self.assertIn('chezmoi status: clean', output)
         self.assert_quiet_status()
         profile = (self.home / '.config/dotfleet/profile.toml').read_bytes()
         output = self.terminal([], flags=[], auto_wizard=False)
@@ -89,7 +89,7 @@ class WizardTests(unittest.TestCase):
     def test_repo_door_legacy_stow(self):
         repo = os.environ['DOTFLEET_ARCHIVE_FIXTURE']
         output = self.terminal(self.answers('repo', repo), flags=[], auto_wizard=False)
-        self.assertIn('Result: SUCCESS', output)
+        self.assertIn('chezmoi status: clean', output)
         self.assertTrue((self.home / '.zshrc').is_file())
         self.assert_quiet_status()
 
@@ -101,7 +101,7 @@ class WizardTests(unittest.TestCase):
         answers = self.answers()
         answers[-1] = (b'Review [quit]:', b'quit\n')
         output = self.terminal(answers, flags=[], auto_wizard=False)
-        self.assertIn('Home unchanged; nothing applied.', output)
+        self.assertIn('chezmoi status: cancelled', output)
         self.assertEqual(self.snapshot(), before)
 
     def test_review_go_back_changes_identity_before_apply(self):

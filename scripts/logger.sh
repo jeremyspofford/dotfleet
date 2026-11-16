@@ -12,6 +12,7 @@
 #           error_exit "Something broke" 3
 #
 # Functions and output:
+# log_change KIND msg...: added=green, removed=red, changed=yellow; stdout.
 # log_info msg...: blue progress; log_success msg...: green success. Both use stdout.
 # log_warning msg...: yellow warnings on stderr. log_warn is the same interface.
 # log_error msg...: red errors on stderr.
@@ -108,6 +109,18 @@ log_info() {
 
 log_success() {
 	_log_line "${GREEN}" "$*"
+}
+
+# File changes are information, including removals. Keep them on stdout.
+log_change() {
+	local kind="$1"
+	shift
+	case $kind in
+	added) _log_line "${GREEN}" "$*" ;;
+	removed) _log_line "${RED}" "$*" ;;
+	changed) _log_line "${YELLOW}" "$*" ;;
+	*) _log_line '' "$*" ;;
+	esac
 }
 
 log_warning() {
@@ -242,6 +255,7 @@ Parameters:
   No other command-line arguments are accepted.
 
 Functions:
+  log_change KIND MESSAGE... File change on stdout: added=green, removed=red, changed=yellow.
   log_info MESSAGE...       Blue progress on stdout.
   log_success MESSAGE...    Green success on stdout.
   log_warning MESSAGE...    Yellow warning on stderr; log_warn is an alias.
