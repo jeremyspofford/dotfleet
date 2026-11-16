@@ -80,6 +80,7 @@ Secret values never enter Git or the profile. Content declares references and na
 Back up every target before replacement. Preserve symbolic links and copy external file targets separately.
 Save profile data at `~/.config/dotfleet/profile.toml`. Saved selections win over later defaults.
 During legacy adoption, merge old chezmoi pins, current Mise tools, and saved installer pins, in that order.
+Carry existing Mise settings into `mise_settings` too. This preserves settings beyond tool versions.
 A saved Dotfleet profile then becomes authoritative. Carry identity and domain from saved data too.
 
 The manager records output hashes, identifiers used to compare contents. Remove deselected outputs only when they still match their recorded state.

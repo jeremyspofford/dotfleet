@@ -18,7 +18,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: jeremyspofford/dotfiles
-          ref: feat/plain-content-split
+          ref: main
           path: content
           persist-credentials: false
       - uses: actions/checkout@v4

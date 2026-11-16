@@ -71,7 +71,8 @@ def checkout_content(home, repo):
 def old_profile(home):
     data = read_toml(home / '.config/chezmoi/chezmoi.toml').get('data', {})
     pins = dict(data.get('miseTools', {}))
-    current = read_toml(home / '.config/mise/config.toml').get('tools', {})
+    current_mise = read_toml(home / '.config/mise/config.toml')
+    current = current_mise.get('tools', {})
     pins.update(current)
     saved = read_toml(home / '.config/dotfiles/profile.toml')
     pins.update(saved.get('miseTools', saved.get('tool_pins', saved.get('pins', saved.get('tools', {})))))
@@ -82,6 +83,8 @@ def old_profile(home):
         'git_email': saved.get('git_email', saved.get('gitEmail', data.get('gitEmail', ''))),
         'pins': pins, 'groups': saved.get('groups', {}),
     }
+    if 'settings' in current_mise:
+        profile['mise_settings'] = current_mise['settings']
     if data.get('secretsEnabled'):
         profile['secrets'] = {'EXAMPLE_API_TOKEN': {'enabled': True, 'reference': data['secretReference']}}
     if saved.get('secrets'):
@@ -212,6 +215,8 @@ def generated_files(home, profile, manifest, defaults):
     pins, available = installed_defaults(defaults.get('tools', {}), profile['pins'], home)
     mise = dict(defaults)
     mise['tools'] = pins
+    if 'mise_settings' in profile:
+        mise['settings'] = profile['mise_settings']
     mise.setdefault('settings', {})
     mise['settings'].setdefault('experimental', False)
     with tempfile.TemporaryDirectory() as folder:

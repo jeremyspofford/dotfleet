@@ -132,7 +132,7 @@ class EnrollmentTests(unittest.TestCase):
     def test_migration_reads_all_sources_and_preserves_pins(self):
         for name, data in {
             ".config/chezmoi/chezmoi.toml": {"data": {"domain": "personal", "gitName": "Example Owner", "gitEmail": "owner@example.invalid", "miseTools": {"node": "22", "python": "3.12"}}},
-            ".config/mise/config.toml": {"tools": {"node": "24"}},
+            ".config/mise/config.toml": {"tools": {"node": "24"}, "settings": {"experimental": False}},
             ".config/dotfiles/profile.toml": {"pins": {"python": "3.13"}},
         }.items():
             path = self.home / name
@@ -144,6 +144,8 @@ class EnrollmentTests(unittest.TestCase):
         profile = tomllib.loads((self.home / ".config/dotfleet/profile.toml").read_text())
         self.assertEqual(profile["pins"], {"node": "24", "python": "3.13"})
         self.assertEqual(profile["git_name"], "Example Owner")
+        rendered = tomllib.loads((self.home / ".config/mise/config.toml").read_text())
+        self.assertEqual(rendered["settings"], {"experimental": False})
         before = (self.home / ".config/dotfleet/profile.toml").read_bytes()
         self.install(defaults=False)
         self.assertEqual((self.home / ".config/dotfleet/profile.toml").read_bytes(), before)

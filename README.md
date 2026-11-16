@@ -41,7 +41,7 @@ The manager creates Git identity, domain, Mise settings, and a private secrets f
 A reference such as `op://Vault/Item/field` names a secret in 1Password. References are disabled unless explicitly enabled.
 
 Old Layer 0 enrollment migrates automatically. Setup reads old chezmoi data, rendered Mise pins, and saved installer data before applying files.
-Existing Dotfleet profiles remain authoritative. Backups preserve replaced files and prior staged sources.
+Migration also saves existing Mise settings in the profile. Existing Dotfleet profiles remain authoritative. Backups preserve replaced files and prior staged sources.
 Conflict menus explain letter keys and require Enter. Skipping changes can leave differences; the summary reports that as incomplete enrollment.
 
 1. Edit files in `~/dotfiles` or edit your profile.
