@@ -205,6 +205,10 @@ The one-line installer remains the first-install and recovery path.
 | Command | Action |
 | --- | --- |
 | `dotfleet update` | Fetch the manager and content, then apply saved choices. Refuse dirty or diverged checkouts. |
+| `dotfleet profile` | Show saved choices and the profile location. Edit choices through commands or the wizard. |
+| `dotfleet backups` | List backup dates, results, and sizes without changing files. |
+| `dotfleet secrets` | List declared secret names as set or unset. Values stay private. |
+| `dotfleet content` | Show the content checkout, repository, commit, behind state, and short Git status. |
 | `dotfleet status` | Show this machine's choices, installed pins, drift, last run, and last backup. |
 | `dotfleet diff` | Show pending patches. Use `--stat` for paths only. Exit 0 means clean; exit 1 means differences. |
 | `dotfleet rollback` | List backups and choose one in a terminal. Include the saved profile when restoring. |
@@ -260,3 +264,12 @@ Content cannot manage the registry or profile file. These belong to the manager.
 An add-on is an optional manager extension. Run `dotfleet addons` to list validated installed records. No add-ons ship with Dotfleet.
 The [add-on contract](docs/ADDON-INTERFACE.md) defines installation declarations, allowed data access, output ownership, and safe teardown.
 A test fixture validates the contract. It is not installed or offered as a product add-on.
+
+Use `dotfleet machines export` to view this machine’s saved record alone.
+Use `dotfleet machines export --output FILE` to save a private TOML copy for transfer. FILE must not exist.
+TOML is the configuration format used by the registry. Export never prints its raw contents.
+Use `dotfleet machines remove HOSTNAME` to remove another machine’s stale record. Dotfleet backs up the registry and records the change.
+The active machine’s record cannot be removed this way.
+
+Use `dotfleet profile` to inspect saved choices. Change them through `domain`, `pins`, `groups`, or `configure`; do not edit profile.toml.
+The manager’s chezmoi configuration and converted source are internal files. Inspect their locations through `status` and their health through `doctor`.

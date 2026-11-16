@@ -1,0 +1,10 @@
+Profile
+  Profile file   ~/.config/dotfleet/profile.toml
+  Domain         personal
+  Domain choice  chosen
+  Git name       Example Person
+  Git email      example@example.invalid
+  Pin node       24.14.1
+  Group helpers  on
+  Agent codex    off
+  Edit choices   Use dotfleet domain, pins, groups, or configure. Do not edit profile.toml.
