@@ -30,6 +30,31 @@ Paths remain absolute. `home` records the machine's home path so reports can pri
 The registry does not store identity, pins, or credentials.
 Use unique hostnames when combining records manually.
 
+Example record; the values below describe an illustrative machine:
+
+```toml
+schema_version = 1
+
+[machines."example-hub"]
+hostname = "example-hub"
+home = "/home/example"
+os = "Linux"
+domain = "personal"
+domain_chosen = true
+content_repo = "https://github.com/jeremyspofford/dotfiles"
+content_commit = "0123456789abcdef0123456789abcdef01234567"
+manager_version = "0.2.0"
+last_run = "2026-11-16T12:00:00+00:00"
+last_backup = "/home/example/dotfleet-backups/20261116-070000"
+last_run_record = "/home/example/dotfleet-backups/20261116-070000/RUN.json"
+result = "SUCCESS"
+enrolled = true
+```
+
+Backups include the registry for manual recovery. Automatic rollback never replaces it, and uninstall never removes it.
+These operations preserve other machines' records. Each operation refreshes this machine's record; uninstall records `enrolled = false`.
+Inspect current records before any manual recovery. An older registry can contain stale facts about other machines.
+
 Backed-up apply, update, restore, and backup runs refresh this machine's record, including failures.
 Read-only commands and cancellations do not update timestamps. Cancelling before confirmation leaves home unchanged.
 `dotfleet machines` prints saved records already present in the file. It does not contact other machines or prove that their records are current.
