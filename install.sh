@@ -3,6 +3,7 @@
 # Usage: bash install.sh [OPTIONS]
 # Parameters: --repo chooses content; --configure asks again; --defaults skips prompts for complete profiles.
 # --domain, --git-name, and --git-email supply profile choices. Repeat --pin TOOL=VERSION for full tool versions.
+# --adopt keeps scanned home files. --group NAME=on|off selects groups. --agents chooses coding assistants.
 # --format selects plain (real names) or chezmoi (native sources); -h/--help prints help.
 # Example: bash install.sh --repo https://github.com/jeremyspofford/dotfiles
 # Exit codes: 0 success/help; 1 setup failure; 2 invalid arguments.
@@ -38,7 +39,10 @@ Usage: bash install.sh [OPTIONS]
 Options:
   --repo URL       Content Git repository; default: https://github.com/jeremyspofford/dotfiles.
                    Plain repositories use real names. Chezmoi repositories use native source names.
-  --configure      Ask profile questions again. Enter keeps each displayed answer.
+  --adopt          Create a local repository from existing home files. Exclude secret matches before committing.
+  --configure      Run the enrollment wizard again. Review every choice before applying.
+  --group NAME=on|off Include or exclude a content group. Repeat for more groups.
+  --agents NAMES   Configure detected coding assistants, separated by commas; none skips this step.
   --defaults       Skip prompts only with a complete profile. New groups default to on.
                    This flag cannot bypass missing identity, domain confirmation, or floating pins.
   --domain VALUE   Record a domain choice: core, personal, work, or client (defined below).
@@ -50,17 +54,24 @@ Options:
 A profile saves the repository, domain, Git author identity, tool pins, and content groups.
 Domains choose optional additions from your content repository. Identity and tools are chosen separately.
   core      Base configuration only.
-  personal  Intended for your own use; no extra aliases in the bundled example.
-  work      Intended for employer work; no extra aliases in the bundled example.
-  client    Intended for customer work; no extra aliases in the bundled example.
-All four currently provide the same bundled settings. Start with core.
+  personal  Your own settings; bundled examples show your directory and list its entries.
+  work      Employer settings; bundled examples show your directory and list its entries.
+  client    Customer settings; bundled examples show your directory and list its entries.
+Domain descriptions and command names come from your content. Empty overlays say they add nothing yet.
 The domain prompt inspects the selected checkout and lists its domain command additions.
 Custom repositories can define other behavior; check their documentation when additions are not described.
 A new profile defaults to core. Later prompts show the domain saved in ~/.config/dotfleet/profile.toml.
 Press Enter to confirm that domain, or type another domain name and press Enter.
 The profile also saves Git identity, exact tool versions, and group choices. Mise tracks installed versions.
 Groups select optional files or alias blocks. Each prompt defines on and off.
-Plain reruns ask about missing identity, an unconfirmed domain, and floating pins such as latest.
+The wizard runs for new or incomplete profiles, unchosen domains, and --configure.
+Steps: welcome, scan, source, domain, identity, pins, groups, agents, review, apply.
+Source choices: adopt keeps existing files; defaults uses our examples; repo uses your Git URL.
+Adoption scans root dotfiles and .config files. It excludes credential and shell-history names, secret patterns, binary files, and files above 2 MiB.
+The scan cannot prove a file contains no secrets. Review the local repository before pushing it.
+Review shows the backup path and changed files. Type confirm to apply, quit to cancel, or a step name to go back.
+Nothing in your home changes before confirmation. Temporary tool downloads stay outside your home.
+Adopted file contents stay unchanged, including existing Mise files. Profile choices do not rewrite adopted files.
 Pins use full versions. Enter accepts the prompt's stated action; skip leaves a choice incomplete.
 Complete profiles need no profile prompts. The summary lists skipped gaps under Warnings.
 Without a terminal, missing identity, an unconfirmed domain, or floating pins stop setup with exit 1.
@@ -87,8 +98,8 @@ while [[ $# -gt 0 ]]; do
 		usage
 		exit 0
 		;;
-	--configure | --defaults) shift ;;
-	--repo | --format | --domain | --git-name | --git-email | --pin)
+	--configure | --defaults | --adopt) shift ;;
+	--repo | --format | --domain | --git-name | --git-email | --pin | --group | --agents)
 		[[ $# -ge 2 && -n $2 && $2 != --* ]] || {
 			usage >&2
 			exit 2
@@ -115,44 +126,23 @@ log_section "Dotfleet setup"
 log_info "Host: $host / $(uname -m)"
 export PATH="$HOME/.local/bin:$PATH"
 umask 077
-mkdir -p "$HOME/.local/bin"
+mkdir -p "$work_dir/bin"
 if ! command -v chezmoi >/dev/null; then
-	log_info 'Installing chezmoi into ~/.local/bin'
+	log_info 'Preparing chezmoi; it moves to ~/.local/bin only after confirmation'
 	curl -fsSL https://get.chezmoi.io -o "$work_dir/chezmoi-install"
-	sh "$work_dir/chezmoi-install" -b "$HOME/.local/bin" </dev/null
+	sh "$work_dir/chezmoi-install" -b "$work_dir/bin" </dev/null
+	export DOTFLEET_STAGED_CHEZMOI="$work_dir/bin/chezmoi"
 fi
 if ! command -v mise >/dev/null; then
-	log_info 'Installing Mise into ~/.local/bin'
+	log_info 'Preparing Mise; it moves to ~/.local/bin only after confirmation'
 	curl -fsSL https://mise.run -o "$work_dir/mise-install"
-	MISE_INSTALL_PATH="$HOME/.local/bin/mise" sh "$work_dir/mise-install" </dev/null
+	HOME="$work_dir" MISE_INSTALL_PATH="$work_dir/bin/mise" sh "$work_dir/mise-install" </dev/null
+	export DOTFLEET_STAGED_MISE="$work_dir/bin/mise"
 fi
+export PATH="$work_dir/bin:$PATH"
 if [[ -z $script_dir ]]; then
-	script_dir="$HOME/.local/share/dotfleet/manager"
-	if [[ -e $script_dir ]]; then
-		[[ -d $script_dir/.git && ! -L $script_dir ]] || error_exit 'Manager path is occupied by another directory.'
-		remote=$(git -C "$script_dir" config --get remote.origin.url)
-		[[ $remote == "$manager_repo" ]] || error_exit 'Manager checkout belongs to another repository.'
-		[[ -z $(git -C "$script_dir" status --porcelain) ]] || error_exit 'Preserve manager checkout edits before updating.'
-		git -C "$script_dir" pull --ff-only </dev/null
-	else
-		mkdir -p "$(dirname -- "$script_dir")"
-		git clone "$manager_repo" "$script_dir" </dev/null
-	fi
+	script_dir="$work_dir/manager"
+	git clone "$manager_repo" "$script_dir" </dev/null
 fi
-# Keep messages ordered and use the shared logger's severity colors.
-python3 -u "$script_dir/scripts/manager.py" "${arguments[@]}" </dev/null 2>&1 | while IFS= read -r line; do
-	case $line in
-	'END SUMMARY')
-		log_info ''
-		log_section "$line"
-		;;
-	'Warnings:')
-		log_info ''
-		log_info "$line"
-		;;
-	'Result: SUCCESS' | 'chezmoi status: CLEAN'* | '  None.' | 'Choose ['*) log_success "$line" ;;
-	'Setup failed:'* | 'Result: FAILED' | 'Apply stopped.'*) log_error "$line" ;;
-	'  '* | 'chezmoi: warning:'*) log_warn "$line" ;;
-	*) log_info "$line" ;;
-	esac
-done
+# Python sends each completed line through logger.sh before showing a terminal prompt.
+python3 -u "$script_dir/scripts/manager.py" "${arguments[@]}" </dev/null

@@ -151,7 +151,7 @@ class EnrollmentTests(unittest.TestCase):
         cached = command("chezmoi", "state", "get", "--bucket=configState", "--key=configState", env=self.env)
         self.assertEqual(json.loads(cached)["configTemplateContentsSHA256"], hashlib.sha256(contents.encode()).hexdigest())
         command("chezmoi", "state", "set", "--bucket=scriptState", "--key=keep", '--value={"keep": true}', env=self.env)
-        self.install(Path(os.environ["DOTFLEET_CONTENT_FIXTURE"]))
+        command("bash", str(ROOT / "install.sh"), "--repo", os.environ["DOTFLEET_CONTENT_FIXTURE"], "--defaults", "--domain", "personal", env=self.env, cwd=self.home)
         self.assert_quiet_status()
         self.assertEqual(command("chezmoi", "state", "get", "--bucket=configState", "--key=configState", env=self.env), "")
         self.assertEqual(json.loads(command("chezmoi", "state", "get", "--bucket=scriptState", "--key=keep", env=self.env)), {"keep": True})
@@ -219,7 +219,7 @@ class EnrollmentTests(unittest.TestCase):
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(toml(data))
         (self.home / ".secrets").write_text("# preserved secret placeholder\n")
-        output = self.install(Path(os.environ["DOTFLEET_CONTENT_FIXTURE"]))
+        output = command("bash", str(ROOT / "install.sh"), "--repo", os.environ["DOTFLEET_CONTENT_FIXTURE"], "--defaults", "--domain", "personal", env=self.env, cwd=self.home)
         self.assertIn("old chezmoi data, current Mise tools, saved installer profile", output)
         profile = tomllib.loads((self.home / ".config/dotfleet/profile.toml").read_text())
         self.assertEqual(profile["pins"], {"node": "24.1.0", "python": "3.13.0"})
@@ -232,7 +232,7 @@ class EnrollmentTests(unittest.TestCase):
         self.assertEqual((self.home / ".secrets").read_text(), "# preserved secret placeholder\n")
         self.assertEqual(command("chezmoi", "status", env=self.env, cwd=self.home), "")
 
-    def terminal(self, responses, expected=0, configure=False, plain=False, raw=False):
+    def terminal(self, responses, expected=0, configure=False, plain=False, raw=False, flags=None, auto_wizard=True, timeout=45):
         master, slave = pty.openpty()
         def controlling_terminal():
             os.setsid()
@@ -240,6 +240,8 @@ class EnrollmentTests(unittest.TestCase):
         args = ["bash", str(ROOT / "install.sh"), "--repo", os.environ["DOTFLEET_CONTENT_FIXTURE"]]
         if plain:
             args = ["bash", str(ROOT / "install.sh")]
+        if flags is not None:
+            args = ["bash", str(ROOT / "install.sh"), *flags]
         if configure:
             args.append("--configure")
         process = subprocess.Popen(args, cwd=self.home, env=self.env, stdin=subprocess.PIPE,
@@ -250,7 +252,7 @@ class EnrollmentTests(unittest.TestCase):
         transcript = b""
         cursor = 0
         answered = 0
-        deadline = time.monotonic() + 45
+        deadline = time.monotonic() + timeout
         try:
             while time.monotonic() < deadline:
                 ready, _, _ = select.select([master], [], [], .1)
@@ -270,6 +272,18 @@ class EnrollmentTests(unittest.TestCase):
                     os.write(master, responses[answered][1])
                     cursor = len(transcript)
                     answered += 1
+                elif auto_wizard:
+                    pending = re.sub(rb'\x1b\[[0-9;]*m', b'', transcript[cursor:])
+                    for pattern, answer in [(rb'Content door \[[^]]+\]:', b'repo\n'),
+                                            (rb'Content repository \[[^]]+\]:', b'\n'),
+                                            (rb'Pins \[accept\]:', b'accept\n'),
+                                            (rb'Agents \[[^]]+\]:', b'none\n'),
+                                            (rb'Review \[quit\]:', b'confirm\n'),
+                                            (rb'(?:docker|terraform|kubectl|python|npm) \[(?:on|off)\]:', b'\n')]:
+                        if re.search(pattern, pending):
+                            os.write(master, answer)
+                            cursor = len(transcript)
+                            break
             if process.poll() is None:
                 os.killpg(process.pid, signal.SIGKILL)
             process.wait(timeout=5)
@@ -330,9 +344,9 @@ class EnrollmentTests(unittest.TestCase):
         self.terminal(self.gap_answers(), plain=True)
         self.check_completed_gap_profile()
 
-    def test_complete_migration_needs_no_prompts(self):
+    def test_complete_migration_with_explicit_domain_needs_no_prompts(self):
         self.seed_profile(legacy=True, complete=True)
-        output = self.install(defaults=False)
+        output = command("bash", str(ROOT / "install.sh"), "--domain", "core", env=self.env, cwd=self.home)
         self.assertNotIn("Git author", output)
         self.assertNotIn("Domain:", output)
         self.assertNotIn("node pin:", output)
@@ -341,8 +355,8 @@ class EnrollmentTests(unittest.TestCase):
 
     def test_skipped_gaps_warn_and_do_not_repin_from_content_defaults(self):
         self.seed_profile()
-        answers = [(b"[core]:", b"skip\n"), (b"Git author name", b"\n"),
-                   (b"Git author email", b"\n"), (b"[latest]:", b"skip\n")]
+        answers = [(b"[core]:", b"skip\n"), (b"Git author name", b"skip\n"),
+                   (b"Git author email", b"skip\n"), (b"[latest]:", b"skip\n")]
         output = self.terminal(answers, plain=True)
         self.assertIn("Warnings:", output)
         self.assertIn("No domain choice confirmed", output)
@@ -410,8 +424,8 @@ class EnrollmentTests(unittest.TestCase):
         self.install(defaults=False)
 
     def test_profile_flags_reject_missing_and_invalid_arguments(self):
-        cases = [[flag] for flag in ["--domain", "--git-name", "--git-email", "--pin"]]
-        cases += [["--domain", "unknown"], ["--pin", "node"]]
+        cases = [[flag] for flag in ["--domain", "--git-name", "--git-email", "--pin", "--group", "--agents"]]
+        cases += [["--domain", "unknown"], ["--pin", "node"], ["--group", "docker=maybe"], ["--repo", "example", "--adopt"]]
         for flags in cases:
             with self.subTest(flags=flags):
                 result = subprocess.run(["bash", str(ROOT / "install.sh"), *flags], env=self.env,
@@ -426,15 +440,15 @@ class EnrollmentTests(unittest.TestCase):
                                 env=self.env, cwd=self.home, stdin=subprocess.DEVNULL, text=True,
                                 capture_output=True, start_new_session=True)
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("Git name is empty", result.stdout)
-        self.assertIn("Git email is empty", result.stdout)
-        self.assertIn("node pin is floating", result.stdout)
+        self.assertIn("Git name is empty", result.stdout + result.stderr)
+        self.assertIn("Git email is empty", result.stdout + result.stderr)
+        self.assertIn("node pin is floating", result.stdout + result.stderr)
         self.assertNotIn("Domain was never explicitly chosen", result.stdout)
 
     def test_terminal_profile_and_update(self):
         responses = [(b"[core]:", b"invalid\n"), (b"[core]:", b"personal\n"),
                      (b"Git author name", b"Fixture Person\n"), (b"Git author email", b"fixture@example.invalid\n")]
-        responses += [(f"{group}:".encode(), b"\n") for group in ["docker", "terraform", "kubectl", "python", "npm"]]
+        responses += [(f"{group} [".encode(), b"\n") for group in ["docker", "terraform", "kubectl", "python", "npm"]]
         self.terminal(responses)
         path = self.home / ".config/dotfleet/profile.toml"
         profile = path.read_bytes()
@@ -446,11 +460,9 @@ class EnrollmentTests(unittest.TestCase):
     def test_first_domain_prompt_explains_choices_and_saves_core_default(self):
         answers = [(b"Domain [core]:", b"\n"), (b"Git author name", b"Fixture Person\n"),
                    (b"Git author email", b"fixture@example.invalid\n")]
-        answers += [(f"{group}:".encode(), b"\n") for group in ["docker", "terraform", "kubectl", "python", "npm"]]
+        answers += [(f"{group} [".encode(), b"\n") for group in ["docker", "terraform", "kubectl", "python", "npm"]]
         output = self.terminal(answers)
         for description in ["Base configuration only. No domain additions.",
-                            "No extra commands. The domain alias file is empty.",
-                            "Personal, work, and client currently add no domain commands.",
                             "Choosing a domain does not install software or create accounts.",
                             "Your choice is saved in ~/.config/dotfleet/profile.toml.",
                             "Press Enter to confirm the value in brackets",
@@ -471,14 +483,14 @@ class EnrollmentTests(unittest.TestCase):
         self.env.pop("NO_COLOR", None)
         self.env["TERM"] = "xterm-256color"
         output = self.terminal([(b"Domain [core]:", b"invalid\n"), *self.gap_answers()], plain=True, raw=True)
-        self.assertIn("\x1b[36m\x1b[1mChoose your domain", output)
+        self.assertIn("\x1b[36m\x1b[1m4. Choose your domain", output)
         self.assertIn("\x1b[32mDomain [core]:", output)
         self.assertIn("\x1b[33mChoose core, personal, work, client, skip.", output)
         plain = re.sub(r'\x1b\[[0-9;]*m', '', output).replace("\r\n", "\n")
-        self.assertIn("\nChoose your domain\n------------------\n", plain)
+        self.assertIn("\n4. Choose your domain\n---------------------\n", plain)
         self.assertIn("\n\nDomain [core]:", plain)
-        self.assertIn("\nGit commit identity\n", plain)
-        self.assertIn("No extra commands. The domain alias file is empty.", plain)
+        self.assertIn("\n5. Git commit identity\n", plain)
+        self.assertIn("Base configuration only. No domain additions.", plain)
         self.assert_quiet_status()
 
     def test_no_color_and_basic_terminal_keep_prompts_readable(self):
@@ -491,11 +503,11 @@ class EnrollmentTests(unittest.TestCase):
                     self.env["NO_COLOR"] = no_color
                 self.env["TERM"] = term
                 answers = [(b"Domain [core]:", b"\n"), (b"Git author name", b"\n"), (b"Git author email", b"\n")]
-                answers += [(f"{group}:".encode(), b"\n") for group in ["docker", "terraform", "kubectl", "python", "npm"]]
+                answers += [(f"{group} [".encode(), b"\n") for group in ["docker", "terraform", "kubectl", "python", "npm"]]
                 before = path.read_bytes()
                 output = self.terminal(answers, configure=True, raw=True)
                 self.assertNotIn("\x1b[", output)
-                self.assertIn("Choose your domain", output)
+                self.assertIn("4. Choose your domain", output)
                 self.assertIn("Domain [core]:", output)
                 self.assertEqual(path.read_bytes(), before)
         # Captured output must remain plain even when TERM supports color.
@@ -514,7 +526,7 @@ class EnrollmentTests(unittest.TestCase):
                 before = path.read_bytes()
                 answers = [(f"Domain [{domain}]:".encode(), b"\n"), (b"Git author name", b"\n"),
                            (b"Git author email", b"\n")]
-                answers += [(f"{group}:".encode(), b"\n") for group in ["docker", "terraform", "kubectl", "python", "npm"]]
+                answers += [(f"{group} [".encode(), b"\n") for group in ["docker", "terraform", "kubectl", "python", "npm"]]
                 self.terminal(answers, configure=True)
                 self.assertEqual(path.read_bytes(), before)
                 self.assertEqual((self.home / ".config/dotfiles/domain").read_text(), domain + "\n")
@@ -605,7 +617,7 @@ class ConverterTests(unittest.TestCase):
             # Untracked files must not appear as content that will be applied.
             (checkout / ".config/dotfiles/aliases/client.zsh").write_text("alias untracked='false'\n")
             detail = domain_details(checkout)
-            self.assertIn("personal  No extra commands", detail)
+            self.assertIn("personal  Adds nothing yet", detail)
             self.assertIn("Command names: project, review.", detail)
             self.assertNotIn("ignored", detail)
             self.assertIn("client    Additions are not described here", detail)
@@ -626,9 +638,9 @@ class ConverterTests(unittest.TestCase):
         self.assertEqual(profile["pins"], {"node": ["22.1.0", {"version": "24.14.1", "option": "keep"}]})
 
     def test_defaults_only_fill_installed_gaps(self):
-        with patch("manager.run", side_effect=[json.dumps({"node": [{}], "python": [{}]}), "3.13.0\n"]):
+        with patch("manager.run", return_value=json.dumps({"node": [{}], "python": [{}]})), patch("manager.resolve_installed_pin", return_value="3.13.0"):
             pins, available = installed_defaults({"node": "24", "python": "3.13", "uv": "0.12"}, {"node": "22"}, Path("/tmp"))
-        self.assertEqual(pins, {"node": "22", "python": "3.13"})
+        self.assertEqual(pins, {"node": "22", "python": "3.13.0"})
         self.assertEqual(available, {"uv": "0.12"})
 
     def test_agent_generation_keeps_conflict_checks(self):
