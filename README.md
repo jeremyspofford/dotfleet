@@ -81,6 +81,8 @@ Read `--help` for examples, limits, and exit codes.
 ## Run account
 
 Every run prints six categories, including scripted runs. Empty categories collapse to one line.
+A clean no-change run has about twelve content lines, plus spacing between sections.
+Its Locations line points to RUN.json; the record retains every location. Review screens and changed runs show locations in full.
 The wizard uses the same run record before apply. It describes planned actions; the end summary describes confirmed results.
 Paths use `~` for your home directory. Commit IDs identify saved Git versions and show eight characters.
 Full paths and commit IDs remain in RUN.json. Present software shares one quiet line.
