@@ -79,7 +79,7 @@ class RunAccountTests(unittest.TestCase):
         self.assertIn('Already present:', category(text, 1))
         self.assertIn('~/.config/dotfleet/profile.toml', category(text, 5))
         self.assertIn('MANIFEST.json', category(text, 6))
-        self.assertIn('bash -s -- --configure', category(text, 6))
+        self.assertIn('dotfleet configure', category(text, 6))
         self.assert_quiet_status()
 
     def test_manager_update_uses_last_confirmed_commit(self):
@@ -96,7 +96,7 @@ class RunAccountTests(unittest.TestCase):
         new = command('git', '-C', str(manager), 'rev-parse', 'HEAD').strip()
         text = summary(self.enroll(root=manager))
         self.assertIn(f'{old[:8]} → {new[:8]}', text)
-        self.assertIn(str(manager), text)
+        self.assertIn('~/.local/share/dotfleet/manager', text)
         self.assertEqual(category(text, 2).count('→'), 1)
 
     def test_review_has_full_future_account_and_cancel_has_no_changes(self):

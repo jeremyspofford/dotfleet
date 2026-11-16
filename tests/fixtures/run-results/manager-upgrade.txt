@@ -15,13 +15,9 @@
   Backup   ~/dotfleet-backups/20261116-140000
 
 6 · Next steps
-  Update
-    curl -fsSL https://raw.githubusercontent.com/jeremyspofford/dotfleet/main/install.sh |
-    bash
+  Update    dotfleet update
   Rollback  ~/dotfleet-backups/20261116-140000/MANIFEST.json
-  Wizard
-    curl -fsSL https://raw.githubusercontent.com/jeremyspofford/dotfleet/main/install.sh |
-    bash -s -- --configure
+  Wizard    dotfleet configure
 
 chezmoi status: clean · warnings: none
 Run record: ~/dotfleet-backups/20261116-140000/RUN.json

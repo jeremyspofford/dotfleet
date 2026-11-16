@@ -125,13 +125,9 @@ This example is checked against the renderer's recorded test fixture:
   Backup   ~/dotfleet-backups/20261116-140000
 
 6 · Next steps
-  Update
-    curl -fsSL https://raw.githubusercontent.com/jeremyspofford/dotfleet/main/install.sh |
-    bash
+  Update    dotfleet update
   Rollback  ~/dotfleet-backups/20261116-140000/MANIFEST.json
-  Wizard
-    curl -fsSL https://raw.githubusercontent.com/jeremyspofford/dotfleet/main/install.sh |
-    bash -s -- --configure
+  Wizard    dotfleet configure
 
 chezmoi status: clean · warnings: none
 Run record: ~/dotfleet-backups/20261116-140000/RUN.json
@@ -193,3 +189,43 @@ Read [release rules](docs/RELEASES.md) and [writing rules](docs/WRITING.md).
 CI means automated change checks. It runs shell checks, formatting, release-policy tests, and container enrollment tests.
 Container tests cover plain content, the private Stow archive, and a native chezmoi fixture.
 They check adoption, secret exclusions, review cancellation, repeat runs, shell startup, group changes, saved profiles, and clean status.
+
+## After enrollment
+
+Use `dotfleet` for daily commands. The installer places it in `~/.local/bin` on every run.
+It keeps the manager checkout at `~/.local/share/dotfleet/manager`. The command uses that copy and its VERSION file.
+Keep `~/.local/bin` on PATH, the list of folders your shell searches for commands.
+The one-line installer remains the first-install and recovery path.
+
+| Command | Action |
+| --- | --- |
+| `dotfleet update` | Fetch the manager and content, then apply saved choices. Refuse dirty or diverged checkouts. |
+| `dotfleet status` | Show this machine's choices, installed pins, drift, last run, and last backup. |
+| `dotfleet diff` | Fetch into temporary storage and preview the update. Change no home files. |
+| `dotfleet rollback` | List backups and choose one in a terminal. Include the saved profile when restoring. |
+| `dotfleet rollback BACKUP` | Review one backup folder, then type restore to confirm. |
+| `dotfleet domain` | Show the current domain, its confirmation state, and each domain's description. |
+| `dotfleet domain personal` | Record the personal domain as chosen and apply it. |
+| `dotfleet groups` | List content groups, their states, and descriptions. |
+| `dotfleet groups docker off` | Exclude Docker content. Use on to restore it. |
+| `dotfleet pins` | List saved exact versions and installed versions. |
+| `dotfleet pins set node@24.14.1` | Explicitly install and record that exact version. Content defaults still never install software. |
+| `dotfleet pins remove node` | Remove the pin and prevent content defaults from filling it again. Keep installed software. |
+| `dotfleet configure` | Reopen the enrollment wizard. |
+| `dotfleet doctor` | Check profile completeness, drift, checkout edits, and backups. Print a fix for each failed check. |
+| `dotfleet backup` | Snapshot managed files and the profile without applying content. |
+| `dotfleet version` | Print the manager version and content commit. |
+| `dotfleet uninstall` | Review removal, then type uninstall. Keep the content checkout and all backups. |
+
+A checkout is a local Git copy. Status reports how far content trails the last fetched remote state; it does not fetch.
+Drift means that managed files differ from the selected content. Groups select optional files or alias blocks.
+The profile stores machine choices. Pins select exact tool versions.
+Every command supports `--help`. Exit codes are 0 for success or cancellation, 1 for failed checks or operations, and 2 for arguments.
+
+Change-making commands write RUN.json and print the standard review. File lists come from the plan and backup inventory.
+Rollback makes another backup first. It restores only recorded paths, including original symlinks and recorded external targets.
+It verifies saved file fingerprints before writing. A fingerprint records the file's content hash and permissions, or its symlink target.
+A content checkout remains at its current commit after rollback. Use diff to review differences before updating again.
+Uninstall offers to restore the oldest backup. Otherwise, it removes known managed files and the manager's command, checkout, and converted source.
+Uninstall keeps installed tools, the content checkout, and all backups. Removal includes local edits, which the new backup preserves.
+Rollback and uninstall require terminal confirmation. A scripted rollback without a folder only lists backups.

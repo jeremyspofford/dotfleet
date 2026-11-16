@@ -65,7 +65,7 @@ jobs:
           second = (folder / 'install-second.log').read_text()
           for number, name in enumerate(['Software', 'Manager and content', 'Files', 'Profile changes', 'Locations', 'Next steps'], 1):
               assert f'{number} · {name}' in first and f'{number} · {name}' in second
-          assert '2 installed.' in first
+          assert '3 installed.' in first
           assert '~/.local/bin/chezmoi' in first
           assert '~/.local/bin/mise' in first
           for number, name in enumerate(['Software', 'Manager and content', 'Files', 'Profile changes'], 1):

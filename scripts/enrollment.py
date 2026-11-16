@@ -85,7 +85,10 @@ def stage_repo(home, repo, workspace):
         if repo == str(canonical) and result.returncode == 0:
             repo = remote
     destination = workspace / f'checkout-{len(list(workspace.glob("checkout-*")))}'
-    run('git', 'clone', '--no-hardlinks', repo, str(destination))
+    source = str(canonical) if os.environ.get('DOTFLEET_LOCAL_CONTENT') and canonical.exists() else repo
+    run('git', 'clone', '--no-hardlinks', source, str(destination))
+    if source != repo:
+        run('git', '-C', str(destination), 'remote', 'set-url', 'origin', repo)
     if canonical.exists():
         old = run('git', '-C', str(canonical), 'rev-parse', 'HEAD').strip()
         # Fetch only into scratch. Divergence must fail before review or home writes.
