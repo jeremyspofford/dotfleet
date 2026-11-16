@@ -29,7 +29,7 @@ DESCRIPTIONS = {
     'status': 'Show this machine’s profile, saved choices, installed pins, groups, checkout state, drift, and recent backups. Drift means managed files differ.',
     'diff': 'Preview an update in temporary storage. Apply nothing and keep your home unchanged. File markers show added, changed, or removed paths.',
     'rollback': 'List backups or restore one after confirmation. A backup contains original files and a manifest listing them. The profile is restored too.',
-    'domain': 'Show domains, or apply a named domain. A domain selects additions described by your content repository. Record explicit choices as chosen.',
+    'domain': 'Show domains, or apply a named domain. A domain selects content additions. A missing domain_chosen field means UNCHOSEN; a named choice confirms it.',
     'groups': 'List optional content groups. Turn a group on to include it, or off to remove its managed files or alias blocks.',
     'pins': 'List exact tool versions and installed state. Set a pin to install that exact version. Remove a pin without uninstalling software.',
     'configure': 'Reopen the enrollment wizard. The wizard reviews source, domain, identity, pins, groups, and agents before applying choices.',
@@ -130,23 +130,40 @@ def domain_choices(home):
             for name in ['core', 'personal', 'work', 'client']}
 
 
+def command_profile_gaps(p):
+    """Keep the manager's validation, with fixes users can run through this command."""
+    gaps = []
+    for gap in m.profile_gaps(p):
+        if gap.startswith('Domain '):
+            gap = gap.replace('Supply --domain.', 'Run dotfleet domain to list choices, then dotfleet domain NAME.')
+        elif gap.startswith(('Git name ', 'Git email ')):
+            gap = gap.split('. Supply ', 1)[0] + '. Run dotfleet configure.'
+        elif ' pin is floating ' in gap:
+            tool = gap.split(' pin is floating ', 1)[0]
+            gap = gap.split('. Supply ', 1)[0] + f'. Run dotfleet pins set {tool}@VERSION with a full version.'
+        gaps.append(gap)
+    return gaps
+
+
 def read_view(args, home, p):
     name = args.command
     manifest = read_toml(home / 'dotfiles/dotfleet.toml')
     if name == 'version':
         pairs = [('Manager', (ROOT / 'VERSION').read_text().strip()), ('Content commit', commit(home / 'dotfiles'))]
     elif name == 'domain':
-        pairs = [('Current', p.get('domain', 'core')), ('Chosen', p.get('domain_chosen', False))]
+        pairs = [('Current', p.get('domain', 'core')), ('Choice', 'chosen' if p.get('domain_chosen', False) else 'UNCHOSEN')]
         pairs += list(domain_choices(home).items())
+        pairs.append(('Choose', 'dotfleet domain NAME · replace NAME with a listed choice'))
     elif name == 'groups':
         pairs = [(group, ('on' if p.get('groups', {}).get(group, True) else 'off') + ' · ' + spec['description'])
                  for group, spec in manifest.get('groups', {}).items()]
     elif name == 'pins':
         pairs = pin_rows(p, home)
     elif name == 'doctor':
-        gaps = m.profile_gaps(p)
+        gaps = command_profile_gaps(p)
         drift = status(home)
-        pairs = [('Profile', 'PASS' if not gaps else 'FAIL · run dotfleet configure')]
+        pairs = [('Profile', 'PASS' if not gaps else 'FAIL · resolve the gaps below')]
+        pairs.append(('Domain choice', 'PASS · chosen' if p.get('domain_chosen', False) else 'FAIL · UNCHOSEN; run dotfleet domain'))
         pairs += [('Gap', gap) for gap in gaps]
         pairs += [('Managed files', 'FAIL · run dotfleet diff to inspect drift' if drift else 'PASS · no drift')]
         for label, path in [('Manager checkout', home / MANAGER), ('Content checkout', home / 'dotfiles')]:
@@ -159,7 +176,7 @@ def read_view(args, home, p):
         backups = records(home)
         last = next((path for path in reversed(backups) if (path / 'RUN.json').exists()), None)
         record = load_json(last / 'RUN.json', {}) if last else {}
-        pairs = [('Domain', p.get('domain', 'core') + (' · chosen' if p.get('domain_chosen') else ' · not chosen')),
+        pairs = [('Domain', p.get('domain', 'core') + (' · chosen' if p.get('domain_chosen', False) else ' · UNCHOSEN; run dotfleet domain')),
                  ('Identity', (p.get('git_name', '') + ' <' + p.get('git_email', '') + '>') if p.get('git_name', '').strip() and p.get('git_email', '').strip() else 'missing; run dotfleet configure')]
         pairs += [('Pin ' + key, value) for key, value in pin_rows(p, home)] or [('Pins', 'none')]
         pairs += [('Group ' + key, value) for key, value in p.get('groups', {}).items()]

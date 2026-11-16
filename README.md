@@ -159,7 +159,9 @@ bash install.sh --domain personal --git-name "Example Person" --git-email person
 Repeat `--pin TOOL=VERSION` for each full version. A floating value in a flag still fails unattended validation.
 Complete profiles need no flags on later runs. New group defaults are printed during scripted setup.
 
-`domain_chosen` records a human choice in this wizard or through `--domain`. Carried and defaulted domains remain unchosen until confirmed.
+`domain_chosen` records a human choice in this wizard, through `--domain`, or through `dotfleet domain NAME`.
+A missing field means UNCHOSEN, including profiles saved before the wizard existed. Carried and defaulted domains remain unchosen until confirmed.
+Status and doctor show that gap. Run `dotfleet domain` to read the choices, then `dotfleet domain NAME` to confirm one.
 `unpinned_tools` records skipped tools, so content defaults cannot select them later. Remove a tool there to allow its defaults again.
 Content defaults fill gaps only when the requested versions are installed. The summary lists other defaults as available, without installing them.
 The manager creates Git identity, domain, Mise settings, and a private secrets file. Keep secret references in the profile, never values.
