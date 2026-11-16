@@ -490,7 +490,7 @@ class EnrollmentTests(unittest.TestCase):
         self.env.pop("NO_COLOR", None)
         self.env["TERM"] = "xterm-256color"
         output = self.terminal([(b"Domain [core]:", b"invalid\n"), *self.gap_answers()], plain=True, raw=True)
-        self.assertIn("\x1b[36m\x1b[1m4. Choose your domain", output)
+        self.assertIn("\x1b[36m\x1b[1m  4. Choose your domain", output)
         self.assertIn("\x1b[32mDomain [core]:", output)
         self.assertIn("\x1b[33mChoose core, personal, work, client, skip.", output)
         plain = re.sub(r'\x1b\[[0-9;]*m', '', output).replace("\r\n", "\n")

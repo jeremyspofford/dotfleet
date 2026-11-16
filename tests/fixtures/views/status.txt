@@ -1,0 +1,13 @@
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Status
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Domain            personal · chosen
+  Identity          Example Person <example@example.invalid>
+  Pin node          24.14.1 · installed: 24.14.1
+  Group helpers     on
+  Content           12345678 · 0 behind last fetched upstream · clean
+  Drift             none
+  Last run          ~/dotfleet-backups/20261116-120000 · SUCCESS
+  Last backup       ~/dotfleet-backups/20261116-120000
+  Manager config    ~/.config/chezmoi/chezmoi.toml
+  Converted source  ~/.local/share/dotfleet/chezmoi-source

@@ -273,3 +273,10 @@ The active machine’s record cannot be removed this way.
 
 Use `dotfleet profile` to inspect saved choices. Change them through `domain`, `pins`, `groups`, or `configure`; do not edit profile.toml.
 The manager’s chezmoi configuration and converted source are internal files. Inspect their locations through `status` and their health through `doctor`.
+
+## Terminal output
+
+Python commands share the colors and section rule from `scripts/logger.sh`. Shell entry points use that logger directly.
+Colors reinforce labels and change markers. Redirected output, `NO_COLOR`, and `TERM=dumb` disable colors.
+Errors use the diagnostic output stream and return a failure code. Unexpected errors never print a traceback, Python’s technical call history.
+When an apply run has a record, its technical error detail stays in private RUN.json.

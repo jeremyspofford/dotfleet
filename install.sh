@@ -168,5 +168,5 @@ if [[ -z $script_dir ]]; then
 	script_dir="$work_dir/manager"
 	git clone "$manager_repo" "$script_dir" </dev/null
 fi
-# Python sends each completed line through logger.sh before showing a terminal prompt.
+# Python uses the same logger style for output and terminal prompts.
 python3 -u "$script_dir/scripts/manager.py" "${arguments[@]}" </dev/null

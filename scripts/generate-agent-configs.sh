@@ -71,6 +71,4 @@ if ! command -v python3 >/dev/null; then
 	log_error "Python 3.11+ required."
 	exit 1
 fi
-python3 "$SCRIPT_DIR/agent_configs.py" "${args[@]}" 2>&1 | while IFS= read -r line; do
-	log_info "$line"
-done
+python3 "$SCRIPT_DIR/agent_configs.py" "${args[@]}"

@@ -55,7 +55,7 @@ class CommandTests(unittest.TestCase):
     def cli(self, *args, expected=0):
         result = subprocess.run([str(self.exe), *args], env=self.env, cwd=self.home, text=True, capture_output=True)
         self.assertEqual(result.returncode, expected, result.stdout + result.stderr)
-        return result.stdout
+        return result.stdout + result.stderr
 
     def record(self):
         paths = sorted((self.home / 'dotfleet-backups').glob('*/RUN.json'))

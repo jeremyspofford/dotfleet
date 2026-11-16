@@ -20,6 +20,7 @@ import manager as m
 import enrollment as e
 import registry
 import owned_views
+import style
 from installation import COMMAND, MANAGER
 from render_run import render, render_view
 from run_account import RunAccount, commit, profile_changes
@@ -64,8 +65,8 @@ TERMS = ('Profile: saved machine choices. Pins: exact tool versions. Groups: opt
 
 
 def parser():
-    p = argparse.ArgumentParser(prog='dotfleet', description='Manage this machine after enrollment. A profile saves your choices.',
-        epilog='Exit codes: 0 success, help, or cancellation; 1 failed operation or check; 2 invalid arguments.\n'
+    p = style.ArgumentParser(prog='dotfleet', description='Manage this machine after enrollment. A profile saves your choices.',
+        epilog='Exit codes: 0 success, help, or cancellation; 1 failed operation or check; 2 invalid arguments; 130 interrupted.\n'
                'Examples: dotfleet update; dotfleet status; dotfleet domain personal.\n'
                'First install or manager recovery: use the README one-line installer.\n' + TERMS,
         formatter_class=HelpFormatter)
@@ -525,7 +526,8 @@ def main(argv=None):
                     account.save()
             return m.main(['--defaults', '--pin', tool + '=' + version], software=software, before_apply=install)
     except (OSError, ValueError, RuntimeError) as error:
-        info('Command stopped', [('Reason', str(error)), ('Next step', 'Use dotfleet COMMAND --help for the selected action.')], home)
+        style.record_failure()
+        print('Error: ' + str(error), file=sys.stderr)
         return 2 if args.command == 'diff' else 1
     return 0
 
@@ -587,6 +589,4 @@ def snapshot(home, operations):
 
 
 if __name__ == '__main__':
-    sys.stdout = LoggerStream(ROOT)
-    sys.stderr = LoggerStream(ROOT, error=True)
-    sys.exit(main(sys.argv[1:]))
+    sys.exit(style.run_cli(lambda: main(sys.argv[1:]), ROOT))

@@ -5,6 +5,7 @@ Use future=True for the wizard's planned actions. See install.sh --help.
 """
 import re
 import textwrap
+from style import section
 
 UPDATE = 'dotfleet update'
 WIZARD = 'dotfleet configure'
@@ -171,4 +172,4 @@ def render(record, future=False):
 
 def render_view(title, pairs, home=''):
     """Use the same width, path, and column rules for read-only command results."""
-    return '\n'.join(wrap(title) + block(pairs, home)) + '\n'
+    return '\n'.join([section(title), *block(pairs, home)]) + '\n'

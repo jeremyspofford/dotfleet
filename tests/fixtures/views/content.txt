@@ -1,4 +1,6 @@
-Content
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Content
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   Checkout           ~/dotfiles
   Repository         https://example.invalid/dotfiles
   Commit and behind  12345678 · 0 behind last fetched upstream · clean
