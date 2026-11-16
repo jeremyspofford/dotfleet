@@ -27,6 +27,7 @@ import tempfile
 import textwrap
 
 from common import atomic, read_toml, relative, run, toml
+from render_run import change_marker
 from convert import GENERATED, convert, detect, source_name, tracked
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -57,7 +58,7 @@ def ask(label, default, choices=None, defaults=False, *, detail='', heading=None
                         indent = ' ' * 12 if line.startswith('  ') else ''
                         value = line if formatted else textwrap.fill(line, width, subsequent_indent=indent,
                                                      break_long_words=False, break_on_hyphens=False)
-                        palette = {'+': 'GREEN', '−': 'RED', '~': 'YELLOW'}.get(line.strip()[:1]) if formatted else None
+                        palette = {'+': 'GREEN', '−': 'RED', '~': 'YELLOW'}.get(change_marker(line)) if formatted else None
                         terminal.write((prompt_style(palette, value) if palette else value) + '\n')
                     terminal.write('\n')
                 terminal.write(prompt_style('GREEN', f'{label} [{default}]: '))

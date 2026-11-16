@@ -7,11 +7,7 @@
 
 4 · Profile changes — no changes.
 
-5 · Locations
-  Content  ~/dotfiles
-  Profile  ~/.config/dotfleet/profile.toml
-  Source   ~/.local/share/dotfleet/chezmoi-source
-  Backup   ~/dotfleet-backups/20261116-140000
+5 · Locations — recorded in RUN.json.
 
 6 · Next steps
   Update    dotfleet update
