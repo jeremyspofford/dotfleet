@@ -224,6 +224,7 @@ Every command supports `--help`. Exit codes are 0 for success or cancellation, 1
 
 Change-making commands write RUN.json and print the standard review. File lists come from the plan and backup inventory.
 Rollback makes another backup first. It restores only recorded paths, including original symlinks and recorded external targets.
+It refuses directory replacement and changed external targets whose original symlink is missing.
 It verifies saved file fingerprints before writing. A fingerprint records the file's content hash and permissions, or its symlink target.
 A content checkout remains at its current commit after rollback. Use diff to review differences before updating again.
 Uninstall offers to restore the oldest backup. Otherwise, it removes known managed files and the manager's command, checkout, and converted source.

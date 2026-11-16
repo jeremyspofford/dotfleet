@@ -160,7 +160,7 @@ def read_view(args, home, p):
         last = next((path for path in reversed(backups) if (path / 'RUN.json').exists()), None)
         record = load_json(last / 'RUN.json', {}) if last else {}
         pairs = [('Domain', p.get('domain', 'core') + (' · chosen' if p.get('domain_chosen') else ' · not chosen')),
-                 ('Identity', (p.get('git_name', '') + ' <' + p.get('git_email', '') + '>') if p.get('git_name') and p.get('git_email') else 'missing; run dotfleet configure')]
+                 ('Identity', (p.get('git_name', '') + ' <' + p.get('git_email', '') + '>') if p.get('git_name', '').strip() and p.get('git_email', '').strip() else 'missing; run dotfleet configure')]
         pairs += [('Pin ' + key, value) for key, value in pin_rows(p, home)] or [('Pins', 'none')]
         pairs += [('Group ' + key, value) for key, value in p.get('groups', {}).items()]
         pairs += [('Content', checkout_state(home / 'dotfiles')), ('Drift', 'present; run dotfleet diff' if status(home) else 'none'),
@@ -260,7 +260,12 @@ def validate_backup(home, selected):
             # Restore only the original linked destination, never an arbitrary path in edited metadata.
             if not source or not source.is_symlink() or (destination.parent / os.readlink(source)).resolve() != target:
                 raise ValueError('External target does not match the saved symlink.')
-            operations.append((str(target), external))
+            if m.fingerprint(target) != m.fingerprint(external):
+                # The normal backup inventory follows current symlinks. Without this
+                # link, it cannot capture the external file before replacement.
+                if not destination.is_symlink() or destination.resolve() != target:
+                    raise ValueError('External target changed and its original link is missing. Preserve it before restoring: ' + str(target))
+                operations.append((str(target), external))
     return folder, operations
 
 

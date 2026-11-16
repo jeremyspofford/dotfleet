@@ -217,6 +217,27 @@ else: sys.exit(1)
         self.cli('pins', 'set', 'node@latest', expected=2)
         self.assert_quiet_status()
 
+    def test_external_restore_backs_up_the_current_target(self):
+        self.enroll()
+        external = self.base / 'external'
+        external.write_text('saved external\n')
+        path = self.home / '.file'
+        path.unlink()
+        path.symlink_to(external)
+        self.cli('backup')
+        _, saved = self.record()
+        external.write_text('current external\n')
+        self.terminal(['rollback', saved.name], [(b'Confirm [cancel]:', b'restore\n')])
+        _, newest = self.record()
+        self.assertEqual(external.read_text(), 'saved external\n')
+        self.assertEqual((newest / 'external' / str(external).lstrip('/')).read_text(), 'current external\n')
+        path.unlink()
+        path.write_text('regular file now\n')
+        external.write_text('untracked external change\n')
+        self.assertIn('original link is missing', self.cli('rollback', saved.name, expected=1))
+        self.assertEqual(external.read_text(), 'untracked external change\n')
+
+
     def test_rollback_rejects_changed_backup_and_unsafe_paths(self):
         self.enroll()
         self.cli('backup')
