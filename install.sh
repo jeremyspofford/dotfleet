@@ -48,7 +48,15 @@ Options:
   --format FORMAT  plain=real names; chezmoi=native sources. A manifest takes priority.
   -h, --help       Print full help and exit 0.
 A profile saves the repository, domain, Git author identity, tool pins, and content groups.
-Domains: core=shared; personal=personal+shared; work=employer+shared; client=client+shared.
+A domain selects extra settings for how you use this machine. Every domain includes base shell and Git settings.
+  core      Base settings only. Start here if you are unsure.
+  personal  Base settings plus additions for your own projects and everyday use.
+  work      Base settings plus additions for your employer's work.
+  client    Base settings plus additions for work you do for a customer.
+Your dotfiles repository defines these additions, such as command shortcuts. They may be empty.
+A new profile defaults to core. Later prompts show the domain saved in ~/.config/dotfleet/profile.toml.
+Press Enter to confirm that domain, or type another domain name and press Enter.
+The profile also saves Git identity, exact tool versions, and group choices. Mise tracks installed versions.
 Groups select optional files or alias blocks. Each prompt defines on and off.
 Plain reruns ask about missing identity, an unconfirmed domain, and floating pins such as latest.
 Pins use full versions. Enter accepts the prompt's stated action; skip leaves a choice incomplete.

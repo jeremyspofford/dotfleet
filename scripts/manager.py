@@ -182,9 +182,19 @@ def validate_profile(home, profile, defaults=False, configure=False):
     # Old core defaults have no proof of an explicit choice. Ask once and record it.
     profile.setdefault('domain_chosen', profile.get('domain', 'core') != 'core')
     if not defaults and (configure or not profile['domain_chosen']):
-        domain = ask('Domain: core=shared; personal=personal+shared; work=employer+shared; client=client+shared; '
-                     'skip=keep without confirming; press Enter to confirm the shown domain',
-                     profile.get('domain', 'core'), ['core', 'personal', 'work', 'client', 'skip'], defaults)
+        domain = ask(
+            "A domain selects extra settings for how you use this machine.\n"
+            "Every choice includes the base shell and Git settings.\n\n"
+            "  core     Base settings only. Start here if you are unsure.\n"
+            "  personal Base settings plus additions for your own projects and everyday use.\n"
+            "  work     Base settings plus additions for your employer's work.\n"
+            "  client   Base settings plus additions for work you do for a customer.\n\n"
+            "Your dotfiles repository defines these additions, such as command shortcuts. They may be empty.\n"
+            "Your choice is saved in ~/.config/dotfleet/profile.toml.\n"
+            "The default is core for a new profile, or your saved domain on later runs.\n"
+            "Press Enter to confirm the value in brackets, or type a domain name and press Enter.\n"
+            "Type skip and press Enter to keep the value without confirming it.\n"
+            "Domain", profile.get('domain', 'core'), ['core', 'personal', 'work', 'client', 'skip'], defaults)
         if domain != 'skip':
             profile['domain'] = domain
             if not defaults:
@@ -410,7 +420,7 @@ def main():
     parser.add_argument('--repo', help='content Git URL or absolute local repository')
     parser.add_argument('--configure', action='store_true', help='ask profile questions again, with saved answers shown')
     parser.add_argument('--defaults', action='store_true', help='skip prompts only with complete profile values; accept group defaults')
-    parser.add_argument('--domain', choices=['core', 'personal', 'work', 'client'], help='explicit domain: shared, personal, employer, or client')
+    parser.add_argument('--domain', choices=['core', 'personal', 'work', 'client'], help='core=base settings only; personal/work/client add settings for your own use, employer, or customer')
     parser.add_argument('--git-name', help='Git author name; required when missing without a terminal')
     parser.add_argument('--git-email', help='Git author email; required when missing without a terminal')
     parser.add_argument('--pin', action='append', type=pin_argument, default=[], metavar='TOOL=VERSION',

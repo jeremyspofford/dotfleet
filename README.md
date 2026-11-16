@@ -16,7 +16,17 @@ curl -fsSL https://raw.githubusercontent.com/jeremyspofford/dotfleet/main/instal
 Requires Bash, git, curl, tar, and Python 3.11+. Use Linux, macOS, or WSL (Windows Subsystem for Linux).
 Missing chezmoi and Mise install into `~/.local/bin`. Setup never uses sudo.
 Interactive setup asks for a content repository, missing domain and identity choices, and content groups. Explicit flags supply recorded choices. Prompts read the terminal, never piped input.
-Domains: core means shared settings; personal adds personal settings; work adds employer settings; client adds client settings.
+A domain selects extra settings for how you use this machine. Every domain includes base shell and Git settings.
+
+- `core`: base settings only. Start here if you are unsure.
+- `personal`: base settings plus additions for your own projects and everyday use.
+- `work`: base settings plus additions for your employer's work.
+- `client`: base settings plus additions for work you do for a customer.
+
+Your dotfiles repository defines these additions, such as command shortcuts. They may be empty.
+A new profile defaults to `core`. Later domain prompts use the saved choice from `~/.config/dotfleet/profile.toml`.
+Press Enter to confirm the displayed domain, or type another domain name and press Enter.
+
 Groups show their purpose and an on/off choice. On includes content; off excludes it. Press Enter to keep the displayed answer.
 Later runs ask about new groups and incomplete profile choices. Use `--configure` to review all answers. Use `--defaults` to skip prompts only when profile values are complete.
 
@@ -35,7 +45,9 @@ The [content contract](docs/CONTENT-CONTRACT.md) defines files, formats, groups,
 Dotfleet converts plain files into a private chezmoi source. Native chezmoi repositories use their checkout directly.
 Stow layouts under `packages/<package>/` also work; their package prefixes do not reach the home directory.
 
-Your profile lives at `~/.config/dotfleet/profile.toml`. Edit pins there, then rerun the installer.
+Your profile lives at `~/.config/dotfleet/profile.toml`. It saves the domain, Git identity, exact tool versions, and group choices between runs.
+Edit pins there, then rerun the installer. Mise records which versions are installed; Dotfleet reads that list during setup.
+A saved pin selects a version. It does not mean that version is installed.
 Setup asks when identity is incomplete, the domain choice is unconfirmed, or a pin floats, such as `latest`.
 Prompts show recorded values. Press Enter to use the stated action, or type `skip` to leave a choice incomplete.
 For identity, Enter keeps the displayed value; an empty value stays unset.
