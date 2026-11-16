@@ -48,12 +48,14 @@ Options:
   --format FORMAT  plain=real names; chezmoi=native sources. A manifest takes priority.
   -h, --help       Print full help and exit 0.
 A profile saves the repository, domain, Git author identity, tool pins, and content groups.
-A domain selects extra settings for how you use this machine. Every domain includes base shell and Git settings.
-  core      Base settings only. Start here if you are unsure.
-  personal  Base settings plus additions for your own projects and everyday use.
-  work      Base settings plus additions for your employer's work.
-  client    Base settings plus additions for work you do for a customer.
-Your dotfiles repository defines these additions, such as command shortcuts. They may be empty.
+Domains choose optional additions from your content repository. Identity and tools are chosen separately.
+  core      Base configuration only.
+  personal  Intended for your own use; no extra aliases in the bundled example.
+  work      Intended for employer work; no extra aliases in the bundled example.
+  client    Intended for customer work; no extra aliases in the bundled example.
+All four currently provide the same bundled settings. Start with core.
+The domain prompt inspects the selected checkout and lists its domain command additions.
+Custom repositories can define other behavior; check their documentation when additions are not described.
 A new profile defaults to core. Later prompts show the domain saved in ~/.config/dotfleet/profile.toml.
 Press Enter to confirm that domain, or type another domain name and press Enter.
 The profile also saves Git identity, exact tool versions, and group choices. Mise tracks installed versions.
@@ -64,6 +66,8 @@ Complete profiles need no profile prompts. The summary lists skipped gaps under 
 Without a terminal, missing identity, an unconfirmed domain, or floating pins stop setup with exit 1.
 Supply the listed flags to complete those values. New group defaults are printed before applying files.
 Prompts read /dev/tty, the terminal device, never piped input.
+Headings, input, and warnings use the shared logger's colors. Choices also have text labels.
+Set NO_COLOR to disable colors, even with an empty value. Redirected output and TERM=dumb remain plain.
 Requires git, curl, tar, and Python 3.11+. Supports Linux, macOS, and WSL (Windows Subsystem for Linux).
 Missing chezmoi and Mise go in ~/.local/bin. Setup never uses sudo or installs content-default tools.
 Content lives in ~/dotfiles. Backups live in ~/dotfleet-backups/<timestamp>/.
@@ -107,6 +111,7 @@ Linux)
 Darwin) host=macOS ;;
 *) error_exit 'Supported systems: Linux, macOS, or WSL.' ;;
 esac
+log_section "Dotfleet setup"
 log_info "Host: $host / $(uname -m)"
 export PATH="$HOME/.local/bin:$PATH"
 umask 077
@@ -134,4 +139,20 @@ if [[ -z $script_dir ]]; then
 		git clone "$manager_repo" "$script_dir" </dev/null
 	fi
 fi
-python3 "$script_dir/scripts/manager.py" "${arguments[@]}" </dev/null 2>&1 | while IFS= read -r line; do log_info "$line"; done
+# Keep messages ordered and use the shared logger's severity colors.
+python3 -u "$script_dir/scripts/manager.py" "${arguments[@]}" </dev/null 2>&1 | while IFS= read -r line; do
+	case $line in
+	'END SUMMARY')
+		log_info ''
+		log_section "$line"
+		;;
+	'Warnings:')
+		log_info ''
+		log_info "$line"
+		;;
+	'Result: SUCCESS' | 'chezmoi status: CLEAN'* | '  None.' | 'Choose ['*) log_success "$line" ;;
+	'Setup failed:'* | 'Result: FAILED' | 'Apply stopped.'*) log_error "$line" ;;
+	'  '* | 'chezmoi: warning:'*) log_warn "$line" ;;
+	*) log_info "$line" ;;
+	esac
+done

@@ -16,16 +16,23 @@ curl -fsSL https://raw.githubusercontent.com/jeremyspofford/dotfleet/main/instal
 Requires Bash, git, curl, tar, and Python 3.11+. Use Linux, macOS, or WSL (Windows Subsystem for Linux).
 Missing chezmoi and Mise install into `~/.local/bin`. Setup never uses sudo.
 Interactive setup asks for a content repository, missing domain and identity choices, and content groups. Explicit flags supply recorded choices. Prompts read the terminal, never piped input.
-A domain selects extra settings for how you use this machine. Every domain includes base shell and Git settings.
+**All four domains currently provide the same bundled settings. Start with `core`.**
+They include shell startup, shared command shortcuts, Git defaults, and prompt configuration.
+Identity and tool versions are chosen separately.
 
-- `core`: base settings only. Start here if you are unsure.
-- `personal`: base settings plus additions for your own projects and everyday use.
-- `work`: base settings plus additions for your employer's work.
-- `client`: base settings plus additions for work you do for a customer.
+- `core`: the base configuration, with no domain additions.
+- `personal`: a name for your own use. Its bundled alias file is empty.
+- `work`: a name for employer work. Its bundled alias file is empty.
+- `client`: a name for customer work. Its bundled alias file is empty.
 
-Your dotfiles repository defines these additions, such as command shortcuts. They may be empty.
+Choosing a domain does not install software or create accounts.
+The prompt reads domain alias files in your selected checkout and reports empty files or defined command names.
+Custom repositories can define other behavior. Check their documentation when the prompt cannot describe additions.
 A new profile defaults to `core`. Later domain prompts use the saved choice from `~/.config/dotfleet/profile.toml`.
 Press Enter to confirm the displayed domain, or type another domain name and press Enter.
+
+Prompts use headings, spacing, and the shared logger's colors. Text labels keep choices clear without color.
+Set `NO_COLOR` to disable colors, including an empty value. Redirected output stays plain.
 
 Groups show their purpose and an on/off choice. On includes content; off excludes it. Press Enter to keep the displayed answer.
 Later runs ask about new groups and incomplete profile choices. Use `--configure` to review all answers. Use `--defaults` to skip prompts only when profile values are complete.
