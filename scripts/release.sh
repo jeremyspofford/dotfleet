@@ -14,6 +14,7 @@ SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 # shellcheck source=scripts/logger.sh
 source "$SCRIPT_DIR/logger.sh"
 usage() {
+	log_section "Release help"
 	cat <<EOF
 release.sh — propose and publish releases with release-please ($DOTFILES_VERSION)
 Usage: bash scripts/release.sh [--dry-run] [-h|--help]

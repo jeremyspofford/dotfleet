@@ -13,6 +13,7 @@ SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 # shellcheck source=scripts/logger.sh
 source "$SCRIPT_DIR/logger.sh"
 usage() {
+	log_section "Agent configuration help"
 	cat <<EOF
 generate-agent-configs.sh — configure installed coding agents ($DOTFILES_VERSION)
 Usage: bash scripts/generate-agent-configs.sh [OPTIONS]

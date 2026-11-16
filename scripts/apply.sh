@@ -10,6 +10,7 @@ SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 # shellcheck source=scripts/logger.sh
 source "$SCRIPT_DIR/logger.sh"
 usage() {
+	log_section "Apply help"
 	log_info "Usage: bash scripts/apply.sh [-h|--help] ($DOTFILES_VERSION)"
 	log_info 'Apply files through chezmoi. Conflict prompts explain keys and require Enter.'
 	log_info 'Parameters: -h, --help prints help. Example: bash scripts/apply.sh'

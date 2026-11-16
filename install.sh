@@ -51,6 +51,7 @@ finish_run() {
 }
 trap finish_run EXIT
 usage() {
+	log_section "Dotfleet help"
 	log_heredoc '' <<EOF
 Dotfleet $DOTFILES_VERSION manages home configuration with a saved machine profile.
 Usage: bash install.sh [OPTIONS]
