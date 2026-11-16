@@ -10,6 +10,7 @@ Exit codes: 0 success/help; 1 conflict or runtime failure; 2 invalid arguments.
 Author: Jeremy Spofford / Aria Labs; Version: read from ../VERSION.
 The calling Bash wrapper sends messages through logger.sh.
 """
+
 import argparse
 import style
 import hashlib
@@ -47,9 +48,9 @@ def target(home, relative):
 
 def write_atomic(path, data):
     path.parent.mkdir(parents=True, exist_ok=True)
-    fd, temporary = tempfile.mkstemp(prefix=".dotfiles-", dir=path.parent)
+    descriptor, temporary = tempfile.mkstemp(prefix=".dotfiles-", dir=path.parent)
     try:
-        with os.fdopen(fd, "wb") as handle:
+        with os.fdopen(descriptor, "wb") as handle:
             handle.write(data)
         os.replace(temporary, path)
     finally:
@@ -102,7 +103,10 @@ def generate(home, os_name, dry_run, *, profile=None, content_root=None):
             relative = str(Path(agent["skills_paths"][os_name]) / skill.name)
             if relative in planned:
                 raise ValueError(f"Two sources own one output: {relative}")
-            planned[relative] = {"link": str(home / "dotfiles" / skill.relative_to(content_root)), "agent": name}
+            planned[relative] = {
+                "link": str(home / "dotfiles" / skill.relative_to(content_root)),
+                "agent": name,
+            }
     # Preflight every target before changing any file.
     for relative, item in planned.items():
         path = target(home, relative)
@@ -112,12 +116,17 @@ def generate(home, os_name, dry_run, *, profile=None, content_root=None):
                 raise ValueError(f"Unmanaged/modified link: {relative}")
         elif path.exists():
             if not path.is_file() or not old or old.get("sha256") != digest(path.read_bytes()):
-                raise ValueError(f"Unmanaged/modified config: {relative}; move it aside after review")
+                raise ValueError(
+                    f"Unmanaged/modified config: {relative}; move it aside after review"
+                )
         print(f"{'Would generate' if dry_run else 'Generate'}: {relative}")
     for relative in previous.keys() - planned.keys():
         print(f"Retained output (agent absent or manifest changed): {relative}")
     if dry_run:
-        return {name: {key: value for key, value in item.items() if key != "agent"} for name, item in planned.items()}
+        return {
+            name: {key: value for key, value in item.items() if key != "agent"}
+            for name, item in planned.items()
+        }
     # Record intent before writes so partial failures are still inventoried.
     updated = {**previous, **planned}
     write_atomic(state_path, (json.dumps(updated, indent=2, sort_keys=True) + "\n").encode())
@@ -144,9 +153,23 @@ def main():
         "Author: Jeremy Spofford / Aria Labs; Version: " + (ROOT / "VERSION").read_text().strip(),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("--home", type=Path, default=Path.home(), help="full target home path; default: current user home")
-    parser.add_argument("--os", choices=["linux", "darwin", "windows", "wsl"], help="linux=Linux, darwin=macOS, windows=Windows, wsl=Windows Subsystem for Linux; default: detected system")
-    parser.add_argument("--dry-run", action="store_true", help="validate and report proposed paths without writing")
+    parser.add_argument(
+        "--home",
+        type=Path,
+        default=Path.home(),
+        help="full target home path; default: current user home",
+    )
+    parser.add_argument(
+        "--os",
+        choices=["linux", "darwin", "windows", "wsl"],
+        help=(
+            "linux=Linux, darwin=macOS, windows=Windows, wsl=Windows Subsystem for Linux; "
+            "default: detected system"
+        ),
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true", help="validate and report proposed paths without writing"
+    )
     args = parser.parse_args()
     if not args.home.is_absolute():
         parser.error("--home must be absolute")
