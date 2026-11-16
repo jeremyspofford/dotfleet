@@ -5,6 +5,8 @@ Parameters and examples are defined by each subcommand's --help.
 Author: Jeremy Spofford / Aria Labs; Version: read from ../VERSION.
 """
 import argparse
+import contextlib
+import io
 import json
 import os
 from pathlib import Path
@@ -30,7 +32,7 @@ DESCRIPTIONS = {
     'addons': 'List installed add-ons, optional manager extensions. A manifest declares an extension’s actions. A receipt records its owned outputs. No add-ons ship with Dotfleet.',
     'update': 'Pull the manager and content repositories, then apply your saved choices. A repository stores versioned files.',
     'status': 'Show this machine’s profile, saved choices, installed pins, groups, checkout state, drift, and recent backups. Drift means managed files differ.',
-    'diff': 'Preview an update in temporary storage. Apply nothing and keep your home unchanged. File markers show added, changed, or removed paths.',
+    'diff': 'Show pending file paths and unified patches from chezmoi. A patch shows removed (-) and added (+) lines. Change nothing. Exit codes: 0 no differences; 1 differences; 2 preview failed.',
     'rollback': 'List backups or restore one after confirmation. A backup contains original files and a manifest listing them. The profile is restored too.',
     'domain': 'Show domains, or apply a named domain. A domain selects content additions. A missing domain_chosen field means UNCHOSEN; a named choice confirms it.',
     'groups': 'List optional content groups. Turn a group on to include it, or off to remove its managed files or alias blocks.',
@@ -68,7 +70,9 @@ def parser():
         q = sub.add_parser(name, prog='dotfleet ' + name, help=detail.split('. ')[0] + '.', description=detail,
                            formatter_class=HelpFormatter,
                            epilog='Example: dotfleet ' + name + '\n' + TERMS + '\nRun dotfleet --help for exit codes. All prompts require Enter and use the terminal.')
-        if name == 'rollback':
+        if name == 'diff':
+            q.add_argument('--stat', action='store_true', help='print changed paths only, without patch bodies; use the same exit codes')
+        elif name == 'rollback':
             q.add_argument('backup', nargs='?', help='backup folder name or path; omit to list and choose in a terminal')
         elif name == 'domain':
             q.add_argument('name', nargs='?', help='domain name from the listed content choices')
@@ -216,16 +220,16 @@ def prepare_manager(home, workspace):
     return staged
 
 
-def preview(home, p):
+def preview(home, p, stat=False):
     # Fetch only into scratch. Tool queries and chezmoi state also stay there.
     with tempfile.TemporaryDirectory(prefix='dotfleet-diff-') as folder:
         workspace = Path(folder)
         staged = prepare_manager(home, workspace)
         # Use the updated manager's code, without applying it or installing tools.
-        return subprocess.call([sys.executable, str(staged / 'scripts/command.py'), '_preview'], env=dict(os.environ, DOTFLEET_PREVIEW='1'))
+        return subprocess.call([sys.executable, str(staged / 'scripts/command.py'), '_preview', *(['--stat'] if stat else [])], env=dict(os.environ, DOTFLEET_PREVIEW='1'))
 
 
-def preview_current(home, p):
+def preview_current(home, p, stat=False):
     with tempfile.TemporaryDirectory(prefix='dotfleet-plan-') as folder:
         workspace = Path(folder)
         original = Path(os.environ.get('MISE_DATA_DIR', home / '.local/share/mise'))
@@ -235,11 +239,21 @@ def preview_current(home, p):
             os.environ['MISE_' + key + '_DIR'] = str(workspace / key.lower())
         checkout = e.stage_repo(home, p['content_repo'], workspace)
         _, manifest = m.detect(checkout, p.get('format'))
-        plan = m.prepare(home, checkout, p, manifest, workspace / 'plan')
-        account = RunAccount(home, ROOT)
-        account.plan(plan, checkout, p, m.backup_location(home), m.backup_inventory(home, plan['all_paths']))
-        print(render(account.record(), future=True), end='')
-    return 0
+        # Agent planning messages are progress, not differences.
+        with contextlib.redirect_stdout(io.StringIO()):
+            plan = m.prepare(home, checkout, p, manifest, workspace / 'plan')
+        from preview_diff import patches
+        changes = patches(home, p, plan, workspace / 'plan', ROOT)
+        if not changes:
+            print(f"No differences. Your files match {p['content_repo']} @ {commit(checkout)[:8]}.")
+            return 0
+        if isinstance(sys.stdout, LoggerStream):
+            sys.stdout.diff = True
+        for name, patch in changes:
+            print('~/' + name)
+            if not stat:
+                print(patch, end='' if patch.endswith('\n') else '\n')
+        return 1
 
 
 def managed_paths(home):
@@ -407,12 +421,12 @@ def restore_command(args, home):
 def main(argv=None):
     home = Path.home()
     os.environ['GIT_OPTIONAL_LOCKS'] = '0'
-    if argv == ['_preview'] and os.environ.get('DOTFLEET_PREVIEW') == '1':
+    if argv in (['_preview'], ['_preview', '--stat']) and os.environ.get('DOTFLEET_PREVIEW') == '1':
         try:
-            return preview_current(home, profile(home))
+            return preview_current(home, profile(home), '--stat' in argv)
         except (OSError, ValueError, RuntimeError) as error:
-            info('Preview stopped', [('Reason', str(error))], home)
-            return 1
+            print('Preview failed: ' + str(error), file=sys.stderr)
+            return 2
     args = parser().parse_args(argv)
     try:
         p = profile(home)
@@ -423,7 +437,7 @@ def main(argv=None):
                 staged = prepare_manager(home, Path(folder))
                 return subprocess.call(['bash', str(staged / 'install.sh')])
         if args.command == 'diff':
-            return preview(home, p)
+            return preview(home, p, args.stat)
         if args.command == 'configure':
             if not m.has_terminal():
                 raise ValueError('Configure needs a terminal. Run dotfleet configure in an interactive shell.')
@@ -479,7 +493,7 @@ def main(argv=None):
             return m.main(['--defaults', '--pin', tool + '=' + version], software=software, before_apply=install)
     except (OSError, ValueError, RuntimeError) as error:
         info('Command stopped', [('Reason', str(error)), ('Next step', 'Use dotfleet COMMAND --help for the selected action.')], home)
-        return 1
+        return 2 if args.command == 'diff' else 1
     return 0
 
 

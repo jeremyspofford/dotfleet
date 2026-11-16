@@ -67,6 +67,7 @@ class LoggerStream:
         self.error = error
         self.pending = ''
         self.in_warnings = False
+        self.diff = False
 
     def write(self, text):
         self.pending += text
@@ -85,6 +86,8 @@ class LoggerStream:
         level = 'log_error' if self.error else 'log_info'
         arguments = [line]
         marker = change_marker(line)
+        if self.diff and line.startswith(('+', '-')):
+            marker = '+' if line.startswith('+') else '−'
         if marker:
             level = 'log_change'
             arguments = [{'+': 'added', '−': 'removed', '~': 'changed'}[marker], line]

@@ -14,7 +14,12 @@ from common import atomic, read_toml, run, toml
 from render_run import human
 from convert import FURNITURE, detect
 import manager as m
+<<<<<<< HEAD
 import agent_detection
+||||||| 4b83ee3
+=======
+import scan_view
+>>>>>>> fix/wizard-scan-door
 
 STEPS = ['source', 'domain', 'identity', 'pins', 'groups', 'agents']
 PRIVATE_NAMES = re.compile(r'(^|/)(?:\.secrets(?:\..*)?|\.env(?:\..*)?|\.netrc|\.npmrc|\.pypirc|credentials[^/]*|.*_history|.*\.(?:key|pem|secret)|id_(?:rsa|ed25519).*)$', re.I)
@@ -26,21 +31,23 @@ def scan(home):
     """Inspect root dotfiles and .config files; never traverse linked directories."""
     found, excluded = [], {}
     for path in sorted(home.iterdir()):
-        if path.name.startswith('.') and path.name not in FURNITURE and (path.is_file() or path.is_symlink()):
+        if path.name.startswith('.') and path.name not in FURNITURE and not scan_view.transient(path.name) and (path.is_file() or path.is_symlink()):
             found.append(path.name)
     config = home / '.config'
     if config.is_dir() and not config.is_symlink():
         for parent, directories, files in os.walk(config, followlinks=False):
-            directories[:] = sorted(d for d in directories if not (Path(parent) / d).is_symlink() and d not in {'.git', 'cache', 'Cache'})
+            directories[:] = sorted(d for d in directories if not (Path(parent) / d).is_symlink() and d != '.git' and not scan_view.transient(d))
             for name in sorted(files):
                 path = Path(parent) / name
                 rel = path.relative_to(config).as_posix()
+                if scan_view.transient(rel):
+                    continue
                 if any(rel == item or rel.startswith(item + '/') for item in EXCLUDE_CONFIG):
                     continue
                 found.append(path.relative_to(home).as_posix())
     for name in found:
         path = home / name
-        if PRIVATE_NAMES.search(name):
+        if PRIVATE_NAMES.search(name) or scan_view.sensitive(name):
             excluded[name] = 'credential filename'
         elif not path.is_file():
             excluded[name] = 'not a regular file or readable file link'
@@ -125,21 +132,36 @@ def adopt(home, workspace, found, excluded):
     return destination
 
 
-def welcome(home, sources):
+def welcome(home, sources, profile=None, record=None):
     print('\n1. Welcome\nWe will scan this machine, choose content, and review every choice before apply.')
     print('A backup comes before replacement. Existing files are kept in backups; nothing is discarded.')
     print('Quit at review to leave your home unchanged.')
     found, excluded = scan(home)
     tools = installed(home)
     os_name = 'WSL' if os.environ.get('WSL_DISTRO_NAME') or Path('/proc/version').exists() and 'microsoft' in Path('/proc/version').read_text().lower() else os.uname().sysname
-    print(f'\n2. Scan\nOS: {os_name}\nExisting enrollment: {", ".join(sources) or "none"}')
-    print('Commands on PATH: ' + ', '.join(name for name in ['git', 'curl', 'bash', 'zsh', 'node', 'python3'] if shutil.which(name)))
-    print('Installed tools (Mise inventory): ' + (', '.join(f'{name} {versions(items)}' for name, items in tools.items()) or 'none'))
-    print(f'Home dotfiles found: {len(found)} (root files and .config files)')
-    for name in found:
-        print('  ~/' + name)
+    details = {'os': os_name, 'enrollment': sources, 'tools': tools,
+               'candidates': [name for name in found if name not in excluded], 'excluded': excluded}
+    if record is not None:
+        record.update(details)
+    print('\n' + '\n'.join(scan_view.lines(details, (profile or {}).get('pins', {}), detected_agents(home, tools))))
     return found, excluded
 
+
+def door_options(home, profile, found, excluded):
+    """An enrollment keeps its source. New homes choose from safe candidates."""
+    choices = ['defaults', 'repo'] + (['adopt'] if set(found) - set(excluded) else [])
+    enrolled = any((home / name).exists() for name in ('dotfiles', '.config/dotfleet/profile.toml',
+                                                     '.config/dotfiles/profile.toml', '.config/chezmoi/chezmoi.toml'))
+    recommended = 'repo' if enrolled else 'adopt' if 'adopt' in choices else 'defaults'
+    detail = ''
+    if enrolled:
+        detail += 'Current source: ' + profile.get('content_repo', m.DEFAULT_REPO) + '\n'
+    detail += 'defaults: use our example shell and Git files.\n'
+    detail += 'repo: keep the current source, or enter another repository URL.\n' if enrolled else 'repo: enter your own Git repository URL.\n'
+    if 'adopt' in choices:
+        detail += 'adopt: keep your existing files unchanged in a new local repository. Secret matches are excluded.\n'
+    detail += f'Recommended: {recommended}. Press Enter to keep this choice, or type a listed door.'
+    return choices, recommended, detail
 
 def group_flags(profile, values, manifest):
     for name, choice in values:
@@ -222,18 +244,12 @@ def steps(home, args, workspace, profile, found, excluded, start=0, checkout=Non
         elif args.repo:
             door = 'repo'
         else:
-            choices = ['defaults', 'repo'] + (['adopt'] if found else [])
-            recommended = 'adopt' if 'adopt' in choices else 'defaults'
-            default = 'repo' if (home / 'dotfiles').exists() or profile.get('source_door') == 'repo' else recommended
-            detail = 'defaults: use our example shell and Git files.\nrepo: use your own Git repository URL.\n'
-            if 'adopt' in choices:
-                detail += 'adopt: keep your existing files unchanged in a new local repository. Secret matches are excluded.\n'
-            detail += f'Recommended: {recommended}. Type a door name and press Enter.'
-            door = m.ask('Content door', default, choices, heading='3. Where your content comes from', detail=detail)
+            choices, recommended, detail = door_options(home, profile, found, excluded)
+            door = m.ask('Content door', recommended, choices, heading='3. Where your content comes from', detail=detail)
         if door == 'adopt':
             found, excluded = scan(home)
-            for name, reason in excluded.items():
-                print(f'Excluded from adoption: {name} ({reason})')
+            for line in scan_view.exclusions(excluded):
+                print(line)
             checkout = adopt(home, workspace, found, excluded)
             repo = str(home / 'dotfiles')
             profile['adopted'] = True

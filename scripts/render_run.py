@@ -149,9 +149,7 @@ def render(record, future=False):
             lines += wrap(human(warning, home), '  ')
     exclusions = record.get('adoption_excluded', [])
     if exclusions:
-        lines += ['', 'Excluded from adoption:']
-        for path in exclusions:
-            lines += wrap(human(path, home), '  ')
+        lines += ['', f'Excluded from adoption: {len(exclusions)} files. See RUN.json for the private list.']
     status = 'not applied (review)' if future else record.get('chezmoi_status_after') or (record.get('result') or 'not checked').lower()
     if status == 'CLEAN (no differences)':
         status = 'clean'
