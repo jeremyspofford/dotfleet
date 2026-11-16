@@ -19,7 +19,7 @@ jobs:
           from pathlib import Path
           import re
           paths = [Path(name) for name in (
-              'README.md', 'AGENTS.md', 'docs/WRITING.md', 'docs/ADDON-INTERFACE.md')]
+              'README.md', 'AGENTS.md', 'docs/WRITING.md', 'docs/ADDON-INTERFACE.md', 'docs/CONTENT-CONTRACT.md', 'docs/AGENTS.md', 'docs/RELEASES.md')]
           for path in paths:
               assert path.is_file(), f'Missing document: {path}'
               text = path.read_text()

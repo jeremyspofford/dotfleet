@@ -1,0 +1,70 @@
+name: CI
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    container: ubuntu:24.04
+    steps:
+      - name: Install test dependencies
+        run: apt-get update -qq && apt-get install -y --no-install-recommends bash ca-certificates curl git openssh-client python3 shellcheck shfmt tar zsh
+      - uses: actions/checkout@v4
+        with:
+          path: manager
+      - uses: actions/checkout@v4
+        with:
+          repository: jeremyspofford/dotfiles
+          ref: feat/plain-content-split
+          path: content
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: jeremyspofford/dotfiles-archive
+          ref: legacy/stow-local-2026
+          path: archive
+          ssh-key: ${{ secrets.DOTFILES_ARCHIVE_SSH_KEY }}
+          persist-credentials: false
+      - name: Prepare local content origins
+        shell: bash
+        run: |
+          git config --system --add safe.directory '*'
+          git -C content checkout -B fixture-content
+          git -C archive checkout -B fixture-archive
+          test "$(git -C archive rev-parse HEAD)" = 16477c53fa6bc200b329430f2bac732cdaecee15
+      - name: Check shell scripts
+        working-directory: manager
+        run: |
+          shellcheck install.sh scripts/*.sh
+          shfmt -d install.sh scripts/*.sh
+          bash install.sh --help
+          bash scripts/apply.sh --help
+          bash scripts/generate-agent-configs.sh --help
+          bash scripts/release.sh --help
+      - name: Cold install with official tool downloads
+        shell: bash
+        run: |
+          export HOME="$RUNNER_TEMP/cold-home"
+          mkdir -p "$HOME"
+          bash manager/install.sh --repo "$GITHUB_WORKSPACE/content" --defaults
+          export PATH="$HOME/.local/bin:$PATH"
+          test -z "$(chezmoi status)"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Test real content, archive, native source, prompts, and repeat runs
+        working-directory: manager
+        env:
+          DOTFLEET_CONTENT_FIXTURE: ${{ github.workspace }}/content
+          DOTFLEET_ARCHIVE_FIXTURE: ${{ github.workspace }}/archive
+        run: python3 -m unittest discover -s tests -v
+  release-policy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --ignore-scripts
+      - run: npm run test:release
