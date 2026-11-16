@@ -6,6 +6,8 @@ import subprocess
 import tempfile
 import tomllib
 
+from render_run import change_marker
+
 
 def run(*args, cwd=None, env=None):
     result = subprocess.run(args, cwd=cwd, env=env, text=True, capture_output=True)
@@ -82,8 +84,8 @@ class LoggerStream:
         import sys
         level = 'log_error' if self.error else 'log_info'
         arguments = [line]
-        marker = line.lstrip()[:1]
-        if line.startswith('  ') and marker in {'+', '−', '~'}:
+        marker = change_marker(line)
+        if marker:
             level = 'log_change'
             arguments = [{'+': 'added', '−': 'removed', '~': 'changed'}[marker], line]
         elif line.startswith('chezmoi status: clean'):

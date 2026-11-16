@@ -41,7 +41,7 @@ def block(pairs, home):
     for key, value in pairs:
         text = human(value, home)
         prefix = '  ' + key.ljust(width) + '  '
-        if len(prefix + text) <= WIDTH:
+        if len(key) <= width and len(prefix + text) <= WIDTH:
             lines.append(prefix + text)
         else:
             lines.extend(wrap(key, '  '))
@@ -52,6 +52,12 @@ def block(pairs, home):
             else:
                 lines.extend(wrap(text, '    '))
     return lines
+
+
+def change_marker(line):
+    """Recognize a file marker, never a wrapped path beginning with a home tilde."""
+    match = re.match(r'^  ([+−~])(?: |$)', line)
+    return match[1] if match else None
 
 
 def profile_key(name):
@@ -71,6 +77,7 @@ def render(record, future=False):
     changed = [item for item in software if item['action'] != 'present'
                and (future or item['name'] in record.get('completed_software', []))]
     counts = {kind: sum(item['action'] == kind for item in changed) for kind in ('installed', 'upgraded')}
+    has_changes = bool(changed)
     title = ', '.join(f'{count} {kind}' for kind, count in counts.items() if count)
     lines = ['1 · Software — ' + (('will be ' if future else '') + title + '.' if changed else 'no changes.')]
     for item in changed:
@@ -86,11 +93,13 @@ def render(record, future=False):
 
     changed = [item for item in record.get('checkouts', []) if item.get('new') and item.get('old') != item['new']
                and (future or item['name'] in record.get('completed_checkouts', []))]
+    has_changes |= bool(changed)
     lines = ['2 · Manager and content — ' + (f'{len(changed)} ' + ('will update.' if future else 'updated.') if changed else 'no changes.')]
     lines += block([(item['name'], f"{human(item.get('old'), home)} → {human(item['new'], home)} · {item['path']}") for item in changed], home)
     sections.append(lines)
 
     files = [item for item in record.get('files', []) if future or item['path'] in record.get('completed_files', [])]
+    has_changes |= bool(files)
     counts = {kind: sum(item['action'] == kind for item in files) for kind in ('added', 'changed', 'removed')}
     title = ', '.join(f'{count} {kind}' for kind, count in counts.items() if count)
     lines = ['3 · Files — ' + (('will be ' if future else '') + title + '.' if files else 'no changes.')]
@@ -107,6 +116,7 @@ def render(record, future=False):
     sections.append(lines)
 
     changes = record.get('profile_changes', []) if future or record.get('profile_written') else []
+    has_changes |= bool(changes)
     lines = ['4 · Profile changes — ' + (f'{len(changes)} ' + ('will change.' if future else 'changed.') if changes else 'no changes.')]
     lines += block([(profile_key(item['name']), human(item['old'], home) + ' → ' + human(item['new'], home)) for item in changes], home)
     if future and record.get('selected_profile'):
@@ -116,7 +126,10 @@ def render(record, future=False):
 
     locations = record.get('locations', {})
     backup = locations.get('Backup folder') if future or record.get('backup_created') else None
-    lines = ['5 · Locations'] + block([
+    compact = (not future and not has_changes and record.get('result') == 'SUCCESS'
+               and record.get('chezmoi_status_after') in ('clean', 'CLEAN (no differences)')
+               and not record.get('warnings') and not record.get('adoption_excluded'))
+    lines = ['5 · Locations — recorded in RUN.json.'] if compact else ['5 · Locations'] + block([
         ('Content', locations.get('Content checkout')), ('Profile', locations.get('Profile file')),
         ('Source', locations.get('Converted source')), ('Backup', backup or 'not created')], home)
     sections.append(lines)
@@ -142,9 +155,19 @@ def render(record, future=False):
     status = 'not applied (review)' if future else record.get('chezmoi_status_after') or (record.get('result') or 'not checked').lower()
     if status == 'CLEAN (no differences)':
         status = 'clean'
-    lines += ['', f"chezmoi status: {status} · warnings: {len(warnings) if warnings else 'none'}"]
+    status = human(status, home)
+    footer = f"chezmoi status: {status} · warnings: {len(warnings) if warnings else 'none'}"
+    raw_status = '' if future else str(record.get('chezmoi_status_after', ''))
+    structured_status = re.match(r'^\s*(?:[\[{]|[\w.]+\s*[:=])', raw_status)
+    if len(footer) > WIDTH or '\n' in raw_status or structured_status:
+        footer = f"chezmoi status: details in RUN.json · warnings: {len(warnings) if warnings else 'none'}"
+    lines += ['', footer]
     record_path = str(backup) + '/RUN.json' if backup else None
-    lines.append('Run record: ' + human(record_path, home) if record_path else 'Run record: not created; nothing applied.')
+    pointer = 'Run record: ' + human(record_path, home) if record_path else 'Run record: not created; nothing applied.'
+    if len(pointer) <= WIDTH:
+        lines.append(pointer)
+    else:
+        lines += ['Run record:'] + wrap(human(record_path, home), '    ')
     return '\n'.join(lines) + '\n'
 
 
