@@ -14,6 +14,7 @@ import subprocess
 from common import atomic, read_toml, run
 from render_run import render
 from installation import command_software, MANAGER
+import registry
 
 RECORD = '.local/state/dotfleet/last-run.json'
 
@@ -51,6 +52,8 @@ def profile_changes(old, new):
 class RunAccount:
     def __init__(self, home, root):
         self.home, self.root = home, root
+        registry.load(home)  # Reject invalid state before any apply.
+        self.manager_version = (root / 'VERSION').read_text().strip()
         saved = home / RECORD
         previous = json.loads(saved.read_text()) if saved.exists() else {}
         self.old_profile = read_toml(home / '.config/dotfleet/profile.toml')
@@ -101,7 +104,7 @@ class RunAccount:
         before = {item['path']: item for item in manifest}
         self.files = []
         for name in sorted(plan['changed']):
-            if name.startswith('.local/state/dotfleet/') or any(str(self.home / name) == item['path'] and item['action'] != 'present' for item in self.software):
+            if name == registry.REGISTRY or name.startswith('.local/state/dotfleet/') or any(str(self.home / name) == item['path'] and item['action'] != 'present' for item in self.software):
                 continue  # Bookkeeping and software have their own records, not home-setting diffs.
             entry = before[name]
             action = 'removed' if name in plan['stale'] or name in plan['removed'] else 'added' if entry['state'] == 'absent' else 'changed'
@@ -148,8 +151,15 @@ class RunAccount:
         self.result = result
         self.warnings = warnings or []
         self.status_after = status
+        if self.backup:
+            try:
+                registry.refresh(self.home, self.manager_version, self.backup, result, self.old_profile)
+            except (OSError, ValueError, RuntimeError) as error:
+                self.result = 'FAILED'
+                self.warnings.append('Fleet registry was not refreshed: ' + str(error))
         self.save()
         print(render(self.record()), end='')
         marker = os.environ.get('DOTFLEET_SUMMARY_MARKER')
         if marker:
             Path(marker).touch()
+        return 1 if self.result == 'FAILED' else 0

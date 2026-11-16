@@ -16,15 +16,18 @@ import tempfile
 from common import LoggerStream, atomic, read_toml, relative, run, toml
 import manager as m
 import enrollment as e
+import registry
 from installation import COMMAND, MANAGER
 from render_run import render, render_view
 from run_account import RunAccount, commit, profile_changes
 
 ROOT = Path(__file__).resolve().parents[1]
 PROFILE = '.config/dotfleet/profile.toml'
-CONTROLS = {PROFILE, '.config/chezmoi/chezmoi.toml', '.local/state/dotfleet/outputs.json',
+CONTROLS = {registry.REGISTRY, PROFILE, '.config/chezmoi/chezmoi.toml', '.local/state/dotfleet/outputs.json',
             '.local/state/dotfleet/agents.json', '.local/state/dotfleet/last-run.json', COMMAND}
 DESCRIPTIONS = {
+    'machines': 'Show recorded machine facts from fleet.toml. The registry is the manager’s file of saved machine records. This command makes no live network queries.',
+    'addons': 'List installed add-ons, optional manager extensions. A manifest declares an extension’s actions. A receipt records its owned outputs. No add-ons ship with Dotfleet.',
     'update': 'Pull the manager and content repositories, then apply your saved choices. A repository stores versioned files.',
     'status': 'Show this machine’s profile, saved choices, installed pins, groups, checkout state, drift, and recent backups. Drift means managed files differ.',
     'diff': 'Preview an update in temporary storage. Apply nothing and keep your home unchanged. File markers show added, changed, or removed paths.',
@@ -40,9 +43,12 @@ DESCRIPTIONS = {
 }
 
 
-class HelpFormatter(argparse.RawDescriptionHelpFormatter):
+class HelpFormatter(argparse.HelpFormatter):
     def _format_usage(self, usage, actions, groups, prefix):
         return super()._format_usage(usage, actions, groups, prefix or 'Usage: ')
+
+    def _fill_text(self, text, width, indent):
+        return '\n'.join(argparse.HelpFormatter._fill_text(self, line, width, indent) for line in text.splitlines())
 
 
 TERMS = ('Profile: saved machine choices. Pins: exact tool versions. Groups: optional content.\n'
@@ -59,7 +65,7 @@ def parser():
     p.add_argument('--version', action='version', version=(ROOT / 'VERSION').read_text().strip())
     sub = p.add_subparsers(dest='command', required=True, metavar='COMMAND')
     for name, detail in DESCRIPTIONS.items():
-        q = sub.add_parser(name, help=detail.split('. ')[0] + '.', description=detail,
+        q = sub.add_parser(name, prog='dotfleet ' + name, help=detail.split('. ')[0] + '.', description=detail,
                            formatter_class=HelpFormatter,
                            epilog='Example: dotfleet ' + name + '\n' + TERMS + '\nRun dotfleet --help for exit codes. All prompts require Enter and use the terminal.')
         if name == 'rollback':
@@ -148,7 +154,15 @@ def command_profile_gaps(p):
 def read_view(args, home, p):
     name = args.command
     manifest = read_toml(home / 'dotfiles/dotfleet.toml')
-    if name == 'version':
+    if name == 'machines':
+        pairs = registry.rows(home, (ROOT / 'VERSION').read_text().strip())
+    elif name == 'addons':
+        from addons import installed_addons
+        items = installed_addons(home, (ROOT / 'VERSION').read_text().strip())
+        pairs = [(item['id'], item['version'] + ' · ' + item['description']) for item in items]
+        if not pairs:
+            pairs = [('Installed add-ons', 'none; no add-ons ship with Dotfleet.')]
+    elif name == 'version':
         pairs = [('Manager', (ROOT / 'VERSION').read_text().strip()), ('Content commit', commit(home / 'dotfiles'))]
     elif name == 'domain':
         pairs = [('Current', p.get('domain', 'core')), ('Choice', 'chosen' if p.get('domain_chosen', False) else 'UNCHOSEN')]
@@ -255,6 +269,8 @@ def validate_backup(home, selected):
     operations = []
     for item in entries:
         name = str(relative(item['path']))
+        if name == registry.REGISTRY:
+            continue  # Other machines' records must not rewind during local restore.
         destination = home / name
         if not destination.parent.resolve().is_relative_to(home.resolve()):
             raise ValueError('Restore parent leaves home: ' + name)
@@ -288,13 +304,15 @@ def validate_backup(home, selected):
 
 def transaction(home, operations, label, selected=None, require_word=None, tree_removals=()):
     """Record the pre-change inventory, confirm, back up, and execute exact file operations."""
+    operations = [(name, source) for name, source in operations if name != registry.REGISTRY]
+    backup_paths = sorted({name for name, _ in operations if not Path(name).is_absolute()} | {registry.REGISTRY})
     account = RunAccount(home, ROOT)
     account.checkouts = []
     account.software = []
     folder = m.backup_location(home)
     account.locations.update({'Converted source': read_toml(home / '.config/chezmoi/chezmoi.toml').get('sourceDir', 'not configured'),
                               'Backup folder': str(folder)})
-    account.manifest = m.backup_inventory(home, [name for name, _ in operations if not Path(name).is_absolute()])
+    account.manifest = m.backup_inventory(home, backup_paths)
     account.files = []
     for name, source in operations:
         path = home / name
@@ -323,9 +341,9 @@ def transaction(home, operations, label, selected=None, require_word=None, tree_
             if not confirm(require_word, label):
                 account.finish('CANCELLED')
                 return 0
-        if m.backup_inventory(home, [name for name, _ in operations if not Path(name).is_absolute()]) != account.manifest:
+        if m.backup_inventory(home, backup_paths) != account.manifest:
             raise ValueError('Files changed during review. Run the command again.')
-        m.backup(home, [name for name, _ in operations if not Path(name).is_absolute()], folder)
+        m.backup(home, backup_paths, folder)
         account.bind_backup(folder)
         source = home / '.local/share/dotfleet/chezmoi-source'
         if source.is_dir():
@@ -364,8 +382,7 @@ def transaction(home, operations, label, selected=None, require_word=None, tree_
             account.profile_written = True
             account.confirm_files(m.fingerprint)
             drift = status(home) if (home / '.config/chezmoi/chezmoi.toml').exists() else ''
-            account.finish('SUCCESS', [], 'differences remain; run dotfleet diff' if drift else 'clean')
-            return 0
+            return account.finish('SUCCESS', [], 'differences remain; run dotfleet diff' if drift else 'clean')
         except (OSError, ValueError, RuntimeError) as error:
             account.confirm_files(m.fingerprint)
             account.finish('FAILED', [str(error)])
@@ -399,7 +416,7 @@ def main(argv=None):
     args = parser().parse_args(argv)
     try:
         p = profile(home)
-        if args.command in ('status', 'doctor', 'version') or args.command in ('domain', 'groups') and not args.name or args.command == 'pins' and not args.action:
+        if args.command in ('status', 'doctor', 'version', 'machines', 'addons') or args.command in ('domain', 'groups') and not args.name or args.command == 'pins' and not args.action:
             return read_view(args, home, p)
         if args.command == 'update':
             with tempfile.TemporaryDirectory(prefix='dotfleet-update-') as folder:
@@ -482,8 +499,7 @@ def snapshot(home, operations):
         source = home / '.local/share/dotfleet/chezmoi-source'
         if source.exists():
             shutil.copytree(source, folder / 'previous-chezmoi-source', symlinks=True)
-        account.finish('SUCCESS', [], 'differences remain; run dotfleet diff' if account.status else 'clean')
-    return 0
+        return account.finish('SUCCESS', [], 'differences remain; run dotfleet diff' if account.status else 'clean')
 
 
 if __name__ == '__main__':

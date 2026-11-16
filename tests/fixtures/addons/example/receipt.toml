@@ -1,0 +1,9 @@
+schema_version = 1
+id = "fixture-example"
+version = "0.1.0"
+opted_in = true
+tools = {}
+
+[outputs.".config/fixture-example/settings.toml"]
+sha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+mode = 384

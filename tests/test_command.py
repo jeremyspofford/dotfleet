@@ -104,6 +104,9 @@ class CommandTests(unittest.TestCase):
             args = [name, '--help'] if name else ['--help']
             output = command('bash', str(ROOT / 'scripts/dotfleet.sh'), *args, env=self.env)
             self.assertIn('help', output)
+            self.assertNotIn('Usage: Usage:', output)
+            for line in output.splitlines():
+                self.assertLessEqual(len(line), 100)
             self.assertIn('exit codes' if name else 'Exit codes', output)
             if name:
                 self.assertIn(DESCRIPTIONS[name].split('.')[0].split()[0], output)
