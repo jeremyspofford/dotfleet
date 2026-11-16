@@ -22,11 +22,12 @@ Each record stores hostname, operating system, domain, content repository and co
 A commit identifies a saved Git version. The registry retains full commit identifiers and absolute backup paths.
 The `schema_version` field is 1. Each machine table contains these fields:
 
-- Strings: `hostname`, `os`, `domain`, `content_repo`, `content_commit`, `manager_version`, `last_run`, `last_backup`, `last_run_record`, and `result`.
+- Strings: `hostname`, `home`, `os`, `domain`, `content_repo`, `content_commit`, `manager_version`, `last_run`, `last_backup`, `last_run_record`, and `result`.
 - Booleans: `domain_chosen` and `enrolled`. These record explicit domain choice and whether the machine retains an installed profile.
 
 `last_run` uses UTC time in ISO format. UTC is the common time reference; ISO format stores an unambiguous date and time.
-Paths remain absolute. The registry does not store identity, pins, or credentials.
+Paths remain absolute. `home` records the machine's home path so reports can print its saved paths with `~`.
+The registry does not store identity, pins, or credentials.
 Use unique hostnames when combining records manually.
 
 Backed-up apply, update, restore, and backup runs refresh this machine's record, including failures.
