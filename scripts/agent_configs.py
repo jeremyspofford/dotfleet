@@ -11,6 +11,7 @@ Author: Jeremy Spofford / Aria Labs; Version: read from ../VERSION.
 The calling Bash wrapper sends messages through logger.sh.
 """
 import argparse
+import style
 import hashlib
 import json
 import os
@@ -134,7 +135,7 @@ def generate(home, os_name, dry_run, *, profile=None, content_root=None):
 
 
 def main():
-    parser = argparse.ArgumentParser(
+    parser = style.ArgumentParser(
         description="Write settings for installed coding agents from agents/manifest.toml.\n"
         "An agent is a coding assistant. The manifest lists settings and paths.\n"
         "The Bash wrapper logs messages through logger.sh. Requires Python 3.11+.",
@@ -152,10 +153,10 @@ def main():
     try:
         generate(args.home, args.os or native_os(), args.dry_run)
     except (OSError, ValueError, KeyError) as error:
-        print(f"ERROR: {error}")
+        print(f"Error: {error}", file=sys.stderr)
         return 1
     return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(style.run_cli(main, ROOT))

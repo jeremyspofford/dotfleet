@@ -8,6 +8,7 @@ Exit codes: 0 success/help; 1 invalid content; 2 invalid arguments.
 Author: Jeremy Spofford / Aria Labs; Version: read from ../VERSION.
 """
 import argparse
+import style
 from pathlib import Path
 import re
 import sys
@@ -145,7 +146,7 @@ def convert(checkout, output, profile=None, explicit=None):
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter,
+    parser = style.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter,
                                      epilog='Version: ' + (ROOT / 'VERSION').read_text().strip())
     parser.add_argument('checkout', type=Path, help='content Git checkout')
     parser.add_argument('output', type=Path, help='empty converted-source directory')
@@ -162,4 +163,4 @@ def main():
 
 
 if __name__ == '__main__':
-    sys.exit(main())
+    sys.exit(style.run_cli(main, ROOT))

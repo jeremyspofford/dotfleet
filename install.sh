@@ -51,6 +51,7 @@ finish_run() {
 }
 trap finish_run EXIT
 usage() {
+	log_section "Dotfleet help"
 	log_heredoc '' <<EOF
 Dotfleet $DOTFILES_VERSION manages home configuration with a saved machine profile.
 Usage: bash install.sh [OPTIONS]
@@ -168,5 +169,5 @@ if [[ -z $script_dir ]]; then
 	script_dir="$work_dir/manager"
 	git clone "$manager_repo" "$script_dir" </dev/null
 fi
-# Python sends each completed line through logger.sh before showing a terminal prompt.
+# Python uses the same logger style for output and terminal prompts.
 python3 -u "$script_dir/scripts/manager.py" "${arguments[@]}" </dev/null

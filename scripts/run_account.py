@@ -15,6 +15,7 @@ from common import atomic, read_toml, run
 from render_run import render
 from installation import command_software, MANAGER
 import registry
+import style
 
 RECORD = '.local/state/dotfleet/last-run.json'
 
@@ -92,6 +93,8 @@ class RunAccount:
         self.available_defaults = {}
         self.adoption_excluded = []
         self.scan = {}
+        self.debug_details = None
+        style.ACTIVE_RECORD = self
 
     def plan(self, plan, checkout, profile, backup_path, manifest):
         self.checkouts[1]['new'] = commit(checkout)
@@ -131,7 +134,7 @@ class RunAccount:
             'profile_written': self.profile_written, 'backup_created': bool(self.backup),
             'result': self.result, 'warnings': self.warnings, 'chezmoi_status_after': self.status_after,
             'selected_profile': self.selected_profile, 'available_defaults': self.available_defaults,
-            'adoption_excluded': self.adoption_excluded, 'scan': self.scan}
+            'adoption_excluded': self.adoption_excluded, 'scan': self.scan, 'debug_details': self.debug_details}
 
     def save(self):
         if self.backup:

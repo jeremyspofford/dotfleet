@@ -6,7 +6,6 @@ import subprocess
 import tempfile
 import tomllib
 
-from render_run import change_marker
 
 
 def run(*args, cwd=None, env=None):
@@ -60,41 +59,5 @@ def relative(name):
     return path
 
 
-class LoggerStream:
-    """Send whole lines through the owner's logger before displaying the next prompt."""
-    def __init__(self, root, error=False):
-        self.root = root
-        self.error = error
-        self.pending = ''
-        self.in_warnings = False
-        self.diff = False
-
-    def write(self, text):
-        self.pending += text
-        while '\n' in self.pending:
-            line, self.pending = self.pending.split('\n', 1)
-            self.emit(line)
-        return len(text)
-
-    def flush(self):
-        if self.pending:
-            self.emit(self.pending)
-            self.pending = ''
-
-    def emit(self, line):
-        import sys
-        level = 'log_error' if self.error else 'log_info'
-        arguments = [line]
-        marker = change_marker(line)
-        if self.diff and line.startswith(('+', '-')):
-            marker = '+' if line.startswith('+') else '−'
-        if marker:
-            level = 'log_change'
-            arguments = [{'+': 'added', '−': 'removed', '~': 'changed'}[marker], line]
-        elif line.startswith('chezmoi status: clean'):
-            level = 'log_success'
-        elif line.startswith('Warning:'):
-            level = 'log_warn'
-        subprocess.run(['bash', '-c', 'source "$1"; shift; "$@"', 'dotfleet-log',
-                        str(self.root / 'scripts/logger.sh'), level, *arguments], check=True,
-                       stdout=sys.__stdout__, stderr=sys.__stderr__)
+# Keep the existing import path for callers and integrations.
+from style import LoggerStream

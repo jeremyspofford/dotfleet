@@ -1,0 +1,11 @@
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Doctor
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Profile           PASS
+  Domain choice     PASS · chosen
+  Managed files     PASS · no drift
+  Manager checkout  PASS · clean
+  Content checkout  PASS · clean
+  Backup            PASS
+  Manager config    ~/.config/chezmoi/chezmoi.toml
+  Converted source  PASS · ~/.local/share/dotfleet/chezmoi-source

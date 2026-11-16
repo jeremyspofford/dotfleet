@@ -1,4 +1,6 @@
-Machine export
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Machine export
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   Machine            example-hub
   Scope              This machine’s saved record only.
   Home               ~

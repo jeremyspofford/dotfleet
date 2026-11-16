@@ -1,4 +1,6 @@
-Profile
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Profile
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   Profile file   ~/.config/dotfleet/profile.toml
   Domain         personal
   Domain choice  chosen
