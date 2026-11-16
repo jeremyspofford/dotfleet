@@ -1,5 +1,6 @@
 """Exercise real conversion, enrollment, updates, and saved machine settings."""
 import json
+import hashlib
 import errno
 import fcntl
 import pty
@@ -20,7 +21,7 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 import agent_configs
-from manager import installed_defaults
+from manager import exact_version, installed_defaults, validate_profile
 from common import toml
 from convert import convert, detect
 
@@ -29,6 +30,8 @@ def command(*args, env=None, cwd=None):
     result = subprocess.run(args, env=env, cwd=cwd, text=True, capture_output=True)
     if result.returncode:
         raise AssertionError(f"{args}: {result.returncode}\n{result.stdout}\n{result.stderr}")
+    if args[0] == "bash" and len(args) > 1 and args[1] == str(ROOT / "install.sh"):
+        assert "config file template has changed" not in result.stdout + result.stderr, result.stdout + result.stderr
     return result.stdout
 
 
@@ -65,10 +68,26 @@ class EnrollmentTests(unittest.TestCase):
             args += ["--repo", str(repo)]
         if defaults:
             args += ["--defaults"]
+        existing = [self.home / name for name in [".config/dotfleet/profile.toml", ".config/dotfiles/profile.toml", ".config/chezmoi/chezmoi.toml"]]
+        if not any(path.exists() for path in existing):
+            args += ["--domain", "core", "--git-name", "Fixture Person", "--git-email", "fixture@example.invalid"]
         return command(*args, env=self.env, cwd=self.home)
 
+    def complete_profile(self):
+        path = self.home / ".config/dotfleet/profile.toml"
+        profile = tomllib.loads(path.read_text())
+        profile.update(domain_chosen=True, git_name="Fixture Person", git_email="fixture@example.invalid")
+        path.write_text(toml(profile))
+
+    def assert_quiet_status(self):
+        result = subprocess.run(["bash", "-c", "umask 0022; chezmoi status"],
+                                env=self.env, cwd=self.home, text=True, capture_output=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout, "")
+        self.assertEqual(result.stderr, "")
+
     def assert_clean(self):
-        self.assertEqual(command("bash", "-c", "umask 0022; chezmoi status", env=self.env, cwd=self.home), "")
+        self.assert_quiet_status()
         self.assertEqual(command("git", "-C", str(self.home / "dotfiles"), "status", "--porcelain"), "")
         self.assertEqual((self.home / ".secrets").stat().st_mode & 0o777, 0o600)
         for shell in ["bash", "zsh"]:
@@ -105,11 +124,60 @@ class EnrollmentTests(unittest.TestCase):
             self.assertEqual((backups[0] / "external" / str(external).lstrip("/")).read_bytes(), external.read_bytes())
         state = self.home / ".local/state/dotfleet/outputs.json"
         before = state.read_bytes()
+        # Complete the deliberately defaulted profile before testing unattended updates.
+        self.complete_profile()
+        self.install(defaults=False)
+        before = state.read_bytes()
         profile = (self.home / ".config/dotfleet/profile.toml").read_bytes()
         self.assertIn("Result: SUCCESS", self.install(defaults=False))
         self.assertEqual(state.read_bytes(), before)
         self.assertEqual((self.home / ".config/dotfleet/profile.toml").read_bytes(), profile)
         self.assert_clean()
+
+    def test_fresh_install_and_rerun_have_no_config_warning(self):
+        self.assertIn("Result: SUCCESS", self.install(Path(os.environ["DOTFLEET_CONTENT_FIXTURE"])))
+        self.assert_quiet_status()
+        self.assertIn("Result: SUCCESS", self.install())
+        self.assert_quiet_status()
+
+    def test_legacy_template_state_is_retired_without_resetting_other_state(self):
+        legacy = self.base / "legacy"
+        contents = toml({"sourceDir": str(legacy), "umask": 63,
+                         "data": {"domain": "personal", "gitName": "Fixture Person", "gitEmail": "fixture@example.invalid"}})
+        repository(legacy, {".chezmoi.toml.tmpl": contents, "dot_zshrc": "# legacy\n"})
+        command("chezmoi", "--source", str(legacy), "init", env=self.env, cwd=self.home)
+        command("chezmoi", "apply", env=self.env, cwd=self.home)
+        cached = command("chezmoi", "state", "get", "--bucket=configState", "--key=configState", env=self.env)
+        self.assertEqual(json.loads(cached)["configTemplateContentsSHA256"], hashlib.sha256(contents.encode()).hexdigest())
+        command("chezmoi", "state", "set", "--bucket=scriptState", "--key=keep", '--value={"keep": true}', env=self.env)
+        self.install(Path(os.environ["DOTFLEET_CONTENT_FIXTURE"]))
+        self.assert_quiet_status()
+        self.assertEqual(command("chezmoi", "state", "get", "--bucket=configState", "--key=configState", env=self.env), "")
+        self.assertEqual(json.loads(command("chezmoi", "state", "get", "--bucket=scriptState", "--key=keep", env=self.env)), {"keep": True})
+        # Repair the same stale marker on an already enrolled machine, as on the owners' machines.
+        command("chezmoi", "state", "set", "--bucket=configState", "--key=configState", "--value=" + cached, env=self.env)
+        warning = subprocess.run(["chezmoi", "status"], env=self.env, text=True, capture_output=True)
+        self.assertIn("config file template has changed", warning.stderr)
+        self.install(defaults=False)
+        self.assert_clean()
+
+    def test_native_config_template_is_acknowledged_without_running_it(self):
+        contents = '{{ fail "The manager must own the config" }}\n'
+        repo = repository(self.base / "native-template", {".chezmoi.toml.tmpl": contents, "dot_zshrc": "# native\n"})
+        self.install(repo)
+        config = self.home / ".config/chezmoi/chezmoi.toml"
+        before = config.read_bytes()
+        self.assert_quiet_status()
+        self.install()
+        self.assertEqual(config.read_bytes(), before)
+        self.assert_quiet_status()
+        # Updating a native template must not reintroduce the warning or take ownership.
+        (repo / ".chezmoi.toml.tmpl").write_text(contents + "# updated\n")
+        command("git", "-C", str(repo), "add", ".")
+        command("git", "-C", str(repo), "-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-m", "test: update template")
+        self.install()
+        self.assertEqual(config.read_bytes(), before)
+        self.assert_quiet_status()
 
     def test_plain_content_and_groups(self):
         repo = Path(os.environ["DOTFLEET_CONTENT_FIXTURE"])
@@ -142,9 +210,9 @@ class EnrollmentTests(unittest.TestCase):
 
     def test_migration_reads_all_sources_and_preserves_pins(self):
         for name, data in {
-            ".config/chezmoi/chezmoi.toml": {"data": {"domain": "personal", "gitName": "Example Owner", "gitEmail": "owner@example.invalid", "miseTools": {"node": "22", "python": "3.12"}}},
-            ".config/mise/config.toml": {"tools": {"node": "24"}, "settings": {"experimental": False}},
-            ".config/dotfiles/profile.toml": {"pins": {"python": "3.13"}},
+            ".config/chezmoi/chezmoi.toml": {"data": {"domain": "personal", "gitName": "Example Owner", "gitEmail": "owner@example.invalid", "miseTools": {"node": "22.1.0", "python": "3.12.0"}}},
+            ".config/mise/config.toml": {"tools": {"node": "24.1.0"}, "settings": {"experimental": False}},
+            ".config/dotfiles/profile.toml": {"pins": {"python": "3.13.0"}},
         }.items():
             path = self.home / name
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -153,7 +221,7 @@ class EnrollmentTests(unittest.TestCase):
         output = self.install(Path(os.environ["DOTFLEET_CONTENT_FIXTURE"]))
         self.assertIn("old chezmoi data, current Mise tools, saved installer profile", output)
         profile = tomllib.loads((self.home / ".config/dotfleet/profile.toml").read_text())
-        self.assertEqual(profile["pins"], {"node": "24", "python": "3.13"})
+        self.assertEqual(profile["pins"], {"node": "24.1.0", "python": "3.13.0"})
         self.assertEqual(profile["git_name"], "Example Owner")
         rendered = tomllib.loads((self.home / ".config/mise/config.toml").read_text())
         self.assertEqual(rendered["settings"], {"experimental": False})
@@ -163,12 +231,14 @@ class EnrollmentTests(unittest.TestCase):
         self.assertEqual((self.home / ".secrets").read_text(), "# preserved secret placeholder\n")
         self.assertEqual(command("chezmoi", "status", env=self.env, cwd=self.home), "")
 
-    def terminal(self, responses, expected=0, configure=False):
+    def terminal(self, responses, expected=0, configure=False, plain=False):
         master, slave = pty.openpty()
         def controlling_terminal():
             os.setsid()
             fcntl.ioctl(slave, termios.TIOCSCTTY, 0)
         args = ["bash", str(ROOT / "install.sh"), "--repo", os.environ["DOTFLEET_CONTENT_FIXTURE"]]
+        if plain:
+            args = ["bash", str(ROOT / "install.sh")]
         if configure:
             args.append("--configure")
         process = subprocess.Popen(args, cwd=self.home, env=self.env, stdin=subprocess.PIPE,
@@ -210,6 +280,155 @@ class EnrollmentTests(unittest.TestCase):
         self.assertNotIn("diff/overwrite/all-overwrite/skip/Skip-conflicts/quit", output)
         return output
 
+    def seed_profile(self, *, legacy=False, complete=False, installed=True):
+        profile = {"content_repo": os.environ["DOTFLEET_CONTENT_FIXTURE"], "domain": "core",
+                   "git_name": "Fixture Person" if complete else "",
+                   "git_email": "fixture@example.invalid" if complete else "",
+                   "pins": {"node": "24.14.1" if complete else "latest"},
+                   "groups": {group: True for group in ["docker", "terraform", "kubectl", "python", "npm"]}}
+        if complete:
+            profile["domain_chosen"] = True
+        name = ".config/dotfiles/profile.toml" if legacy else ".config/dotfleet/profile.toml"
+        path = self.home / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(toml(profile))
+        if installed:
+            node = self.home / ".local/share/mise/installs/node/24.14.1/bin/node"
+            node.parent.mkdir(parents=True)
+            node.write_text("#!/bin/sh\nprintf 'v24.14.1\\n'\n")
+            node.chmod(0o755)
+        return path
+
+    def gap_answers(self):
+        return [(b"[core]:", b"\n"), (b"Git author name", b"Fixture Person\n"),
+                (b"Git author email", b"fixture@example.invalid\n"), (b"[latest]:", b"\n")]
+
+    def check_completed_gap_profile(self):
+        path = self.home / ".config/dotfleet/profile.toml"
+        profile = tomllib.loads(path.read_text())
+        self.assertTrue(profile["domain_chosen"])
+        self.assertEqual(profile["domain"], "core")
+        self.assertEqual(profile["git_name"], "Fixture Person")
+        self.assertEqual(profile["git_email"], "fixture@example.invalid")
+        self.assertEqual(profile["pins"], {"node": "24.14.1"})
+        self.assert_quiet_status()
+        before = path.read_bytes()
+        self.terminal([], plain=True)
+        self.assertEqual(path.read_bytes(), before)
+
+    def test_migration_prompts_for_all_gaps_and_records_installed_exact_version(self):
+        self.seed_profile(legacy=True)
+        output = self.terminal(self.gap_answers(), plain=True)
+        self.assertIn("Enter uses installed 24.14.1", output)
+        self.assertIn("Recorded exact pin: node = 24.14.1", output)
+        self.check_completed_gap_profile()
+
+    def test_plain_rerun_repairs_existing_profile_gaps(self):
+        self.seed_profile()
+        self.terminal(self.gap_answers(), plain=True)
+        self.check_completed_gap_profile()
+
+    def test_complete_migration_needs_no_prompts(self):
+        self.seed_profile(legacy=True, complete=True)
+        output = self.install(defaults=False)
+        self.assertNotIn("Git author", output)
+        self.assertNotIn("Domain:", output)
+        self.assertNotIn("node pin:", output)
+        self.assertIn("Warnings:\n  None.", output)
+        self.check_completed_gap_profile()
+
+    def test_skipped_gaps_warn_and_do_not_repin_from_content_defaults(self):
+        self.seed_profile()
+        answers = [(b"[core]:", b"skip\n"), (b"Git author name", b"\n"),
+                   (b"Git author email", b"\n"), (b"[latest]:", b"skip\n")]
+        output = self.terminal(answers, plain=True)
+        self.assertIn("Warnings:", output)
+        self.assertIn("No domain choice confirmed", output)
+        self.assertIn("No complete git identity recorded", output)
+        self.assertIn("node is unpinned", output)
+        profile = tomllib.loads((self.home / ".config/dotfleet/profile.toml").read_text())
+        self.assertFalse(profile["domain_chosen"])
+        self.assertNotIn("node", profile["pins"])
+        self.assertNotIn("node", tomllib.loads((self.home / ".config/mise/config.toml").read_text())["tools"])
+        # Skipped identity/domain gaps remain visible on the next plain run.
+        self.terminal(self.gap_answers()[:3], plain=True)
+        self.assert_quiet_status()
+
+    def test_uninstalled_floating_pin_accepts_exact_version_or_stays_unpinned(self):
+        self.seed_profile(installed=False)
+        answers = self.gap_answers()[:3] + [(b"[latest]:", b"24\n"), (b"[latest]:", b"24.14.1\n")]
+        output = self.terminal(answers, plain=True)
+        self.assertIn("no matching version is installed", output)
+        self.check_completed_gap_profile()
+
+    def test_noninteractive_gaps_fail_before_apply_even_with_defaults(self):
+        path = self.seed_profile()
+        before = path.read_bytes()
+        for flags in [[], ["--defaults"]]:
+            result = subprocess.run(["bash", str(ROOT / "install.sh"), *flags], env=self.env, cwd=self.home,
+                                    input="personal\nWrong Name\nwrong@example.invalid\n", text=True,
+                                    capture_output=True, start_new_session=True)
+            self.assertNotEqual(result.returncode, 0)
+            for text in ["Domain was never explicitly chosen (recorded: core)", "Git name is empty", "Git email is empty",
+                         "node pin is floating (recorded: latest)", "--domain", "--git-name", "--git-email", "--pin node=VERSION"]:
+                self.assertIn(text, result.stdout + result.stderr)
+            self.assertEqual(path.read_bytes(), before)
+            self.assertFalse((self.home / "dotfiles").exists())
+            self.assertFalse((self.home / ".config/chezmoi/chezmoi.toml").exists())
+            self.assertFalse((self.home / "dotfleet-backups").exists())
+
+    def test_noninteractive_flags_complete_the_profile_without_prompts(self):
+        self.seed_profile(installed=False)
+        args = ["bash", str(ROOT / "install.sh"), "--domain", "personal", "--git-name", "Script Person",
+                "--git-email", "script@example.invalid", "--pin", "node=24.14.1", "--pin", "python=3.13.0"]
+        result = subprocess.run(args, env=self.env, cwd=self.home, stdin=subprocess.DEVNULL,
+                                text=True, capture_output=True, start_new_session=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        for prompt in ["Git author name;", "Git author email;", "Domain:", "node pin:", "Press Enter"]:
+            self.assertNotIn(prompt, result.stdout + result.stderr)
+        self.assertIn("Warnings:\n  None.", result.stdout)
+        profile = tomllib.loads((self.home / ".config/dotfleet/profile.toml").read_text())
+        self.assertEqual(profile["domain"], "personal")
+        self.assertTrue(profile["domain_chosen"])
+        self.assertEqual(profile["git_name"], "Script Person")
+        self.assertEqual(profile["git_email"], "script@example.invalid")
+        self.assertEqual(profile["pins"], {"node": "24.14.1", "python": "3.13.0"})
+        self.assert_quiet_status()
+        self.install(defaults=False)
+
+    def test_noninteractive_fresh_install_with_flags_prints_group_defaults(self):
+        args = ["bash", str(ROOT / "install.sh"), "--repo", os.environ["DOTFLEET_CONTENT_FIXTURE"],
+                "--domain", "core", "--git-name", "Script Person", "--git-email", "script@example.invalid"]
+        result = subprocess.run(args, env=self.env, cwd=self.home, stdin=subprocess.DEVNULL,
+                                text=True, capture_output=True, start_new_session=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("Group docker: using on", result.stdout)
+        self.assertIn("Warnings:\n  None.", result.stdout)
+        self.assert_quiet_status()
+        self.install(defaults=False)
+
+    def test_profile_flags_reject_missing_and_invalid_arguments(self):
+        cases = [[flag] for flag in ["--domain", "--git-name", "--git-email", "--pin"]]
+        cases += [["--domain", "unknown"], ["--pin", "node"]]
+        for flags in cases:
+            with self.subTest(flags=flags):
+                result = subprocess.run(["bash", str(ROOT / "install.sh"), *flags], env=self.env,
+                                        cwd=self.home, text=True, capture_output=True, start_new_session=True)
+                self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+                self.assertIn("usage:", (result.stdout + result.stderr).lower())
+                self.assertFalse((self.home / ".config/dotfleet/profile.toml").exists())
+
+    def test_noninteractive_partial_flags_still_name_remaining_gaps(self):
+        self.seed_profile(installed=False)
+        result = subprocess.run(["bash", str(ROOT / "install.sh"), "--domain", "personal", "--pin", "node=latest"],
+                                env=self.env, cwd=self.home, stdin=subprocess.DEVNULL, text=True,
+                                capture_output=True, start_new_session=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Git name is empty", result.stdout)
+        self.assertIn("Git email is empty", result.stdout)
+        self.assertIn("node pin is floating", result.stdout)
+        self.assertNotIn("Domain was never explicitly chosen", result.stdout)
+
     def test_terminal_profile_and_update(self):
         responses = [(b"[core]:", b"invalid\n"), (b"[core]:", b"personal\n"),
                      (b"Git author name", b"Fixture Person\n"), (b"Git author email", b"fixture@example.invalid\n")]
@@ -224,6 +443,7 @@ class EnrollmentTests(unittest.TestCase):
 
     def test_terminal_conflict_decisions(self):
         self.install(Path(os.environ["DOTFLEET_CONTENT_FIXTURE"]))
+        self.complete_profile()
         paths = [self.home / ".aliases", self.home / ".bashrc"]
         original = [path.read_bytes() for path in paths]
         for path in paths:
@@ -248,6 +468,7 @@ class EnrollmentTests(unittest.TestCase):
 
     def test_unattended_conflict_keeps_local_edits(self):
         self.install(Path(os.environ["DOTFLEET_CONTENT_FIXTURE"]))
+        self.complete_profile()
         path = self.home / ".aliases"
         path.write_bytes(path.read_bytes() + b"\n# local edit\n")
         before = path.read_bytes()
@@ -261,7 +482,8 @@ class EnrollmentTests(unittest.TestCase):
         (self.home / "dotfiles").mkdir()
         marker = self.home / "dotfiles/keep"
         marker.write_text("keep")
-        result = subprocess.run(["bash", str(ROOT / "install.sh"), "--defaults", "--repo", os.environ["DOTFLEET_CONTENT_FIXTURE"]], env=self.env, text=True, capture_output=True)
+        result = subprocess.run(["bash", str(ROOT / "install.sh"), "--defaults", "--repo", os.environ["DOTFLEET_CONTENT_FIXTURE"],
+                                 "--domain", "core", "--git-name", "Fixture", "--git-email", "fixture@example.invalid"], env=self.env, text=True, capture_output=True)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("not the selected clone", result.stdout)
         self.assertEqual(marker.read_text(), "keep")
@@ -295,6 +517,20 @@ class ConverterTests(unittest.TestCase):
             command("chezmoi", "--source", str(source), "--destination", str(home), "--config", str(root / "missing.toml"), "apply", env=env)
             for name in [".config/run_example", ".config/example.tmpl", ".empty", ".config/literal_example"]:
                 self.assertEqual((home / name).read_bytes(), (repo / name).read_bytes())
+
+    def test_full_versions_and_floating_selectors(self):
+        for version in ["24.14.1", "v3.12.0", "3.13.0t", "21.0.2-tem", "temurin-21.0.2+13.0.LTS", "2026-11-16", "a" * 40]:
+            self.assertTrue(exact_version(version), version)
+        for version in ["latest", "lts", "stable", "nightly", "24", "3.13", "24.x", "^24.1.0", ">=24.1.0"]:
+            self.assertFalse(exact_version(version), version)
+
+    def test_version_lists_and_options_keep_exact_pins(self):
+        profile = {"domain": "core", "domain_chosen": True, "git_name": "Fixture", "git_email": "fixture@example.invalid",
+                   "pins": {"node": ["22.1.0", {"version": "latest", "option": "keep"}]}}
+        with patch("manager.resolve_installed_pin", return_value="24.14.1"), patch("manager.ask", return_value="latest"):
+            warnings = validate_profile(Path("/tmp"), profile)
+        self.assertEqual(warnings, [])
+        self.assertEqual(profile["pins"], {"node": ["22.1.0", {"version": "24.14.1", "option": "keep"}]})
 
     def test_defaults_only_fill_installed_gaps(self):
         with patch("manager.run", side_effect=[json.dumps({"node": [{}], "python": [{}]}), "3.13.0\n"]):

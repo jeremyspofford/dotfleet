@@ -15,10 +15,10 @@ curl -fsSL https://raw.githubusercontent.com/jeremyspofford/dotfleet/main/instal
 
 Requires Bash, git, curl, tar, and Python 3.11+. Use Linux, macOS, or WSL (Windows Subsystem for Linux).
 Missing chezmoi and Mise install into `~/.local/bin`. Setup never uses sudo.
-First setup asks for a content repository, domain, author name/email, and content groups. Prompts read the terminal, never piped input.
+Interactive setup asks for a content repository, missing domain and identity choices, and content groups. Explicit flags supply recorded choices. Prompts read the terminal, never piped input.
 Domains: core means shared settings; personal adds personal settings; work adds employer settings; client adds client settings.
 Groups show their purpose and an on/off choice. On includes content; off excludes it. Press Enter to keep the displayed answer.
-Later runs ask only about new groups. Use `--configure` to review all answers, or `--defaults` to accept saved/default answers without prompts.
+Later runs ask about new groups and incomplete profile choices. Use `--configure` to review all answers. Use `--defaults` to skip prompts only when profile values are complete.
 
 ```sh
 bash ~/.local/share/dotfleet/manager/install.sh --configure
@@ -36,6 +36,24 @@ Dotfleet converts plain files into a private chezmoi source. Native chezmoi repo
 Stow layouts under `packages/<package>/` also work; their package prefixes do not reach the home directory.
 
 Your profile lives at `~/.config/dotfleet/profile.toml`. Edit pins there, then rerun the installer.
+Setup asks when identity is incomplete, the domain choice is unconfirmed, or a pin floats, such as `latest`.
+Prompts show recorded values. Press Enter to use the stated action, or type `skip` to leave a choice incomplete.
+For identity, Enter keeps the displayed value; an empty value stays unset.
+Floating pins resolve to matching installed versions. Without a match, enter a full version, such as `24.14.1`, or leave the tool unpinned.
+Exact pins remain unchanged. Complete profiles need no profile prompts.
+The summary lists skipped gaps under Warnings. Without a terminal, incomplete identity, an unconfirmed domain, or a floating pin stops setup. `--defaults` cannot bypass this check.
+For scripted runs, supply missing choices explicitly:
+
+```sh
+bash install.sh --domain personal --git-name "Example Person" --git-email person@example.invalid --pin node=24.14.1
+```
+
+`--domain` records the domain choice. `--git-name` and `--git-email` record commit identity.
+Repeat `--pin TOOL=VERSION` for each full version. A floating value in a flag still fails unattended validation.
+Complete profiles need no flags on later runs. New group defaults are printed during scripted setup.
+
+`domain_chosen` records confirmation. Older core profiles need confirmation once; older non-core domains retain their selection.
+`unpinned_tools` records skipped tools, so content defaults cannot select them later. Remove a tool there to allow its defaults again.
 Content defaults fill gaps only when the requested versions are installed. The summary lists other defaults as available, without installing them.
 The manager creates Git identity, domain, Mise settings, and a private secrets file. Keep secret references in the profile, never values.
 A reference such as `op://Vault/Item/field` names a secret in 1Password. References are disabled unless explicitly enabled.

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Purpose: Install Dotfleet and enroll or update a content checkout.
-# Usage: bash install.sh [--repo URL] [--configure] [--defaults] [--format FORMAT]
-# Parameters: --repo chooses content; --configure asks again; --defaults accepts shown defaults.
+# Usage: bash install.sh [OPTIONS]
+# Parameters: --repo chooses content; --configure asks again; --defaults skips prompts for complete profiles.
+# --domain, --git-name, and --git-email supply profile choices. Repeat --pin TOOL=VERSION for full tool versions.
 # --format selects plain (real names) or chezmoi (native sources); -h/--help prints help.
 # Example: bash install.sh --repo https://github.com/jeremyspofford/dotfiles
 # Exit codes: 0 success/help; 1 setup failure; 2 invalid arguments.
@@ -38,12 +39,22 @@ Options:
   --repo URL       Content Git repository; default: https://github.com/jeremyspofford/dotfiles.
                    Plain repositories use real names. Chezmoi repositories use native source names.
   --configure      Ask profile questions again. Enter keeps each displayed answer.
-  --defaults       Accept saved/default answers without a terminal; new groups default to on.
+  --defaults       Skip prompts only with a complete profile. New groups default to on.
+                   This flag cannot bypass missing identity, domain confirmation, or floating pins.
+  --domain VALUE   Record a domain choice: core, personal, work, or client (defined below).
+  --git-name NAME  Record the Git author name.
+  --git-email EMAIL Record the Git author email.
+  --pin TOOL=VERSION Record a full tool version, such as node=24.14.1. Repeat for more tools.
   --format FORMAT  plain=real names; chezmoi=native sources. A manifest takes priority.
   -h, --help       Print full help and exit 0.
 A profile saves the repository, domain, Git author identity, tool pins, and content groups.
 Domains: core=shared; personal=personal+shared; work=employer+shared; client=client+shared.
 Groups select optional files or alias blocks. Each prompt defines on and off.
+Plain reruns ask about missing identity, an unconfirmed domain, and floating pins such as latest.
+Pins use full versions. Enter accepts the prompt's stated action; skip leaves a choice incomplete.
+Complete profiles need no profile prompts. The summary lists skipped gaps under Warnings.
+Without a terminal, missing identity, an unconfirmed domain, or floating pins stop setup with exit 1.
+Supply the listed flags to complete those values. New group defaults are printed before applying files.
 Prompts read /dev/tty, the terminal device, never piped input.
 Requires git, curl, tar, and Python 3.11+. Supports Linux, macOS, and WSL (Windows Subsystem for Linux).
 Missing chezmoi and Mise go in ~/.local/bin. Setup never uses sudo or installs content-default tools.
@@ -51,7 +62,7 @@ Content lives in ~/dotfiles. Backups live in ~/dotfleet-backups/<timestamp>/.
 Review MANIFEST.json before restoring backup home/ files and recorded external targets.
 Native chezmoi templates and hooks can execute code. Use only trusted content repositories.
 Examples:
-  bash install.sh --defaults
+  bash install.sh --domain personal --git-name "Example Person" --git-email person@example.invalid --pin node=24.14.1
   bash install.sh --repo git@github.com:you/dotfiles.git --configure
 Exit codes: 0 success/help; 1 setup failure; 2 invalid arguments.
 Author: Jeremy Spofford / Aria Labs; Version: $DOTFILES_VERSION (VERSION).
@@ -65,7 +76,7 @@ while [[ $# -gt 0 ]]; do
 		exit 0
 		;;
 	--configure | --defaults) shift ;;
-	--repo | --format)
+	--repo | --format | --domain | --git-name | --git-email | --pin)
 		[[ $# -ge 2 && -n $2 && $2 != --* ]] || {
 			usage >&2
 			exit 2

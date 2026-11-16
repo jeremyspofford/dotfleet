@@ -44,14 +44,19 @@ jobs:
           bash scripts/apply.sh --help
           bash scripts/generate-agent-configs.sh --help
           bash scripts/release.sh --help
-      - name: Cold install with official tool downloads
+      - name: Cold install and rerun without config-template warnings
         shell: bash
         run: |
           export HOME="$RUNNER_TEMP/cold-home"
           mkdir -p "$HOME"
-          bash manager/install.sh --repo "$GITHUB_WORKSPACE/content" --defaults
-          export PATH="$HOME/.local/bin:$PATH"
-          test -z "$(chezmoi status)"
+          for attempt in first second; do
+            bash manager/install.sh --repo "$GITHUB_WORKSPACE/content" --defaults --domain core --git-name "Container Test" --git-email container@example.invalid > "$RUNNER_TEMP/install-$attempt.log" 2>&1
+            cat "$RUNNER_TEMP/install-$attempt.log"
+            if grep -Fq 'config file template has changed' "$RUNNER_TEMP/install-$attempt.log"; then exit 1; fi
+            export PATH="$HOME/.local/bin:$PATH"
+            chezmoi status > "$RUNNER_TEMP/status-$attempt.log" 2>&1
+            test ! -s "$RUNNER_TEMP/status-$attempt.log"
+          done
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: Test real content, archive, native source, prompts, and repeat runs
         working-directory: manager
