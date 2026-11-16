@@ -1,0 +1,32 @@
+schema_version = 1
+id = "fixture-example"
+version = "0.1.0"
+description = "Test-only configuration. Never installed by enrollment."
+
+[compatibility]
+manager_min = "0.1.0"
+manager_max_exclusive = "1.0.0"
+os = ["linux", "macos", "wsl"]
+architectures = ["x86_64", "aarch64"]
+
+[dependencies]
+tools = ["git"]
+addons = []
+
+[install]
+roots = [".config/fixture-example"]
+tools = {}
+outputs = [{ path = ".config/fixture-example/settings.toml", kind = "configuration" }]
+
+[reads]
+profile = ["domain"]
+machine = ["hostname", "os"]
+
+[teardown]
+owned_only = true
+preserve_edits = true
+preserve_credentials = true
+preserve_shared_dependencies = true
+preserve_unrelated_files = true
+explain_retained = true
+no_unbounded_delete = true
