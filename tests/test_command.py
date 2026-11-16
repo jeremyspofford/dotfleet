@@ -177,6 +177,36 @@ class CommandTests(unittest.TestCase):
         output = self.cli('doctor', expected=1)
         for text in ['never explicitly chosen', 'Git name is empty', 'Git email is empty', 'node pin is floating']:
             self.assertIn(text, output)
+        for fix in ['dotfleet domain', 'dotfleet configure', 'dotfleet pins set node@VERSION']:
+            self.assertIn(fix, output)
+        self.assertNotIn('Supply --', output)
+
+    def test_missing_domain_provenance_is_unchosen_until_named_choice(self):
+        self.enroll()
+        path = self.home / '.config/dotfleet/profile.toml'
+        p = tomllib.loads(path.read_text())
+        del p['domain_chosen']
+        path.write_text(toml(p))
+        before = path.read_bytes()
+        output = self.cli('status')
+        self.assertIn('core · UNCHOSEN', output)
+        self.assertIn('dotfleet domain', output)
+        output = self.cli('doctor', expected=1)
+        self.assertIn('FAIL · UNCHOSEN', output)
+        self.assertIn('never explicitly chosen', output)
+        self.assertIn('dotfleet domain NAME', output)
+        self.assertNotIn('Supply --domain', output)
+        choices = self.cli('domain')
+        self.assertIn('UNCHOSEN', choices)
+        self.assertIn('Personal shortcut', choices)
+        self.assertIn('dotfleet domain NAME', choices)
+        self.assertEqual(path.read_bytes(), before)
+        self.cli('domain', 'core')
+        self.assertTrue(tomllib.loads(path.read_text())['domain_chosen'])
+        self.assertIn('core · chosen', self.cli('status'))
+        self.assertNotIn('FAIL', self.cli('doctor'))
+        self.assert_quiet_status()
+
 
     def test_explicit_pin_installs_exact_version_and_remove_blocks_defaults(self):
         self.enroll()
