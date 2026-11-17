@@ -241,7 +241,7 @@ Command groups require an action. Bare `machines`, `backups`, `secrets`, `pins`,
 | `dotfleet doctor` | Check profile completeness, drift, checkout edits, and backups. Print a fix for each failed check. |
 | `dotfleet machines list` | List saved machines with known facts and connections. Make no network requests. |
 | `dotfleet addons list` | List installed add-on records. No add-ons ship with Fleet. |
-| `dotfleet backup` | Snapshot managed files and the profile without applying content. |
+| `dotfleet backups create` | Snapshot managed files and the profile without applying content. |
 | `dotfleet version` | Print the manager version and content commit. |
 | `dotfleet uninstall` | Review removal, then type uninstall. Keep the content checkout and all backups. |
 
@@ -250,7 +250,9 @@ Its Updates line includes the check time, or says not checked yet.
 Its content behind count compares the last fetched remote state. Check prints only update results.
 Drift means that managed files differ from the selected content. Groups select optional files or alias blocks.
 The profile stores machine choices. Pins select exact tool versions.
+A domain selects content additions. A commit identifies a saved Git version.
 Use `help`, `-h`, or `--help` at any command or action. `fleet help machines` lists machine actions.
+Top-level help lists commands and global options. Each command’s help keeps its own exit codes and examples.
 Use `version` or `--version` for the same version output. Exit codes are 0 for success or cancellation, 1 for failed checks or operations, and 2 for arguments.
 Check uses 0 for current, 1 for available updates, and 2 when a check fails.
 

@@ -1,0 +1,28 @@
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  fleet check
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Usage: fleet check [-h] [machine]
+
+Fetch new update results.
+Status reads saved results; check fetches new results.
+Fetch manager and content upstreams quietly, with a 10-second limit per fetch.
+An upstream is the remote branch tracked by a checkout, a local Git copy.
+Save both results only when both checks succeed.
+SSH securely connects to another machine.
+Add MACHINE to use one registered machine and its own saved choices.
+Remote runs never prompt; connection failures exit nonzero.
+
+positional arguments:
+  machine     one registered machine; omit to use this machine
+
+options:
+  -h, --help  show this help message and exit
+
+Exit codes:
+  0  Manager and content are current.
+  1  Updates are available.
+  2  Could not check updates, or invalid arguments.
+  130  Interrupted.
+
+Examples:
+  fleet check

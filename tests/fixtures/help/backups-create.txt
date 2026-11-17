@@ -1,0 +1,20 @@
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  fleet backups create
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Usage: fleet backups create [-h]
+
+Copy managed files and the profile into a new private backup.
+Change no managed files.
+Print the backup location and run record.
+
+options:
+  -h, --help  show this help message and exit
+
+Exit codes:
+  0  Success, help, or cancellation.
+  1  Operation failed.
+  2  Invalid arguments.
+  130  Interrupted.
+
+Examples:
+  fleet backups create

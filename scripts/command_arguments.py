@@ -12,13 +12,17 @@ import remote
 
 GROUPS = {
     "machines": {
-        "list": "List saved machines and their connections. Make no network requests.",
-        "set-ssh": "Save and test an SSH target. Omit flags to pick a host in a terminal.",
+        "list": "List saved machines and their connections.\nMake no network requests.",
+        "set-ssh": "Save and test an SSH target.\nOmit flags to pick a host in a terminal.",
         "export": "Show this machine's saved record, or save a private copy with --output.",
-        "remove": "Remove a stale machine record. Keep the active machine.",
+        "remove": "Remove a stale machine record.\nKeep the active machine.",
     },
-    "backups": {"list": "List saved copies with their dates, results, sizes, and locations."},
-    "secrets": {"list": "List declared variable names as set or unset. Never print a value."},
+    "backups": {
+        "create": "Copy managed files and the profile into a new private backup.\n"
+        "Change no managed files.\nPrint the backup location and run record.",
+        "list": "List saved copies with their dates, results, sizes, and locations.",
+    },
+    "secrets": {"list": "List declared variable names as set or unset.\nNever print a value."},
     "pins": {
         "list": "List recorded tool versions and whether they are installed.",
         "set": "Install and record an exact tool version.",
@@ -34,15 +38,15 @@ GROUPS = {
     },
     "content": {"show": "Show the content checkout, repository, commit, and local Git state."},
     "profile": {"show": "Show saved machine choices and the profile file's location."},
-    "addons": {"list": "List installed add-on records. No add-ons ship with Fleet."},
+    "addons": {"list": "List installed add-on records.\nNo add-ons ship with Fleet."},
 }
 
 EXAMPLES = {
-    "machines": "machines list; machines set-ssh --target mini-pc; machines set-ssh --name beelink --target mini-pc",
+    "machines": "machines list; machines set-ssh --target mini-pc; machines set-ssh --name beelink --target mini-pc; machines export --output FILE; machines remove --name NAME",
     "domain": "domain list; domain set --name personal",
     "groups": "groups list; groups set --name docker --state off",
     "pins": "pins list; pins set --tool node --version 24.14.1; pins remove --tool node",
-    "backups": "backups list",
+    "backups": "backups create; backups list",
     "secrets": "secrets list",
     "content": "content show",
     "profile": "profile show",
@@ -53,7 +57,37 @@ EXAMPLES = {
 }
 
 
-def add_groups(parser, name, formatter, epilog):
+def help_epilog(name, display, action=None):
+    codes = ["0  Success, help, or cancellation.", "1  Operation failed.", "2  Invalid arguments."]
+    if name == "check":
+        codes = [
+            "0  Manager and content are current.",
+            "1  Updates are available.",
+            "2  Could not check updates, or invalid arguments.",
+        ]
+    elif name == "diff":
+        codes = [
+            "0  No differences.",
+            "1  Differences exist.",
+            "2  Preview failed, or invalid arguments.",
+        ]
+    elif name == "doctor":
+        codes[1] = "1  One or more checks failed."
+    elif name == "machines" and action == "set-ssh":
+        codes[2] = "2  Connection test failed, or invalid arguments. The saved target stays."
+    codes.append("130  Interrupted.")
+    choices = EXAMPLES.get(name, name).split("; ")
+    if action:
+        choices = [value for value in choices if value.split()[:2] == [name, action]]
+    examples = ["  " + display + " " + value for value in choices]
+    return (
+        "Exit codes:\n"
+        + "\n".join("  " + code for code in codes)
+        + ("\n\nExamples:\n" + "\n".join(examples) if examples else "")
+    )
+
+
+def add_groups(parser, name, formatter, display):
     actions = parser.add_subparsers(dest="action", metavar="ACTION")
     parser.set_defaults(help_parser=parser)
     for action, description in GROUPS[name].items():
@@ -62,15 +96,16 @@ def add_groups(parser, name, formatter, epilog):
             prog=parser.prog + " " + action,
             description=description
             + (
-                " Either flag supplies both fields unless the values differ."
-                " Test SSH once in batch mode, without password prompts, with a ten-second timeout."
-                " A failed test keeps the saved target and exits 2. Fleet never edits SSH configuration."
+                "\nEither flag supplies both fields unless the values differ."
+                "\nTest SSH once in batch mode, without password prompts, with a ten-second timeout."
+                "\nA failed test keeps the saved target and exits 2."
+                "\nFleet never edits SSH configuration."
                 if action == "set-ssh"
                 else ""
             ),
-            help=description,
+            help=description.splitlines()[0],
             formatter_class=formatter,
-            epilog=epilog,
+            epilog=help_epilog(name, display, action),
         )
         child.set_defaults(help_parser=child)
         add_action_parameters(child, name, action)

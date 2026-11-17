@@ -163,7 +163,6 @@ class CommandSurfaceTests(unittest.TestCase):
             "pins": "views/pins.txt",
             "configure": "views/configure review.txt",
             "doctor": "views/doctor.txt",
-            "backup": "views/backup review.txt",
             "version": "views/version.txt",
             "uninstall": "views/uninstall review.txt",
         }

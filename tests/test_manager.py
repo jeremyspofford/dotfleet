@@ -1114,7 +1114,12 @@ class ConverterTests(unittest.TestCase):
         for path in [ROOT / "install.sh", *sorted((ROOT / "scripts").glob("*.sh"))]:
             for flag in ["--help", "-h"]:
                 output = command("bash", str(path), flag)
-                for word in ["Usage:", "Example", "Exit codes:"]:
+                words = (
+                    ["Usage:", "global options:"]
+                    if path.name == "dotfleet.sh"
+                    else ["Usage:", "Example", "Exit codes:"]
+                )
+                for word in words:
                     self.assertIn(word, output, str(path))
             result = subprocess.run(
                 ["bash", str(path), "--unknown"], text=True, capture_output=True

@@ -171,7 +171,7 @@ class ChannelTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_rollback_uses_real_core_review_confirmation_and_record(self):
         self.enroll()
-        self.cli("backup")
+        self.cli("backups", "create")
         _, backup = self.record()
         original = (self.home / ".file").read_text()
         (self.home / ".file").write_text("local edit\n")
