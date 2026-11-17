@@ -122,6 +122,20 @@ def unpin_arguments(home):
     return ["tools", "remove", answer["tool"]] if answer is not None else None
 
 
+def uninstall_tool_arguments(home):
+    answer = form(
+        "Uninstall an extra tool version",
+        [
+            field("tool", "Tool name, such as node"),
+            field("version", "Exact version, such as 26.3.1"),
+        ],
+        "Only extra installed versions can be removed. A typed confirmation follows the review.",
+    )
+    return (
+        ["tools", "uninstall", answer["tool"], "--version", answer["version"]] if answer else None
+    )
+
+
 def remove_machine_arguments(home):
     selected = choose(
         "Remove a stale record",
@@ -171,6 +185,7 @@ FORMS = {
     "group-set": group_arguments,
     "pin-set": pin_arguments,
     "pin-remove": unpin_arguments,
+    "tool-uninstall": uninstall_tool_arguments,
     "machine-remove": remove_machine_arguments,
     "machine-export": export_arguments,
     "name-connection": connection_arguments,

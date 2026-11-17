@@ -114,7 +114,8 @@ def render(record, future=False):
         and (future or item["name"] in record.get("completed_software", []))
     ]
     counts = {
-        kind: sum(item["action"] == kind for item in changed) for kind in ("installed", "upgraded")
+        kind: sum(item["action"] == kind for item in changed)
+        for kind in ("installed", "upgraded", "removed")
     }
     has_changes = bool(changed)
     title = ", ".join(f"{count} {kind}" for kind, count in counts.items() if count)

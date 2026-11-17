@@ -28,9 +28,12 @@ GROUPS = {
     },
     "secrets": {"list": "List declared variable names as set or unset.\nNever print a value."},
     "tools": {
-        "list": "List recorded tool versions and whether they are installed.",
+        "list": "List recorded and installed versions.\nInstalled versions are marked recorded or extra.",
         "set": "Install and record an exact tool version.",
         "remove": "Remove a recorded version without uninstalling the tool.",
+        "uninstall": "Uninstall one installed extra version through Mise.\n"
+        "Type uninstall to confirm, then press Enter.\n"
+        "A recorded version must first be removed from choices or replaced with tools set.",
     },
     "groups": {
         "list": "List content groups, their state, and what each adds.",
@@ -47,7 +50,7 @@ EXAMPLES = {
     "machines": "machines list; machines set-ssh --target mini-pc; machines set-ssh --name beelink --target mini-pc; machines export --output FILE; machines remove --name NAME",
     "domain": "domain list; domain set --name personal",
     "groups": "groups list; groups set --name docker --state off",
-    "tools": "tools list; tools set node --version 26.13.1; tools remove node",
+    "tools": "tools list; tools set node --version 26.13.1; tools remove node; tools uninstall node --version 26.3.1",
     "backups": "backups create; backups list; backups restore --backup BACKUP; backups delete --name BACKUP; backups delete --keep 2; backups delete --all",
     "secrets": "secrets list",
     "content": "content",
@@ -143,9 +146,9 @@ def add_action_parameters(parser, name, action):
         parser.add_argument(
             "--state", required=True, choices=["on", "off"], help="include or remove content"
         )
-    elif name == "tools" and action in ("set", "remove"):
+    elif name == "tools" and action in ("set", "remove", "uninstall"):
         parser.add_argument("tool", help="tool name, such as node")
-        if action == "set":
+        if action in ("set", "uninstall"):
             parser.add_argument(
                 "--version", required=True, help="exact tool version, such as 24.14.1"
             )

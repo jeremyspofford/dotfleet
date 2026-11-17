@@ -4,4 +4,4 @@
 
 node
   Version    26.13.1
-  Installed  26.3.1, 26.13.1
+  Installed  26.3.1 (extra), 26.13.1 (recorded)

@@ -238,6 +238,7 @@ Command groups require an action. Bare `machines`, `backups`, `secrets`, `tools`
 | `dotfleet groups set --name docker --state off` | Exclude Docker content. Use on to restore it. |
 | `dotfleet tools list` | List saved exact versions and installed versions. |
 | `dotfleet tools set node --version 24.14.1` | Explicitly install and record that exact version. Content defaults still never install software. |
+| `dotfleet tools uninstall node --version 26.3.1` | Uninstall an extra installed version through Mise, after typing uninstall to confirm. |
 | `dotfleet tools remove node` | Remove the selection and prevent content defaults from filling it again. Keep installed software. |
 | `dotfleet configure` | Reopen the enrollment wizard. |
 | `dotfleet doctor` | Check profile completeness, drift, checkout edits, and backups. Print a fix for each failed check. |
@@ -347,6 +348,16 @@ Older `dotfleet.toml` content manifests still work. When both names exist, `flee
 Fleet updates chezmoi's source pointer during migration. Rollback translates old backup paths to the new locations.
 The review lists each store move under Profile changes. Cancelling later apply does not undo these earlier moves.
 If both old and new stores exist, migration stops before moving folders. Resolve that conflict before retrying; Fleet never merges them silently.
+
+## Remove an extra tool version
+
+1. Run `fleet tools list`. Installed versions are marked recorded or extra.
+2. Run `fleet tools uninstall node --version 26.3.1` with the extra tool and version you want to remove.
+3. Review the version and path. Type uninstall and press Enter to confirm, or cancel to stop.
+
+Fleet refuses the recorded version. Use `fleet tools remove node` to clear that choice, or select another with `fleet tools set`.
+Tools remove never uninstalls software. Tools uninstall keeps the profile unchanged and saves a run review.
+Its backup copies managed files, not installed software. Reinstall software with tools set when needed.
 
 ## Check for updates
 

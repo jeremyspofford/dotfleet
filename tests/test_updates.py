@@ -146,7 +146,7 @@ class UpdateTests(unittest.TestCase):
                 fetched,
             )
         rejected = self.cli("status", "--check", expected=2)
-        self.assertIn("unrecognized arguments", rejected)
+        self.assertIn("Does not accept --check", rejected)
         self.assertFalse((self.home / updates.CACHE).exists())
         self.cli("check", expected=1)
         output = self.cli("status")
@@ -172,7 +172,7 @@ class UpdateTests(unittest.TestCase):
         self.assertEqual((cache.read_bytes(), cache.stat().st_mtime_ns, self.snapshot()), before)
         self.assertIn(f"Updates           none (checked {self.checked_time()})", self.cli("status"))
         flagged = self.cli("status", "--check", expected=2)
-        self.assertIn("unrecognized arguments", flagged)
+        self.assertIn("Does not accept --check", flagged)
         self.assertEqual((cache.read_bytes(), cache.stat().st_mtime_ns, self.snapshot()), before)
         cache.unlink()
         self.cli("check", expected=2)
