@@ -86,6 +86,9 @@ def generate(home, os_name, dry_run, *, profile=None, content_root=None):
         if not agent["supported"]:
             print(f"Unsupported native contract: {name}: {agent['reason']}")
             continue
+        if not agent.get("render", True):
+            print(f"Detected, not rendered: {name}: {agent['render_reason']}")
+            continue
         content = agent["content"]
         # Profile data owns machine selection; native defaults remain in the manifest.
         if name in profile.get("agents", {}) and not profile["agents"][name]:

@@ -3,8 +3,10 @@ schema_version = 1
 skills_source = "agents/skills"
 # Empty JSON/TOML are valid native defaults. Add reviewed native keys here.
 # Paths are explicit per OS; WSL intentionally uses Linux-native tools and paths.
+# render = false detects an agent but writes nothing for it until a tested install confirms its paths.
 
 [agents.claude]
+render = true
 command = "claude"
 mise_packages = ["claude", "claude-code", "@anthropic-ai/claude-code"]
 format = "json"
@@ -23,12 +25,13 @@ windows = ".claude/skills"
 wsl = ".claude/skills"
 
 [agents.codex]
+render = true
 command = "codex"
 mise_packages = ["codex", "@openai/codex"]
 format = "toml"
 supported = true
 content = "# Generated from agents/manifest.toml. Edit the manifest, then regenerate.\n"
-documentation = "https://developers.openai.com/codex/config-basic/"
+documentation = "https://learn.chatgpt.com/docs"
 [agents.codex.config_paths]
 linux = ".codex/config.toml"
 darwin = ".codex/config.toml"
@@ -41,6 +44,7 @@ windows = ".agents/skills"
 wsl = ".agents/skills"
 
 [agents.gemini]
+render = true
 command = "gemini"
 mise_packages = ["gemini", "gemini-cli", "@google/gemini-cli"]
 format = "json"
@@ -59,7 +63,11 @@ windows = ".gemini/skills"
 wsl = ".gemini/skills"
 
 [agents.grok]
+render = false
+render_reason = "No tested install confirms Grok Build's paths yet."
 command = "grok"
+# A community tool shares the grok command and ~/.grok; its settings file marks it.
+conflict_markers = [".grok/user-settings.json"]
 mise_packages = ["grok", "grok-cli"]
 format = "toml"
 supported = true
@@ -77,12 +85,13 @@ windows = ".grok/skills"
 wsl = ".grok/skills"
 
 [agents.pi]
+render = true
 command = "pi"
-mise_packages = ["pi", "pi-coding-agent", "@mariozechner/pi-coding-agent"]
+mise_packages = ["pi", "pi-coding-agent", "@mariozechner/pi-coding-agent", "@earendil-works/pi-coding-agent"]
 format = "json"
 supported = true
 content = "{}\n"
-documentation = "https://github.com/badlogic/pi-mono/tree/main/packages/coding-agent"
+documentation = "https://docs.pi.dev"
 [agents.pi.config_paths]
 linux = ".pi/agent/settings.json"
 darwin = ".pi/agent/settings.json"
@@ -95,12 +104,15 @@ windows = ".pi/agent/skills"
 wsl = ".pi/agent/skills"
 
 [agents.opencode]
+render = true
 command = "opencode"
 mise_packages = ["opencode", "opencode-ai"]
 format = "json"
 supported = true
 content = "{}\n"
 documentation = "https://opencode.ai/docs/config/"
+# OpenCode merges opencode.jsonc after opencode.json. A same-name entry there wins over Fleet's entry.
+shadow_paths = [".config/opencode/opencode.jsonc"]
 [agents.opencode.config_paths]
 linux = ".config/opencode/opencode.json"
 darwin = ".config/opencode/opencode.json"
@@ -112,7 +124,27 @@ darwin = ".config/opencode/skills"
 windows = ".config/opencode/skills"
 wsl = ".config/opencode/skills"
 
+[agents.antigravity]
+render = false
+render_reason = "No tested install confirms Antigravity's paths yet."
+command = "agy"
+mise_packages = ["antigravity"]
+format = "json"
+supported = true
+documentation = "https://antigravity.google/docs"
+[agents.antigravity.config_paths]
+linux = ".gemini/config/mcp_config.json"
+darwin = ".gemini/config/mcp_config.json"
+windows = ".gemini/config/mcp_config.json"
+wsl = ".gemini/config/mcp_config.json"
+[agents.antigravity.skills_paths]
+linux = ".gemini/config/skills"
+darwin = ".gemini/config/skills"
+windows = ".gemini/config/skills"
+wsl = ".gemini/config/skills"
+
 [agents.ollama]
+render = false
 config_folders = [".ollama"]
 command = "ollama"
 mise_packages = ["ollama"]

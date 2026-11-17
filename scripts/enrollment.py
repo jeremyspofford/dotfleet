@@ -251,6 +251,8 @@ def agent_flags(profile, value):
     for name in chosen:
         if not known[name]["supported"]:
             raise ValueError(f"{name}: {known[name]['reason']}")
+        if not known[name].get("render", True):
+            raise ValueError(f"{name} is detected only: {known[name]['render_reason']}")
         if name not in detected_agents():
             raise ValueError(
                 f"{name} is not installed. Install it separately before configuring it."
@@ -451,6 +453,9 @@ def choose_agents(home, profile):
     for name, spec in detected.items():
         if not spec["supported"]:
             print(f"{name}: {spec['reason']}")
+            continue
+        if not spec.get("render", True):
+            print(f"{name}: detected. {spec['render_reason']} Fleet writes nothing for it.")
             continue
         selections[name] = (
             manager.ask(
