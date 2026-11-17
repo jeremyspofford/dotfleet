@@ -160,6 +160,12 @@ class AgentTableTests(unittest.TestCase):
             "no tracked skill folder",
         )
 
+    def test_the_gateway_name_is_reserved_for_connectors(self):
+        self.rejects(
+            VALID.replace("[agents.connectors.calendar]", "[agents.connectors.fleet]"),
+            "fleet is the gateway's entry name",
+        )
+
     def test_hook_events_and_tool_classes_are_fixed(self):
         self.rejects(
             VALID.replace('event = "before-tool"', 'event = "on-save"'), "event must be one of"

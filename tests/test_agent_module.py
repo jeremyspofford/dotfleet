@@ -71,12 +71,14 @@ class AgentModuleTests(unittest.TestCase):
         tree = self.home / agent_deploy.TREE
         self.assertEqual(os.readlink(self.home / ".claude/skills/fleet"), str(tree / "claude"))
         servers = json.loads((tree / "claude/.mcp.json").read_text())["mcpServers"]
-        self.assertEqual(set(servers), {"docs", "calendar"})
+        self.assertEqual(set(servers), {"fleet", "calendar"})
+        served = json.loads((tree / "gateway/claude.json").read_text())["servers"]
+        self.assertEqual(served["docs"]["command"], "npx")
         self.assertTrue((self.home / ".agents/skills/notes/SKILL.md").is_file())
         self.assertFalse((self.home / ".agents/skills/personal-notes").exists())
         config = tomllib.loads((self.home / ".codex/config.toml").read_text())
         self.assertEqual(config["model"], "o3")
-        self.assertEqual(config["mcp_servers"]["docs"]["command"], "npx")
+        self.assertEqual(config["mcp_servers"]["fleet"]["command"], str(tree / "gateway/run-codex"))
         self.assertIn("~/.codex/config.toml", output)
         self.assertEqual(self.cli("status").count("Drift             none"), 1)
 
@@ -97,7 +99,9 @@ class AgentModuleTests(unittest.TestCase):
     def test_a_hand_written_value_stops_enrollment_before_backup(self):
         self.enroll()
         (self.home / ".codex").mkdir()
-        (self.home / ".codex/config.toml").write_text('[mcp_servers.docs]\ncommand = "my-docs"\n')
+        (self.home / ".codex/config.toml").write_text(
+            '[mcp_servers.calendar]\nurl = "https://mine.example.com"\n'
+        )
         backups = sorted((self.home / "fleet-backups").iterdir())
         manifest = (self.content / "dotfleet.toml").read_text()
         table = AGENTS.replace('[agents.skills.personal-notes]\ndomains = ["personal"]\n', "")
@@ -112,9 +116,11 @@ class AgentModuleTests(unittest.TestCase):
         )
         result = " ".join((process.stdout + process.stderr).split())
         self.assertEqual(process.returncode, 1, result)
-        self.assertIn("mcp.docs in ~/.codex/config.toml differs from the rendered value", result)
+        self.assertIn(
+            "connectors.calendar in ~/.codex/config.toml differs from the rendered value", result
+        )
         self.assertEqual(sorted((self.home / "fleet-backups").iterdir()), backups)
-        self.assertIn('command = "my-docs"', (self.home / ".codex/config.toml").read_text())
+        self.assertIn("mine.example.com", (self.home / ".codex/config.toml").read_text())
 
     def test_declared_plugins_install_through_the_agent_and_show_as_software(self):
         self.enroll()
@@ -160,23 +166,30 @@ class AgentModuleTests(unittest.TestCase):
         self.assert_review_golden("agents", output)
         profile = tomllib.loads((self.home / ".config/fleet/profile.toml").read_text())
         self.assertEqual(profile["agent_items"], {"mcp.docs": "off"})
+        # With its only server off, the gateway and its entry leave this machine.
+        self.assertFalse((self.home / agent_deploy.TREE / "gateway/codex.json").exists())
         config = tomllib.loads((self.home / ".codex/config.toml").read_text())
-        self.assertNotIn("docs", config["mcp_servers"])
+        self.assertNotIn("fleet", config["mcp_servers"])
 
         self.cli("agents", "set", "--name", "mcp.docs", "--state", "on")
         config_path = self.home / ".codex/config.toml"
-        config_path.write_text(config_path.read_text().replace('"npx"', '"my-npx"'))
+        config_path.write_text(
+            config_path.read_text().replace("mcp.example.com/calendar", "my.example.com")
+        )
         self.assertIn("present; run dotfleet diff", self.cli("status"))
         self.assertIn("FAIL", self.cli("doctor", expected=1))
-        stopped = self.cli("update", expected=1)
-        self.assertIn("mcp.docs in ~/.codex/config.toml changed since Fleet wrote it", stopped)
-        self.assertIn("agents set --name ITEM --state local", " ".join(stopped.split()))
+        stopped = " ".join(self.cli("update", expected=1).split())
+        self.assertIn(
+            "connectors.calendar in ~/.codex/config.toml changed since Fleet wrote it", stopped
+        )
+        self.assertIn("agents set --name ITEM --state local", stopped)
 
-        self.cli("agents", "set", "--name", "mcp.docs", "--state", "local")
-        self.assertIn('"my-npx"', config_path.read_text())
+        self.cli("agents", "set", "--name", "connectors.calendar", "--state", "local")
+        self.assertIn("my.example.com", config_path.read_text())
         self.assertIn("Drift             none", self.cli("status"))
-        self.assertIn("mcp.docs", self.cli("agents", "list"))
-        self.assertIn("local value on this machine", self.cli("agents", "list"))
+        listing = self.cli("agents", "list")
+        self.assertIn("connectors.calendar", listing)
+        self.assertIn("local value on this machine", listing)
 
     assert_review_golden = test_command.CommandTests.assert_review_golden
     assert_golden = test_command.CommandTests.assert_golden

@@ -102,27 +102,25 @@ class DeployTests(Fixture):
         self.assertEqual(os.readlink(self.home / ".claude/skills/fleet"), str(tree / "claude"))
         self.assertEqual(os.readlink(self.home / ".gemini/extensions/fleet"), str(tree / "gemini"))
         servers = self.read_json(f"{agent_deploy.TREE}/claude/.mcp.json")["mcpServers"]
-        self.assertEqual(servers["docs"]["env"], {"DOCS_API_KEY": "${DOCS_API_KEY}"})
+        self.assertEqual(set(servers), {"fleet", "calendar"})
+        self.assertEqual(servers["fleet"]["command"], str(tree / "gateway/run-claude"))
         self.assertEqual(
-            servers["issues"],
-            {
-                "type": "http",
-                "url": "https://mcp.example.com/issues",
-                "headers": {"Authorization": "Bearer ${ISSUES_TOKEN}"},
-            },
+            servers["fleet"]["env"],
+            {"DOCS_API_KEY": "${DOCS_API_KEY}", "ISSUES_TOKEN": "${ISSUES_TOKEN}"},
         )
         self.assertEqual(
             servers["calendar"], {"type": "http", "url": "https://mcp.example.com/calendar"}
         )
+        served = self.read_json(f"{agent_deploy.TREE}/gateway/claude.json")["servers"]
+        self.assertEqual(served["docs"]["pass_env"], ["DOCS_API_KEY"])
+        self.assertEqual(served["issues"]["bearer_token_env"], "ISSUES_TOKEN")
+        self.assertNotIn("description", served["docs"])
         self.assertEqual(os.readlink(tree / "claude/skills"), str(self.home / ".agents/skills"))
         rules = self.home / ".claude/rules/fleet.md"
         self.assertIn("Use plain words.", rules.read_text())
         extension = self.read_json(f"{agent_deploy.TREE}/gemini/gemini-extension.json")
         self.assertEqual(extension["contextFileName"], "GEMINI.md")
-        self.assertEqual(
-            extension["mcpServers"]["issues"]["httpUrl"], "https://mcp.example.com/issues"
-        )
-        self.assertNotIn("calendar", extension["mcpServers"])
+        self.assertEqual(set(extension["mcpServers"]), {"fleet"})
 
     def test_hooks_run_tree_wrappers_with_agent_variables_and_units(self):
         self.run_plan()
@@ -142,20 +140,24 @@ class DeployTests(Fixture):
 
     def test_entry_level_agents_receive_owned_entries(self):
         result = self.run_plan()
+        tree = self.home / agent_deploy.TREE
         codex = tomllib.loads((self.home / ".codex/config.toml").read_text())["mcp_servers"]
-        self.assertEqual(codex["docs"]["env_vars"], ["DOCS_API_KEY"])
-        self.assertEqual(codex["issues"]["bearer_token_env_var"], "ISSUES_TOKEN")
+        self.assertEqual(codex["fleet"]["env_vars"], ["DOCS_API_KEY", "ISSUES_TOKEN"])
+        self.assertEqual(codex["fleet"]["command"], str(tree / "gateway/run-codex"))
+        self.assertEqual(codex["calendar"], {"url": "https://mcp.example.com/calendar"})
         opencode = self.read_json(".config/opencode/opencode.json")
         self.assertEqual(opencode["$schema"], agent_deploy.OPENCODE_SCHEMA)
-        self.assertEqual(opencode["mcp"]["docs"]["command"], ["npx", "-y", "@example/docs-mcp"])
+        self.assertEqual(opencode["mcp"]["fleet"]["command"], [str(tree / "gateway/run-opencode")])
         self.assertEqual(
-            opencode["mcp"]["docs"]["environment"], {"DOCS_API_KEY": "{env:DOCS_API_KEY}"}
+            opencode["mcp"]["fleet"]["environment"],
+            {"DOCS_API_KEY": "{env:DOCS_API_KEY}", "ISSUES_TOKEN": "{env:ISSUES_TOKEN}"},
         )
-        self.assertEqual(
-            opencode["instructions"], [str(self.home / agent_deploy.TREE / "rules/opencode.md")]
-        )
+        self.assertEqual(opencode["instructions"], [str(tree / "rules/opencode.md")])
         pi = self.read_json(".pi/agent/mcp.json")["mcpServers"]
-        self.assertEqual(pi["issues"]["headers"], {"Authorization": "Bearer ${ISSUES_TOKEN}"})
+        self.assertEqual(pi["fleet"]["env"]["ISSUES_TOKEN"], "${ISSUES_TOKEN}")
+        wrapper = (tree / "gateway/run-pi").read_text()
+        self.assertIn("scripts/gateway.py", wrapper)
+        self.assertIn(str(tree / "gateway/pi.json"), wrapper)
         self.assertIn("opencode: hook guard is unsupported for this agent.", result.notes)
         self.assertIn("pi: hook guard is unsupported for this agent.", result.notes)
         self.assertIn("codex: sign in to calendar: run codex mcp login calendar", result.steps)
@@ -172,130 +174,136 @@ class DeployTests(Fixture):
     def test_shared_files_keep_other_values_comments_and_agent_added_keys(self):
         config = self.home / ".codex/config.toml"
         config.parent.mkdir()
-        config.write_text(
-            '# My settings\nmodel = "o3"\n\n[profiles.fast]\nmodel = "mini" # quick\n'
-        )
+        original = '# My settings\nmodel = "o3"\n\n[profiles.fast]\nmodel = "mini" # quick\n'
+        config.write_text(original)
         self.run_plan()
         text = config.read_text()
-        self.assertTrue(
-            text.startswith(
-                '# My settings\nmodel = "o3"\n\n[profiles.fast]\nmodel = "mini" # quick\n'
-            )
-        )
+        self.assertTrue(text.startswith(original))
         # The agent adds a key inside Fleet's entry; that key never counts as drift.
         config.write_text(
-            text.replace("[mcp_servers.docs]\n", "[mcp_servers.docs]\nenabled = false\n")
+            text.replace("[mcp_servers.fleet]\n", "[mcp_servers.fleet]\nenabled = false\n")
         )
         result = self.plan()
         self.assertEqual(result.conflicts, [])
         self.assertNotIn(".codex/config.toml", result.files)
         changed = MANIFEST.replace(
-            'args = ["-y", "@example/docs-mcp"]', 'args = ["-y", "@example/docs-mcp@2"]'
+            'pass_env = ["DOCS_API_KEY"]', 'pass_env = ["DOCS_API_KEY", "DOCS_REGION"]'
         )
         self.run_plan(changed)
-        docs = tomllib.loads(config.read_text())["mcp_servers"]["docs"]
-        self.assertEqual(docs["args"], ["-y", "@example/docs-mcp@2"])
-        self.assertFalse(docs["enabled"])
+        entry = tomllib.loads(config.read_text())["mcp_servers"]["fleet"]
+        self.assertEqual(entry["env_vars"], ["DOCS_API_KEY", "DOCS_REGION", "ISSUES_TOKEN"])
+        self.assertFalse(entry["enabled"])
 
     def test_unrecorded_values_conflict_or_are_adopted(self):
         settings = self.home / ".pi/agent/mcp.json"
         settings.parent.mkdir(parents=True)
-        settings.write_text(json.dumps({"mcpServers": {"docs": {"command": "other"}}}))
+        settings.write_text(json.dumps({"mcpServers": {"fleet": {"command": "other"}}}))
         result = self.plan()
         self.assertIn(
-            "pi: mcp.docs in ~/.pi/agent/mcp.json differs from the rendered value.",
+            "pi: gateway.fleet in ~/.pi/agent/mcp.json differs from the rendered value.",
             result.conflicts,
         )
         with self.assertRaises(ValueError) as caught:
             agent_deploy.require_no_conflicts(result)
         self.assertIn("agents set --name ITEM --state local", str(caught.exception))
-        rendered = agent_deploy.server("pi", tomllib.loads(MANIFEST)["agents"]["mcp"]["docs"])
-        settings.write_text(json.dumps({"mcpServers": {"docs": dict(rendered, disabled=True)}}))
+        rendered = next(entry.value for entry in result.entries if entry.agent == "pi")
+        settings.write_text(json.dumps({"mcpServers": {"fleet": dict(rendered, disabled=True)}}))
         result = self.plan()
         self.assertEqual(result.conflicts, [])
-        self.assertIn("mcp.docs", [entry.item for entry in result.adopted])
+        self.assertIn("gateway.fleet", [entry.item for entry in result.adopted])
 
     def test_changed_recorded_entries_stop_and_missing_ones_return(self):
         self.run_plan()
         settings = self.home / ".pi/agent/mcp.json"
         data = json.loads(settings.read_text())
-        data["mcpServers"]["docs"]["command"] = "edited"
+        data["mcpServers"]["fleet"]["command"] = "edited"
         settings.write_text(json.dumps(data))
         self.assertIn(
-            "pi: mcp.docs in ~/.pi/agent/mcp.json changed since Fleet wrote it.",
+            "pi: gateway.fleet in ~/.pi/agent/mcp.json changed since Fleet wrote it.",
             self.plan().conflicts,
         )
-        del data["mcpServers"]["docs"]
+        del data["mcpServers"]["fleet"]
         settings.write_text(json.dumps(data))
         self.run_plan()
-        self.assertEqual(
-            self.read_json(".pi/agent/mcp.json")["mcpServers"]["docs"]["command"], "npx"
-        )
+        command = self.read_json(".pi/agent/mcp.json")["mcpServers"]["fleet"]["command"]
+        self.assertTrue(command.endswith("gateway/run-pi"))
 
     def test_removed_declarations_remove_matching_outputs_and_keep_changed_ones(self):
         self.run_plan()
-        pi = self.home / ".pi/agent/mcp.json"
-        data = json.loads(pi.read_text())
-        data["mcpServers"]["issues"]["url"] = "https://edited.example.com"
-        pi.write_text(json.dumps(data))
+        config = self.home / ".codex/config.toml"
+        config.write_text(
+            config.read_text().replace("mcp.example.com/calendar", "edited.example.com")
+        )
         without = (
-            MANIFEST.split("[agents.mcp.issues]")[0]
-            + "[agents.connectors"
-            + MANIFEST.split("[agents.connectors")[1]
+            MANIFEST.split("[agents.connectors.calendar]")[0]
+            + "[agents.hooks.guard]"
+            + MANIFEST.split("[agents.hooks.guard]")[1]
         )
-        without = without.replace("[agents.rules.style]\n", "[agents.rules.unused]\n", 0)
-        result = self.run_plan(
-            without.replace(
-                '[agents.rules.style]\ndescription = "Shared writing rules."\nfile = "agents/rules/style.md"\n',
-                "",
-            )
+        without = without.replace(
+            '[agents.rules.style]\ndescription = "Shared writing rules."\nfile = "agents/rules/style.md"\n',
+            "",
         )
-        codex = tomllib.loads((self.home / ".codex/config.toml").read_text())["mcp_servers"]
-        self.assertNotIn("issues", codex)
-        self.assertIn("issues", self.read_json(".pi/agent/mcp.json")["mcpServers"])
+        without = without.replace(
+            '[agents.mcp.issues]\ndescription = "Read work issues."\ntransport = "http"\nurl = "https://mcp.example.com/issues"\nbearer_token_env = "ISSUES_TOKEN"\ndomains = ["work"]\n',
+            "",
+        )
+        result = self.run_plan(without)
+        self.assertIn("calendar", tomllib.loads(config.read_text())["mcp_servers"])
         self.assertIn(
-            "pi: mcp.issues in ~/.pi/agent/mcp.json changed after Fleet wrote it; kept.",
+            "codex: connectors.calendar in ~/.codex/config.toml changed after Fleet wrote it; kept.",
             result.kept,
+        )
+        servers = self.read_json(f"{agent_deploy.TREE}/claude/.mcp.json")["mcpServers"]
+        self.assertEqual(set(servers), {"fleet"})
+        self.assertNotIn(
+            "issues", self.read_json(f"{agent_deploy.TREE}/gateway/pi.json")["servers"]
         )
         self.assertFalse((self.home / ".claude/rules/fleet.md").is_symlink())
         self.assertNotIn("instructions", self.read_json(".config/opencode/opencode.json"))
 
     def test_domain_changes_remove_items_and_turning_an_agent_off_keeps_outputs(self):
         self.run_plan()
+        served = f"{agent_deploy.TREE}/gateway/pi.json"
         self.profile["domain"] = "core"
         self.run_plan()
-        self.assertNotIn("issues", self.read_json(".pi/agent/mcp.json")["mcpServers"])
+        self.assertNotIn("issues", self.read_json(served)["servers"])
         self.profile["agents"]["pi"] = False
         self.profile["domain"] = "work"
         result = self.run_plan()
-        self.assertNotIn("issues", self.read_json(".pi/agent/mcp.json")["mcpServers"])
-        self.assertIn("docs", self.read_json(".pi/agent/mcp.json")["mcpServers"])
+        self.assertNotIn("issues", self.read_json(served)["servers"])
+        self.assertIn("docs", self.read_json(served)["servers"])
+        self.assertIn("fleet", self.read_json(".pi/agent/mcp.json")["mcpServers"])
         self.assertEqual([entry for entry in result.stale_entries if entry.agent == "pi"], [])
 
     def test_exceptions_turn_items_off_or_release_them_to_a_local_value(self):
         self.run_plan()
-        self.profile["agent_items"] = {"mcp.docs": "off", "mcp.issues": "local"}
+        self.profile["agent_items"] = {"mcp.docs": "off", "connectors.calendar": "local"}
         result = self.run_plan()
-        pi = self.read_json(".pi/agent/mcp.json")["mcpServers"]
-        self.assertNotIn("docs", pi)
-        self.assertIn("issues", pi)
-        self.assertIn("pi: mcp.issues released to this machine's own value.", result.notes)
+        self.assertNotIn(
+            "docs", self.read_json(f"{agent_deploy.TREE}/gateway/codex.json")["servers"]
+        )
+        config = self.home / ".codex/config.toml"
+        self.assertIn("calendar", tomllib.loads(config.read_text())["mcp_servers"])
+        self.assertIn(
+            "codex: connectors.calendar released to this machine's own value.", result.notes
+        )
         inventory = json.loads((self.home / agent_deploy.INVENTORY).read_text())
-        self.assertNotIn("mcp.issues", [entry["item"] for entry in inventory["entries"]])
-        pi["issues"]["url"] = "https://mine.example.com"
-        (self.home / ".pi/agent/mcp.json").write_text(json.dumps({"mcpServers": pi}))
+        self.assertNotIn("connectors.calendar", [entry["item"] for entry in inventory["entries"]])
+        config.write_text(
+            config.read_text().replace("mcp.example.com/calendar", "mine.example.com")
+        )
         self.assertEqual(self.plan().conflicts, [])
 
     def test_opencode_skips_servers_that_its_jsonc_file_overrides(self):
         jsonc = self.home / ".config/opencode/opencode.jsonc"
         jsonc.parent.mkdir(parents=True)
         jsonc.write_text(
-            '{\n  // mine\n  "mcp": {"docs": {"type": "local", "command": ["x"]},},\n}\n'
+            '{\n  // mine\n  "mcp": {"fleet": {"type": "local", "command": ["x"]},},\n}\n'
         )
         result = self.run_plan()
-        self.assertNotIn("docs", self.read_json(".config/opencode/opencode.json")["mcp"])
+        self.assertNotIn("mcp", self.read_json(".config/opencode/opencode.json"))
         self.assertIn(
-            "opencode: ~/.config/opencode/opencode.jsonc defines mcp.docs, which overrides Fleet; skipped.",
+            "opencode: ~/.config/opencode/opencode.jsonc defines mcp.fleet, which overrides Fleet; skipped.",
             result.notes,
         )
 
@@ -322,7 +330,7 @@ class DeployTests(Fixture):
         self.assertFalse((self.home / ".claude/skills/notes").is_symlink())
         self.assertFalse((self.home / ".claude/settings.json").exists())
         self.assertIn(".codex/config.toml", result.released)
-        self.assertIn("[mcp_servers.docs]", (self.home / ".codex/config.toml").read_text())
+        self.assertIn("[mcp_servers.fleet]", (self.home / ".codex/config.toml").read_text())
 
     def test_content_cannot_manage_an_agent_output(self):
         table = agent_table.load(self.checkout, self.manifest(), CATALOG)
@@ -352,7 +360,7 @@ class DeployTests(Fixture):
         saved = Path(self.folder.name) / "saved.json"
         saved.write_text(config.read_text())
         data = json.loads(config.read_text())
-        data["mcpServers"]["docs"]["command"] = "edited"
+        data["mcpServers"]["fleet"]["command"] = "edited"
         data["mcpServers"]["mine"] = {"command": "mine"}
         config.write_text(json.dumps(data))
         inventory = agent_deploy.load_inventory(self.home)
@@ -361,7 +369,7 @@ class DeployTests(Fixture):
                 self.home, ".pi/agent/mcp.json", saved, workspace, inventory
             )
             servers = json.loads(restored.read_text())["mcpServers"]
-        self.assertEqual(servers["docs"]["command"], "npx")
+        self.assertTrue(servers["fleet"]["command"].endswith("gateway/run-pi"))
         self.assertEqual(servers["mine"], {"command": "mine"})
 
 

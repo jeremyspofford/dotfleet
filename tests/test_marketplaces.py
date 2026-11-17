@@ -154,8 +154,8 @@ class MarketplaceCommandTests(unittest.TestCase):
         self.assertEqual(
             os.readlink(self.home / ".agents/skills/pr-review"), str(tree / "skills/pr-review")
         )
-        config = tomllib.loads((self.home / ".codex/config.toml").read_text())
-        self.assertEqual(config["mcp_servers"]["review-docs"]["command"], "npx")
+        served = json.loads((tree / "gateway/codex.json").read_text())["servers"]
+        self.assertEqual(served["review-docs"]["command"], "npx")
         self.assertFalse((tree / "rules/claude.md").exists())
         library = self.home / marketplaces.LIBRARY / "market"
         self.assertTrue((library / marketplaces.CATALOG).is_file())
@@ -183,8 +183,7 @@ class MarketplaceCommandTests(unittest.TestCase):
         self.cli("marketplaces", "delete", "--name", "market")
         self.assertFalse((self.home / ".agents/skills/pr-review").is_symlink())
         self.assertFalse(library.exists())
-        config = tomllib.loads((self.home / ".codex/config.toml").read_text())
-        self.assertNotIn("review-docs", config.get("mcp_servers", {}))
+        self.assertFalse((tree / "gateway/codex.json").exists())
         self.assertIn("No marketplaces", self.cli("marketplaces", "list"))
 
     def test_features_take_single_items_and_bad_selections_change_nothing(self):
@@ -209,8 +208,8 @@ class MarketplaceCommandTests(unittest.TestCase):
             "review-kit/mcp.review-docs",
         )
         self.assertFalse((self.home / ".agents/skills/pr-review").exists())
-        config = tomllib.loads((self.home / ".codex/config.toml").read_text())
-        self.assertIn("review-docs", config["mcp_servers"])
+        served = self.home / agent_deploy.TREE / "gateway/codex.json"
+        self.assertIn("review-docs", json.loads(served.read_text())["servers"])
 
     def publish(self, files, tag):
         for name, text in files.items():

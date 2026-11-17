@@ -174,9 +174,10 @@ class RunAccount:
             ):
                 continue  # Bookkeeping and software have their own records, not home-setting diffs.
             entry = before[name]
+            agent_stale = plan.get("agents").stale_paths if plan.get("agents") else {}
             action = (
                 "removed"
-                if name in plan["stale"] or name in plan["removed"]
+                if name in plan["stale"] or name in plan["removed"] or name in agent_stale
                 else "added"
                 if entry["state"] == "absent"
                 else "changed"
