@@ -95,6 +95,21 @@ The profile keeps this machine's exception list under `agent_items`. Content nev
 
 Skills accept `on` and `off` only; they are content files. Updates honor the list.
 
+## Import existing settings
+
+Run `fleet agents import --agent NAME` to print agents-table entries from one agent's user-level settings.
+NAME is claude, codex, gemini, opencode, or pi. The command reads files and writes nothing.
+
+1. Review the printed TOML and its notes.
+2. Copy the entries you want into the `agents` table of `fleet.toml`.
+3. Commit, push, and run `fleet update`.
+
+The import never prints a secret value. A value that looks secret becomes a variable name, and a note names it.
+Set each named variable in your environment, for example through the content's `secrets` table.
+Variable references, such as `${NAME}` or `{env:NAME}`, become `pass_env`, `header_env`, or `bearer_token_env` names.
+Fleet's own gateway entry, plugin folder, and hook wrappers are outputs, so the import skips them.
+Hooks become notes: move each command into a tracked script, then declare it. OpenCode and Pi hooks are code, so the import cannot read them.
+
 ## Drift
 
 Drift means a recorded output differs from its record or is missing.

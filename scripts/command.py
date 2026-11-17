@@ -1117,6 +1117,11 @@ def dispatch(args, argument_parser, home):
                     home,
                 )
                 return 0
+        if args.command == "agents" and args.action == "import":
+            import agent_import
+
+            print(agent_import.run(home, args.agent), end="")
+            return 0
         if args.command in ("status", "doctor", "content") or getattr(args, "action", None) in (
             "list",
             "show",

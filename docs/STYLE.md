@@ -42,6 +42,7 @@ The command audit uses these forms:
 | marketplaces delete | --name |
 | marketplaces update | Optional --name; with --name, optional --pin or --unpin, and --all, --packages, or --features |
 | marketplaces list | No value parameters |
+| agents import | --agent |
 | agents list / set | set requires --name and --state; --machine selects a registered machine |
 | groups list / set | set requires --name and --state; --machine selects a registered machine |
 | tools set | TOOL, --version; --machine selects a registered machine |

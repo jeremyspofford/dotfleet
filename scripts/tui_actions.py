@@ -124,6 +124,12 @@ def agent_item_arguments(home):
     return ["agents", "set", "--name", selected, "--state", state] if state is not None else None
 
 
+def agent_import_arguments(home):
+    agents = [(name, name) for name in ("claude", "codex", "gemini", "opencode", "pi")]
+    selected = choose("Import from an agent", "Agent", agents)
+    return ["agents", "import", "--agent", selected] if selected is not None else None
+
+
 def marketplace_add_arguments(home):
     answer = form(
         "Add a marketplace",
@@ -234,6 +240,7 @@ FORMS = {
     "domain-set": domain_arguments,
     "group-set": group_arguments,
     "agent-set": agent_item_arguments,
+    "agent-import": agent_import_arguments,
     "marketplace-add": marketplace_add_arguments,
     "marketplace-delete": marketplace_delete_arguments,
     "pin-set": pin_arguments,
