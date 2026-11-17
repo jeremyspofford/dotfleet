@@ -59,9 +59,14 @@ reference = "op://Example/Development/api-token"
 enabled = false
 ```
 
-`paths` adds non-dot content paths. `overlays` lists supported domains; core means shared settings only.
-The optional `domains` table gives one plain description per domain. The wizard combines these descriptions with inspected overlay commands.
-Core always applies. Empty overlay files add nothing; descriptions must not promise absent behavior.
+`paths` adds non-dot content paths. `overlays` declares domains; core means shared settings only.
+The optional `domains` table gives one plain description per domain. A name in either place declares that domain.
+Content creates and removes domains. Without `overlays` or `domains`, the content declares core, personal, work, and client.
+Domain names use lowercase letters, digits, and single hyphens.
+Core always applies, even when the content omits it. Each machine carries one domain.
+A saved domain that the content no longer declares stops the next update before any write. Choose a declared domain to continue.
+The wizard combines these descriptions with inspected overlay commands.
+Empty overlay files add nothing; descriptions must not promise absent behavior.
 Each group declares a description and optional `files` or `blocks` paths.
 `files` selects whole files or directory trees. Disabled groups omit those outputs.
 A block starts with `# dotfleet:group NAME begin` and ends with `# dotfleet:group NAME end`.

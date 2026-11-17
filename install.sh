@@ -123,7 +123,7 @@ Options:
   --configure      Run the enrollment wizard again. Review every choice before applying.
   --defaults       Skip prompts only with a complete profile. New groups default to on.
                    This flag cannot bypass missing identity, domain confirmation, or floating tool versions.
-  --domain VALUE   Record a domain choice: core, personal, work, or client (defined below).
+  --domain NAME    Record a domain choice. The content declares each domain (described below).
   --format FORMAT  plain=real names; chezmoi=native sources. A manifest takes priority.
   --git-email EMAIL Record the Git author email.
   --git-name NAME  Record the Git author name.
@@ -134,6 +134,9 @@ Options:
   --tool TOOL=VERSION Record a full tool version, such as node=24.14.1. Repeat for more tools.
 A profile saves the repository, domain, Git author identity, tool versions, and content groups.
 Domains choose optional additions from your content repository. Identity and tools are chosen separately.
+The content declares its domains in fleet.toml. Core always applies.
+Content without declarations offers core, personal, work, and client.
+The bundled content declares these domains:
   core      Base configuration only.
   personal  Your own settings; bundled examples show your directory and list its entries.
   work      Employer settings; bundled examples show your directory and list its entries.

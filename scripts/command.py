@@ -91,6 +91,7 @@ DESCRIPTIONS = {
     "domain": (
         "Show or choose content additions.\n"
         "A domain selects content additions.\n"
+        "The content declares each domain; core always applies.\n"
         "A missing domain_chosen field means UNCHOSEN.\n"
         "Setting a named domain confirms the choice."
     ),
@@ -287,7 +288,10 @@ def format_pin(value):
 
 
 def domain_choices(home):
-    descriptions = content_manifest(home / "dotfiles").get("domains", {})
+    from convert import content_domains
+
+    manifest = content_manifest(home / "dotfiles")
+    descriptions = manifest.get("domains", {})
     return {
         name: descriptions.get(
             name,
@@ -295,7 +299,7 @@ def domain_choices(home):
             if name == "core"
             else "Content additions; inspect the overlay file.",
         )
-        for name in ["core", "personal", "work", "client"]
+        for name in content_domains(manifest)
     }
 
 
@@ -995,8 +999,9 @@ def dispatch(args, argument_parser, home):
             )
         os.environ["DOTFLEET_LOCAL_CONTENT"] = "1"
         if args.command == "domain":
-            if args.name not in domain_choices(home):
-                raise ValueError(f"Unknown domain. Run {display} domain list to see choices.")
+            from convert import require_domain
+
+            require_domain(content_manifest(home / "dotfiles"), args.name, display)
             return manager.main(["--defaults", "--domain", args.name])
         if args.command == "groups":
             return manager.main(["--defaults", "--group", args.name + "=" + args.state])
