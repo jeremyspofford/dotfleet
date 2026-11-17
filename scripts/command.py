@@ -492,6 +492,11 @@ def status_rows(home, saved_profile):
         ("Edit choices", f"Use {display} domain set, tools set, groups set, or configure."),
         ("Content", checkout_state(home / "dotfiles")),
         ("Updates", updates.summary(home, saved_profile).removeprefix("Updates: ")),
+        *(
+            [("Marketplaces", marketplace_summary)]
+            if (marketplace_summary := marketplaces_summary(home))
+            else []
+        ),
         ("Drift", f"present; run {display} diff" if status(home) else "none"),
         (
             "Last run",
@@ -507,6 +512,12 @@ def status_rows(home, saved_profile):
         ),
     ]
     return pairs
+
+
+def marketplaces_summary(home):
+    import marketplaces
+
+    return marketplaces.summary(home)
 
 
 def prepare_manager(home, workspace):
@@ -1078,7 +1089,7 @@ def dispatch(args, argument_parser, home):
         saved_profile = profile(home)
         display = command_name(saved_profile)
         if args.command == "check":
-            return updates.check(home, saved_profile)
+            return updates.check(home, saved_profile, marketplaces=True)
         if args.command == "backups" and args.action == "delete":
             import backup_cleanup
 
@@ -1318,6 +1329,8 @@ def change_marketplace(home, args, display):
 
     saved = marketplaces.load_records(home)["marketplaces"]
     with tempfile.TemporaryDirectory(prefix="dotfleet-marketplace-") as workspace:
+        if args.action == "update":
+            return update_marketplaces(home, args, display, saved, Path(workspace))
         if args.action == "delete":
             if args.name not in saved:
                 raise ValueError(
@@ -1343,6 +1356,45 @@ def change_marketplace(home, args, display):
             "staged": str(staged),
         }
         return manager.main(["--defaults"])
+
+
+def update_marketplaces(home, args, display, saved, workspace):
+    """Stage newer commits, pins, and selections. A pin blocks moving that marketplace."""
+    import marketplaces
+
+    if args.name and args.name not in saved:
+        raise ValueError(f"No marketplace named {args.name}. Run {display} marketplaces list.")
+    if not args.name and (
+        args.pin or args.unpin or args.packages or args.features or args.take_all
+    ):
+        raise ValueError("A pin or selection change needs --name.")
+    for name in [args.name] if args.name else sorted(saved):
+        record = dict(saved[name])
+        pin = args.pin if args.pin else "" if args.unpin else record.get("pin", "")
+        staged, commit = marketplaces.stage(home, record["source"], workspace / name, pin)
+        catalog = marketplaces.read_catalog(staged)
+        take = record["take"]
+        if args.take_all:
+            take = {"all": True}
+        elif args.packages or args.features:
+            take = marketplaces.take_from(comma_list(args.packages), comma_list(args.features))
+        marketplaces.selection(catalog, take)
+        if record.get("pin") and pin == record["pin"] and not args.pin:
+            print(f"Marketplace {name}: pinned at {pin}; the pin blocks updates.")
+        if (commit, take, pin) == (record["commit"], record["take"], record.get("pin", "")):
+            continue
+        record.update(
+            commit=commit,
+            take=take,
+            pin=pin,
+            version=marketplaces.version(staged),
+            staged=str(staged),
+        )
+        marketplaces.PENDING[name] = record
+    if not marketplaces.PENDING:
+        print("Marketplaces are current. Nothing to apply.")
+        return 0
+    return manager.main(["--defaults"])
 
 
 def remove_machine(home, hostname):

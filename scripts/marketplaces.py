@@ -213,6 +213,7 @@ def extend(home, table, content_skills, agents):
 
 def stage(home, source, workspace, pin=""):
     """Clone a marketplace into scratch and check out the pin or the newest commit."""
+    Path(workspace).mkdir(parents=True, exist_ok=True)
     destination = Path(workspace) / "marketplace"
     if destination.exists():
         shutil.rmtree(destination)
@@ -254,6 +255,59 @@ def take_from(packages, features):
     if features:
         take["features"] = sorted(set(features))
     return take
+
+
+def check(home):
+    """Fetch each marketplace with a time limit and save how far each one is behind.
+
+    Fetch only into the library's Git data. A pin blocks updates, not this information.
+    """
+    import datetime
+
+    results = {}
+    for name, record in sorted(load_records(home)["marketplaces"].items()):
+        root = home / LIBRARY / name
+        try:
+            git(root, "fetch", "--quiet", "--no-tags", "origin", "HEAD", timeout=FETCH_TIMEOUT)
+        except subprocess.TimeoutExpired as error:
+            raise ValueError(
+                f"marketplace {name} fetch timed out after {FETCH_TIMEOUT} seconds"
+            ) from error
+        latest = git(root, "rev-parse", "FETCH_HEAD")
+        behind = int(git(root, "rev-list", "--count", f"{record['commit']}..{latest}"))
+        results[name] = {
+            "current": record["commit"],
+            "latest": latest,
+            "behind": behind,
+            "pin": record.get("pin", ""),
+        }
+    stamp = datetime.datetime.now().astimezone().isoformat(timespec="seconds")
+    atomic(
+        home / CACHE, json.dumps({"checked_at": stamp, "marketplaces": results}, indent=2) + "\n"
+    )
+    return results
+
+
+def summary(home):
+    """Describe saved marketplace results for status. Read the cache only."""
+    names = load_records(home)["marketplaces"]
+    if not names:
+        return None
+    try:
+        cache = json.loads((home / CACHE).read_text())["marketplaces"]
+    except (OSError, ValueError, KeyError):
+        return "not checked yet"
+    parts = []
+    for name in sorted(names):
+        result = cache.get(name)
+        if result is None:
+            parts.append(f"{name} not checked yet")
+        elif result["behind"] and names[name].get("pin"):
+            # Status says held, not pinned: tool selections own no pin wording there.
+            parts.append(f"{name} +{result['behind']}, held at {names[name]['pin']}")
+        elif result["behind"]:
+            parts.append(f"{name} +{result['behind']}")
+    return ", ".join(parts) or "none"
 
 
 def entities(home):

@@ -22,6 +22,9 @@ GROUPS = {
         "Take every package, named packages, or named features where a package allows it.\n"
         "The review lists every output before the apply.",
         "delete": "Delete a marketplace, its library copy, and its installed outputs.",
+        "update": "Move marketplaces to their newest commit, or change a pin or selection.\n"
+        "A pin blocks updates; --pin moves the pin and --unpin clears it.\n"
+        "Without --name, update every marketplace.",
         "list": "List marketplaces with their source, version, pin, and installed packages.\n"
         "Read saved records and the last check only.",
     },
@@ -66,7 +69,7 @@ GROUPS = {
 }
 
 EXAMPLES = {
-    "marketplaces": "marketplaces list; marketplaces add --source https://github.com/example/agent-market; marketplaces add --source URL --packages review-kit; marketplaces add --source URL --features review-kit/mcp.docs; marketplaces delete --name agent-market",
+    "marketplaces": "marketplaces list; marketplaces add --source https://github.com/example/agent-market; marketplaces add --source URL --packages review-kit; marketplaces add --source URL --features review-kit/mcp.docs; marketplaces update; marketplaces update --name agent-market --pin v1.2.0; marketplaces update --name agent-market --unpin; marketplaces delete --name agent-market",
     "agents": "agents list; agents set --name mcp.docs --state off; agents set --name mcp.docs --state local",
     "logs": "logs list; logs list --limit 10; logs show; logs show --name BACKUP; logs show --json",
     "machines": "machines list; machines set-ssh --target mini-pc; machines set-ssh --name beelink --target mini-pc; machines export --output FILE; machines remove --name NAME",
@@ -184,6 +187,17 @@ def add_action_parameters(parser, name, action):
         parser.add_argument("--packages", help="package names, separated by commas; default: all")
         parser.add_argument("--pin", help="tag or commit to keep; the pin blocks updates")
         parser.add_argument("--source", required=True, help="marketplace Git URL or local path")
+    elif name == "marketplaces" and action == "update":
+        selectors = parser.add_mutually_exclusive_group()
+        selectors.add_argument(
+            "--all", dest="take_all", action="store_true", help="take every package"
+        )
+        parser.add_argument("--features", help="PACKAGE/KIND.NAME list, separated by commas")
+        parser.add_argument("--name", help="one marketplace; default: every marketplace")
+        selectors.add_argument("--packages", help="package names, separated by commas")
+        pins = parser.add_mutually_exclusive_group()
+        pins.add_argument("--pin", help="tag or commit to keep; the pin blocks updates")
+        pins.add_argument("--unpin", action="store_true", help="clear the pin and update")
     elif name == "marketplaces" and action == "delete":
         parser.add_argument("--name", required=True, help="marketplace from marketplaces list")
     elif name == "agents" and action == "set":

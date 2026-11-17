@@ -11,6 +11,7 @@
   Edit choices      Use fleet domain set, tools set, groups set, or configure.
   Content           12345678 · 0 behind last fetched upstream · clean
   Updates           none (checked 09:02)
+  Marketplaces      agent-market +2, held at v1.0.0
   Drift             none
   Last run          ~/fleet-backups/20261116-120000 · SUCCESS
   Last backup       ~/fleet-backups/20261116-120000

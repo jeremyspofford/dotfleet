@@ -42,7 +42,26 @@ An item name must be unique across the content and every installed package. A co
 2. Use `--features PACKAGE/KIND.NAME` to take single features. Only packages with `split = true` allow that.
 3. Use `--pin REF` to keep a tag or commit. The pin blocks updates, not information.
 4. Run `fleet marketplaces list` to see each source, version, pin, installed packages, and saved update result.
-5. Run `fleet marketplaces delete --name NAME` to remove a marketplace, its library copy, and its installed outputs.
+5. Run `fleet marketplaces update` to move every unpinned marketplace to its newest commit.
+6. Run `fleet marketplaces delete --name NAME` to remove a marketplace, its library copy, and its installed outputs.
+
+`marketplaces update --name NAME` changes one marketplace. With `--name`, these flags also apply:
+
+- `--pin REF` moves the pin to another tag or commit and checks it out.
+- `--unpin` clears the pin and moves to the newest commit.
+- `--all`, `--packages`, or `--features` replaces the selection.
+
+A pinned marketplace stays at its pin. The update prints one line that names the pin. When nothing changes, the update applies nothing.
+
+## Update results
+
+`fleet check` fetches each marketplace into its library, with a ten-second limit, after the manager and content.
+It prints how many commits each marketplace is behind. A pinned marketplace also says that the pin blocks the update.
+Check exits 1 when the manager, the content, or an unpinned marketplace is behind. A pinned marketplace alone does not change the exit code.
+A failed marketplace fetch prints a warning and exits 2. The earlier marketplace result stays saved.
+`fleet status` and `fleet marketplaces list` read the saved result, `~/.local/share/fleet/marketplaces-check.json`. They never fetch.
+Status describes a pinned marketplace that is behind as held at its pin.
+`fleet update` does not move marketplaces. Run `fleet marketplaces update` for that.
 
 `--name` saves the marketplace under another name. The default is the repository name.
 Each change runs the shared review and apply. The backup runs first. Unattended runs never prompt.
