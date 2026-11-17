@@ -106,7 +106,7 @@ Set NO_COLOR to disable colors, even with an empty value. Redirected output and 
 Requires git, curl, tar, and Python 3.11+. Supports Linux, macOS, and WSL (Windows Subsystem for Linux).
 Missing chezmoi and Mise go in ~/.local/bin. Setup never uses sudo or installs content-default tools.
 Content lives in ~/dotfiles. Backups live in ~/fleet-backups/<timestamp>/.
-The installer adds ~/.local/bin/dotfleet. Run dotfleet --help for updates, checks, rollback, and saved choices.
+The installer adds ~/.local/bin/dotfleet. Use its --help for updates, checks, rollback, and saved choices.
 The manager checkout lives in ~/.local/share/fleet/manager. Software results include the installed command.
 Review MANIFEST.json before restoring backup home/ files and recorded external targets.
 Native chezmoi templates and hooks can execute code. Use only trusted content repositories.

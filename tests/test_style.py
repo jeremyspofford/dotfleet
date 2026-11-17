@@ -67,6 +67,7 @@ def command_goldens():
         )
         outputs = {}
         with (
+            patch("command_display.shutil.which", return_value=None),
             patch.object(command, "run", return_value=""),
             patch.object(command, "records", return_value=[backup]),
             patch.object(

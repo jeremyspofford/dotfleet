@@ -11,18 +11,20 @@ import socket
 
 from common import atomic, read_toml, run
 import registry
+from command_display import command_name, current_command
 
 
 def profile_rows(home, profile):
+    display = command_name(profile)
     rows = [
         ("Profile file", str(home / ".config/fleet/profile.toml")),
         ("Domain", profile.get("domain", "core")),
         (
             "Domain choice",
-            "chosen" if profile.get("domain_chosen", False) else "UNCHOSEN; run dotfleet domain",
+            "chosen" if profile.get("domain_chosen", False) else f"UNCHOSEN; run {display} domain",
         ),
-        ("Git name", profile.get("git_name") or "missing; run dotfleet configure"),
-        ("Git email", profile.get("git_email") or "missing; run dotfleet configure"),
+        ("Git name", profile.get("git_name") or f"missing; run {display} configure"),
+        ("Git email", profile.get("git_email") or f"missing; run {display} configure"),
     ]
     for field, label in [("pins", "Pin"), ("groups", "Group"), ("agents", "Agent")]:
         rows += [
@@ -31,7 +33,7 @@ def profile_rows(home, profile):
     rows.append(
         (
             "Edit choices",
-            "Use dotfleet domain, pins, groups, or configure. Do not edit profile.toml.",
+            f"Use {display} domain, pins, groups, or configure. Do not edit profile.toml.",
         )
     )
     return rows
@@ -56,7 +58,7 @@ def backup_rows(home, folders):
             (folder.name, f"{date} · {record.get('result') or 'not recorded'} · {size:,} bytes")
         )
     if not folders:
-        rows.append(("Saved backups", "none; run dotfleet backup"))
+        rows.append(("Saved backups", f"none; run {current_command(home)} backup"))
     return rows
 
 
@@ -118,7 +120,7 @@ def export_rows(home, version, output=None):
         rows.append(
             (
                 "Carry this record",
-                "Use dotfleet machines export --output FILE to save a private TOML copy.",
+                f"Use {current_command(home)} machines export --output FILE to save a private TOML copy.",
             )
         )
     return rows

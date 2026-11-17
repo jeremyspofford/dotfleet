@@ -1,5 +1,5 @@
 1 · Software — no changes.
-  Already present: chezmoi 2.74.1, Mise 2026.8.5
+  Already present: chezmoi 2.74.1, Mise 2026.8.5, Fleet 0.2.0
 
 2 · Manager and content — no changes.
 
@@ -18,9 +18,9 @@
   Backup   ~/fleet-backups/20261116-140000
 
 6 · Next steps
-  Update    dotfleet update
+  Update    fleet update
   Rollback  ~/fleet-backups/20261116-140000/MANIFEST.json
-  Wizard    dotfleet configure
+  Wizard    fleet configure
 
 chezmoi status: clean · warnings: none
 Run record: ~/fleet-backups/20261116-140000/RUN.json

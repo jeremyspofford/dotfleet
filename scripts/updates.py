@@ -206,8 +206,11 @@ def check(home, profile, display=True):
     return int(any(source["behind"] for source in sources))
 
 
-def summary(home):
-    missing = "Updates: not checked — run: fleet check"
+def summary(home, profile=None):
+    from command_display import command_name, current_command
+
+    display = current_command(home) if profile is None else command_name(profile)
+    missing = f"Updates: not checked — run: {display} check"
     try:
         cache = home / CACHE
         if cache.is_symlink() or not cache.parent.resolve().is_relative_to(home.resolve()):
@@ -227,7 +230,7 @@ def summary(home):
             f"{source['name']} +{source['behind']}" for source in sources if source["behind"]
         )
         if changes:
-            return f"Updates: {changes} (checked {checked}) — run: fleet update"
+            return f"Updates: {changes} (checked {checked}) — run: {display} update"
         return f"Updates: none (checked {checked})"
     except (OSError, ValueError, KeyError, TypeError):
         return missing

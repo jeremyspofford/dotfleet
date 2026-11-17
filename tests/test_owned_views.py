@@ -74,10 +74,12 @@ def goldens():
             {"content_repo": machine["content_repo"]},
             lambda path: "12345678 · 0 behind last fetched upstream · clean",
         )
+    with patch("command_display.shutil.which", return_value=None):
+        profile_rows = owned_views.profile_rows(home, profile)
     pairs = {
         "content": content,
         "machine export": exported,
-        "profile": owned_views.profile_rows(home, profile),
+        "profile": profile_rows,
         "backups": backups,
         "secrets": secrets,
     }

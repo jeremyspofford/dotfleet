@@ -145,6 +145,7 @@ def refresh(home, manager_version, backup, result, fallback=None):
 def rows(home, manager_version):
     """Render stored records; add a local unrecorded view for older enrollments."""
     from render_run import human
+    from command_display import current_command
 
     data = load(home)
     local = socket.gethostname()
@@ -169,7 +170,7 @@ def rows(home, manager_version):
             ("Content repo", record["content_repo"] or "not set"),
             ("Content commit", record["content_commit"] or "not recorded"),
             ("Manager version", record["manager_version"]),
-            ("Last run", record["last_run"] or "not recorded; run dotfleet update"),
+            ("Last run", record["last_run"] or f"not recorded; run {current_command(home)} update"),
             ("Last result", record["result"]),
             (
                 "Last backup",

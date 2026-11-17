@@ -9,4 +9,4 @@
   Pin node       24.14.1
   Group helpers  on
   Agent codex    off
-  Edit choices   Use dotfleet domain, pins, groups, or configure. Do not edit profile.toml.
+  Edit choices   Use fleet domain, pins, groups, or configure. Do not edit profile.toml.
