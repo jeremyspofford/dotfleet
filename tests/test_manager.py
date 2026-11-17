@@ -1104,7 +1104,7 @@ class ConverterTests(unittest.TestCase):
         manifest = tomllib.loads((ROOT / "agents/manifest.toml").read_text())
         self.assertEqual(
             set(manifest["agents"]),
-            {"claude", "codex", "gemini", "grok", "pi", "opencode", "ollama"},
+            {"antigravity", "claude", "codex", "gemini", "grok", "pi", "opencode", "ollama"},
         )
         for agent in manifest["agents"].values():
             self.assertEqual(set(agent["config_paths"]), {"darwin", "linux", "windows", "wsl"})
