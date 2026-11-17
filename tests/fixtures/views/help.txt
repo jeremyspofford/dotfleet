@@ -8,7 +8,7 @@ Manage enrolled machines.
 commands:
   COMMAND
     addons     List optional manager extensions.
-    backups    Create or list saved file copies.
+    backups    Create, list, or delete saved file copies.
     check      Fetch new update results.
     configure  Reopen the enrollment wizard.
     content    Show the content checkout and Git state.
@@ -26,7 +26,7 @@ commands:
     topology   Show this machine’s connection tree.
     tui        Open the full-screen terminal interface.
     uninstall  Remove Fleet and its managed files.
-    update     Pull repositories and apply saved choices.
+    update     Check updates and drift before applying.
     version    Show manager and content versions.
 
 global options:
