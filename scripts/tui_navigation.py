@@ -34,7 +34,7 @@ ACTIONS = {
     "machine-export": ("Export this machine's record", ("machines", "export")),
     "machine-remove": ("Remove a stale machine record", ("machines", "remove")),
     "backups": ("List backups", ("backups", "list")),
-    "backup": ("Create a backup now", ("backup",)),
+    "backup": ("Create a backup now", ("backups", "create")),
     "rollback": ("Restore a backup", ("rollback",)),
     "version": ("Version — manager and content", ("version",)),
     "addons": ("Add-ons — installed records", ("addons", "list")),

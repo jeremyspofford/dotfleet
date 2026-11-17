@@ -126,7 +126,7 @@ class RegistryCommandTests(unittest.TestCase):
         self.assertEqual(registry.load(self.home)["machines"]["recorded-machine"], other)
         after = registry.load(self.home)["machines"][local]
         self.assertNotEqual(after["last_run_record"], first["last_run_record"])
-        self.cli("backup")
+        self.cli("backups", "create")
         latest = registry.load(self.home)["machines"][local]
         self.assertNotEqual(latest["last_run_record"], after["last_run_record"])
         self.assertEqual(
@@ -175,7 +175,7 @@ class RegistryCommandTests(unittest.TestCase):
 
     def test_restore_and_uninstall_preserve_new_other_machine_records(self):
         self.enroll()
-        self.cli("backup")
+        self.cli("backups", "create")
         _, before_other = self.record()
         path = self.home / registry.REGISTRY
         data = registry.load(self.home)

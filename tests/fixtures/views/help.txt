@@ -3,52 +3,32 @@
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Usage: fleet [-h] [--version] COMMAND ...
 
-Manage enrolled machines. A profile saves each machine’s choices.
+Manage enrolled machines.
 
-positional arguments:
+commands:
   COMMAND
-    addons     List installed add-ons, optional manager extensions.
-    backup     Copy managed files and the profile into a new private backup.
-    backups    List backup folders with their dates, recorded results, and
-               sizes.
-    check      Check fetches new update results; status only reads the saved
-               results.
+    addons     List optional manager extensions.
+    backups    Create or list saved file copies.
+    check      Fetch new update results.
     configure  Reopen the enrollment wizard.
-    content    Show the content checkout, a local Git copy.
-    diff       Show pending file paths and unified patches from chezmoi.
-    doctor     Check profile completeness, drift, clean checkouts, and
-               backups.
-    domain     Show domains, or apply a named domain.
-    groups     List optional content groups.
-    help       Show commands and actions.
-    machines   Show recorded machine facts from registry.toml.
-    pins       List exact tool versions and installed state.
-    profile    Show saved domain, identity, pins, groups, and agents from
-               profile.toml.
-    rollback   List backups or restore one after confirmation.
-    secrets    Show secret variable names declared by the content manifest,
-               the repository’s settings file.
-    status     Status reads saved update results without fetching; check
-               fetches new results.
-    topology   Show this machine’s recorded view as a tree.
-    tui        Open the terminal interface, a full-screen view of Fleet
-               commands.
-    uninstall  Remove the manager and its managed files after typed
-               confirmation.
-    update     Pull the manager and content repositories, then apply your
-               saved choices.
-    version    Show the manager version and content commit.
+    content    Show the content checkout and Git state.
+    diff       Show pending file differences.
+    doctor     Check this machine and name any fixes.
+    domain     Show or choose content additions.
+    groups     Show or switch optional content.
+    help       Show command help.
+    machines   Manage saved machine connections.
+    pins       Show or set exact tool versions.
+    profile    Show saved machine choices.
+    rollback   List backups or restore one.
+    secrets    List secret names as set or unset.
+    status     Show saved state without network requests.
+    topology   Show this machine’s connection tree.
+    tui        Open the full-screen terminal interface.
+    uninstall  Remove Fleet and its managed files.
+    update     Pull repositories and apply saved choices.
+    version    Show manager and content versions.
 
-options:
+global options:
   -h, --help   show this help message and exit
-  --version    show program's version number and exit
-
-Exit codes: 0 success, help, or cancellation; 1 failed operation or check; 2
-invalid arguments or check failure; 130 interrupted. Check uses 1 for
-available updates.
-Examples: fleet update; fleet status; fleet domain set --name personal.
-First install or manager recovery: use the README one-line installer.
-Profile: saved machine choices. Pins: exact tool versions. Groups: optional
-content.
-Domain: content additions. Drift: differences in managed files.
-Commit: saved Git version. Checkout: a local Git copy.
+  --version    show manager and content versions, then exit

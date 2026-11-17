@@ -314,9 +314,9 @@ class UpdateTests(unittest.TestCase):
         for text in [
             "upstream",
             "10-second",
-            "0 current",
-            "1 updates available",
-            "2 could not check",
+            "0 Manager and content are current.",
+            "1 Updates are available.",
+            "2 Could not check updates, or invalid arguments.",
         ]:
             self.assertIn(text, " ".join(output.split()))
         result = subprocess.run(

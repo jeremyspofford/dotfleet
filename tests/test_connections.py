@@ -156,7 +156,7 @@ class RegistrationTests(unittest.TestCase):
         self.cli("machines", "set-ssh", "--target", "lab")
         self.cli("machines", "remove", "--name", "lab")
         self.assertNotIn("lab", registry.load(self.home)["machines"])
-        self.cli("backup")
+        self.cli("backups", "create")
         _, backup = self.record()
         (self.home / ".file").write_text("local edit")
         self.terminal(["rollback", "--backup", backup.name], [(b"Confirm [cancel]:", b"restore\n")])

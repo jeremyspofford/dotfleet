@@ -1,6 +1,6 @@
 """Operate an enrolled machine through the shared manager and run renderer.
 
-Usage: dotfleet COMMAND [ARGS]. Run dotfleet --help for commands and exit codes.
+Usage: dotfleet COMMAND [ARGS]. Run dotfleet --help for commands.
 Parameters and examples are defined by each subcommand's --help.
 Author: Jeremy Spofford / Aria Labs; Version: read from ../VERSION.
 """
@@ -49,104 +49,123 @@ CONTROLS = {
     COMMAND,
 }
 DESCRIPTIONS = {
-    "help": "Show commands and actions. Use help COMMAND ACTION for a specific action.",
-    "topology": (
-        "Show this machine’s recorded view as a tree. Topology means connection layout. "
-        "Each observation has its time. Nothing is checked live; other machines may have different views."
-    ),
-    "tui": (
-        "Open the terminal interface, a full-screen view of Fleet commands. "
-        "Arrows and Tab move; Enter selects; Esc goes back; q quits. "
-        "Configure returns to the existing wizard. If its environment is missing, "
-        "print plain command alternatives and exit 0."
-    ),
-    "check": (
-        "Check fetches new update results; status only reads the saved results. "
-        "Fetch the manager and content upstreams quietly, with a 10-second limit per fetch. "
-        "An upstream is the remote branch tracked by a checkout. Cache both results only "
-        "when both checks succeed. Exit codes: 0 current; 1 updates available; 2 could not check."
-    ),
-    "profile": (
-        "Show saved domain, identity, pins, groups, and agents from profile.toml. An agent "
-        "is a coding assistant. Change choices through their commands or configure."
+    "help": ("Show command help.\nUse help COMMAND ACTION for a specific action."),
+    "addons": (
+        "List optional manager extensions.\n"
+        "A manifest declares an extension’s actions.\n"
+        "A receipt records its owned outputs.\n"
+        "No add-ons ship with Fleet."
     ),
     "backups": (
-        "List backup folders with their dates, recorded results, and sizes. A backup is a "
-        "saved copy of files. Change nothing."
+        "Create or list saved file copies.\n"
+        "A backup is a saved copy of managed files and the profile.\n"
+        "List shows dates, recorded results, sizes, and locations without changing files."
     ),
-    "secrets": (
-        "Show secret variable names declared by the content manifest, the repository’s "
-        "settings file. Set means a nonempty value exists. Never print values."
-    ),
-    "content": (
-        "Show the content checkout, a local Git copy. Report its repository, commit, behind"
-        " state, and short Git status. Change nothing."
-    ),
-    "machines": (
-        "Show recorded machine facts from registry.toml. The registry is the manager’s file of"
-        " saved machine records. Listing them makes no live network queries. Export shows "
-        "this machine; remove deletes a stale record. SSH securely connects to another machine. "
-        "Set-ssh saves a target and tests SSH once. One name supplies both fields. Without flags, pick a host in a terminal. A failed test keeps the saved target and exits 2."
-    ),
-    "addons": (
-        "List installed add-ons, optional manager extensions. A manifest declares an "
-        "extension’s actions. A receipt records its owned outputs. No add-ons ship with "
-        "Fleet."
-    ),
-    "update": (
-        "Pull the manager and content repositories, then apply your saved choices. A "
-        "repository stores versioned files."
-    ),
-    "status": (
-        "Status reads saved update results without fetching; check fetches new results. "
-        "Show this machine’s profile, saved choices, installed pins, groups, checkout "
-        "state, drift, recent backups, and the last update check. "
-        "Drift means managed files differ. Local status makes no network requests."
-    ),
-    "diff": (
-        "Show pending file paths and unified patches from chezmoi. A patch shows removed "
-        "(-) and added (+) lines. Change nothing. Exit codes: 0 no differences; 1 "
-        "differences; 2 preview failed."
-    ),
-    "rollback": (
-        "List backups or restore one after confirmation. A backup contains original files "
-        "and a manifest listing them. The profile is restored too."
-    ),
-    "domain": (
-        "Show domains, or apply a named domain. A domain selects content additions. A "
-        "missing domain_chosen field means UNCHOSEN; a named choice confirms it."
-    ),
-    "groups": (
-        "List optional content groups. Turn a group on to include it, or off to remove its "
-        "managed files or alias blocks."
-    ),
-    "pins": (
-        "List exact tool versions and installed state. Set a pin to install that exact "
-        "version. Remove a pin without uninstalling software."
+    "check": (
+        "Fetch new update results.\n"
+        "Status reads saved results; check fetches new results.\n"
+        "Fetch manager and content upstreams quietly, with a 10-second limit per fetch.\n"
+        "An upstream is the remote branch tracked by a checkout, a local Git copy.\n"
+        "Save both results only when both checks succeed."
     ),
     "configure": (
-        "Reopen the enrollment wizard. The wizard reviews source, domain, identity, pins, "
-        "groups, and agents before applying choices."
+        "Reopen the enrollment wizard.\n"
+        "Review source, domain, identity, pins, groups, and agents before applying choices."
+    ),
+    "content": (
+        "Show the content checkout and Git state.\n"
+        "A checkout is a local Git copy.\n"
+        "Show its repository, commit, behind state, and short Git status without changing files."
+    ),
+    "diff": (
+        "Show pending file differences.\n"
+        "Print paths and unified patches from chezmoi.\n"
+        "A patch shows removed (-) and added (+) lines.\n"
+        "Change nothing."
     ),
     "doctor": (
-        "Check profile completeness, drift, clean checkouts, and backups. A clean checkout "
-        "has no local edits. Each failed check names its fix."
+        "Check this machine and name any fixes.\n"
+        "Check profile completeness, managed file differences, clean checkouts, and backups.\n"
+        "A profile stores machine choices; a clean checkout has no local edits."
     ),
-    "backup": (
-        "Copy managed files and the profile into a new private backup. Change no managed "
-        "files. Print the backup location and run record."
+    "domain": (
+        "Show or choose content additions.\n"
+        "A domain selects content additions.\n"
+        "A missing domain_chosen field means UNCHOSEN.\n"
+        "Setting a named domain confirms the choice."
     ),
-    "version": (
-        "Show the manager version and content commit. A commit identifies a saved Git version."
+    "groups": (
+        "Show or switch optional content.\n"
+        "A group selects optional files or alias blocks.\n"
+        "Turn a group on to include it, or off to remove its managed content."
+    ),
+    "machines": (
+        "Manage saved machine connections.\n"
+        "The registry, registry.toml, stores machine records.\n"
+        "Listing makes no live network queries.\n"
+        "Export shows this machine; remove deletes a stale record.\n"
+        "SSH securely connects to another machine.\n"
+        "Set-ssh saves a target and tests SSH once.\n"
+        "One name supplies both fields; without flags, pick a host in a terminal."
+    ),
+    "pins": (
+        "Show or set exact tool versions.\n"
+        "A pin records an exact tool version.\n"
+        "Set installs that exact version.\n"
+        "Remove unpins the tool without uninstalling it."
+    ),
+    "profile": (
+        "Show saved machine choices.\n"
+        "The profile.toml file saves domain, identity, pins, groups, and agents.\n"
+        "An agent is a coding assistant.\n"
+        "Change choices through their commands or configure."
+    ),
+    "rollback": (
+        "List backups or restore one.\n"
+        "A backup contains original files and a manifest listing them.\n"
+        "Restore the profile too.\n"
+        "Type restore to confirm; press Enter after each answer."
+    ),
+    "secrets": (
+        "List secret names as set or unset.\n"
+        "The content manifest, the repository’s settings file, declares secret variable names.\n"
+        "Set means a nonempty value exists.\n"
+        "Never print values."
+    ),
+    "status": (
+        "Show saved state without network requests.\n"
+        "Status reads saved update results; check fetches new results.\n"
+        "Show the profile, installed pins, groups, checkouts, drift, backups, and last update check.\n"
+        "A profile stores machine choices; drift means managed files differ."
+    ),
+    "topology": (
+        "Show this machine’s connection tree.\n"
+        "Topology means connection layout.\n"
+        "Show each recorded observation with its time.\n"
+        "Check nothing live; another machine may have a different view."
+    ),
+    "tui": (
+        "Open the full-screen terminal interface.\n"
+        "Arrows and Tab move; Enter selects; Esc goes back; q quits.\n"
+        "Configure returns to the existing wizard.\n"
+        "If the interface environment is missing, print plain command alternatives and exit 0."
     ),
     "uninstall": (
-        "Remove the manager and its managed files after typed confirmation. Keep content "
-        "and backups. Offer to restore the oldest backup."
+        "Remove Fleet and its managed files.\n"
+        "Type uninstall to confirm; press Enter after each answer.\n"
+        "Keep content and backups.\n"
+        "Offer to restore the oldest backup."
     ),
+    "update": (
+        "Pull repositories and apply saved choices.\n"
+        "Pull both manager and content.\n"
+        "A repository stores versioned files."
+    ),
+    "version": ("Show manager and content versions.\nA commit identifies a saved Git version."),
 }
 
 
-class HelpFormatter(argparse.HelpFormatter):
+class HelpFormatter(argparse.RawTextHelpFormatter):
     def add_argument(self, action):
         super().add_argument(action)
         # Older Python releases omit nested indentation when sizing command columns.
@@ -158,62 +177,46 @@ class HelpFormatter(argparse.HelpFormatter):
     def _format_usage(self, usage, actions, groups, prefix):
         return super()._format_usage(usage, actions, groups, prefix or "Usage: ")
 
-    def _fill_text(self, text, width, indent):
-        return "\n".join(
-            argparse.HelpFormatter._fill_text(self, line, width, indent)
-            for line in text.splitlines()
-        )
-
-
-TERMS = (
-    "Profile: saved machine choices. Pins: exact tool versions. Groups: optional content.\n"
-    "Domain: content additions. Drift: differences in managed files.\n"
-    "Commit: saved Git version. Checkout: a local Git copy."
-)
-
 
 def parser():
     display = current_command()
     argument_parser = style.ArgumentParser(
         prog=display,
-        description="Manage enrolled machines. A profile saves each machine’s choices.",
-        epilog="Exit codes: 0 success, help, or cancellation; 1 failed operation or check; 2 invalid arguments or check failure; 130 interrupted. Check uses 1 for available updates.\n"
-        f"Examples: {display} update; {display} status; {display} domain set --name personal.\n"
-        "First install or manager recovery: use the README one-line installer.\n" + TERMS,
+        description="Manage enrolled machines.",
         formatter_class=HelpFormatter,
     )
     argument_parser.add_argument(
-        "--version", action="version", version=(ROOT / "VERSION").read_text().strip()
+        "--version",
+        action="version",
+        version=(ROOT / "VERSION").read_text().strip(),
+        help="show manager and content versions, then exit",
     )
-    subcommands = argument_parser.add_subparsers(dest="command", required=True, metavar="COMMAND")
+    subcommands = argument_parser.add_subparsers(
+        dest="command", required=True, metavar="COMMAND", title="commands"
+    )
+    argument_parser._optionals.title = "global options"
+    argument_parser._action_groups.remove(argument_parser._optionals)
+    argument_parser._action_groups.append(argument_parser._optionals)
     for name, detail in DESCRIPTIONS.items():
         if name in remote.CAPABLE:
             detail += (
-                " SSH securely connects to another machine. Add MACHINE to use one recorded "
-                "machine and its own profile. "
-                "Remote runs never prompt. Exit 0 means success; nonzero reports a connection "
-                "or command failure. Check and diff retain exit 1 for updates or differences."
+                "\nSSH securely connects to another machine."
+                "\nAdd MACHINE to use one registered machine and its own saved choices."
+                "\nRemote runs never prompt; connection failures exit nonzero."
             )
         elif name in remote.REASONS:
-            detail += " Remote use is refused: " + remote.REASONS[name] + "."
-        epilog = (
-            f"Example: {display} "
-            + command_arguments.EXAMPLES.get(name, name).replace("; ", f"; {display} ")
-            + "\n"
-            + TERMS
-            + f"\nRun {display} help for exit codes. Help, -h, and --help show help."
-            + " All prompts require Enter and use the terminal."
-        )
+            detail += "\nRemote use is refused: " + remote.REASONS[name] + "."
+        epilog = command_arguments.help_epilog(name, display)
         command_parser = subcommands.add_parser(
             name,
             prog=display + " " + name,
-            help=detail.split(". ")[0] + ".",
+            help=detail.splitlines()[0],
             description=detail,
             formatter_class=HelpFormatter,
             epilog=epilog,
         )
         if name in command_arguments.GROUPS:
-            command_arguments.add_groups(command_parser, name, HelpFormatter, epilog)
+            command_arguments.add_groups(command_parser, name, HelpFormatter, display)
         else:
             command_arguments.add_parameters(command_parser, name)
     return argument_parser
@@ -860,7 +863,7 @@ def main(argv=None):
             if args.backup in registry.load(home)["machines"]:
                 return remote.refusal(args.backup, "rollback")
             return restore_command(args, home)
-        if args.command == "backup":
+        if args.command == "backups" and args.action == "create":
             operations = [
                 (
                     name,

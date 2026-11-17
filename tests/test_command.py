@@ -185,7 +185,10 @@ class CommandTests(unittest.TestCase):
             self.assertNotIn("Usage: Usage:", output)
             for line in output.splitlines():
                 self.assertLessEqual(len(line), 100)
-            self.assertIn("exit codes" if name and name != "help" else "Exit codes", output)
+            if name and name != "help":
+                self.assertIn("Exit codes:", output)
+            else:
+                self.assertNotIn("Exit codes:", output)
             if name and name != "help":
                 self.assertIn(DESCRIPTIONS[name].split(".")[0].split()[0], output)
         result = subprocess.run(
@@ -277,7 +280,7 @@ class CommandTests(unittest.TestCase):
 
     def test_backup_rollback_and_confirmation(self):
         self.enroll()
-        self.assert_review_golden("backup", self.cli("backup"))
+        self.assert_review_golden("backup", self.cli("backups", "create"))
         _, saved = self.record()
         original_profile = (self.home / ".config/fleet/profile.toml").read_bytes()
         (self.home / ".file").write_text("local edit\n")
@@ -389,7 +392,7 @@ else: sys.exit(1)
         path = self.home / ".file"
         path.unlink()
         path.symlink_to(external)
-        self.cli("backup")
+        self.cli("backups", "create")
         _, saved = self.record()
         external.write_text("current external\n")
         self.terminal(["rollback", saved.name], [(b"Confirm [cancel]:", b"restore\n")])
@@ -406,7 +409,7 @@ else: sys.exit(1)
 
     def test_rollback_rejects_changed_backup_and_unsafe_paths(self):
         self.enroll()
-        self.cli("backup")
+        self.cli("backups", "create")
         _, saved = self.record()
         (saved / "home/.file").write_text("tampered\n")
         output = self.cli("rollback", saved.name, expected=1)
