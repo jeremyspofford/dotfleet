@@ -275,6 +275,35 @@ class ScreenTests(unittest.IsolatedAsyncioTestCase):
             await pilot.press("escape")
             self.assertEqual(len(app.screen_stack), 1)
 
+    async def test_escape_and_quit_cancel_a_running_read(self):
+        cancelled = asyncio.Event()
+
+        class SlowCheck(FixtureSession):
+            async def run(self, action, *args, **kwargs):
+                if action == "check":
+                    try:
+                        await asyncio.Event().wait()
+                    finally:
+                        cancelled.set()
+                else:
+                    return await super().run(action, *args, **kwargs)
+
+        app = FleetApp(SlowCheck())
+        async with app.run_test() as pilot:
+            await self.settle(pilot, app)
+            await pilot.press("down", "enter")
+            await pilot.pause()
+            self.assertTrue(app.busy)
+            await pilot.press("escape")
+            await self.settle(pilot, app)
+            self.assertTrue(cancelled.is_set())
+            self.assertEqual(len(app.screen_stack), 1)
+            cancelled.clear()
+            await pilot.press("enter")
+            await pilot.pause()
+            await pilot.press("q")
+            self.assertTrue(cancelled.is_set())
+
 
 if __name__ == "__main__":
     unittest.main()

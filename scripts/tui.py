@@ -15,6 +15,7 @@ from textual.app import App, ComposeResult
 from textual.containers import Vertical
 from textual.screen import ModalScreen, Screen
 from textual.theme import BUILTIN_THEMES, Theme
+from textual.worker import WorkerCancelled, get_current_worker
 from textual.widgets import Button, Input, OptionList, RichLog, Static
 from textual.widgets.option_list import Option
 
@@ -131,10 +132,10 @@ class ActionScreen(Screen):
         options.focus()
 
     @on(OptionList.OptionSelected, "#actions")
-    def selected(self, event):
+    async def selected(self, event):
         choice = event.option.id
         if choice == "back":
-            self.app.action_back()
+            await self.app.action_back()
         elif choice.startswith("restore-"):
             self.app.perform_action(
                 self, "rollback", self.backups[int(choice.removeprefix("restore-"))]
@@ -158,6 +159,7 @@ class FleetApp(App[str]):
         self.changing = False
         self.exit_requested = False
         self.worker = None
+        self.operation_worker = None
         colors = {key: "ansi_white" if self.plain else palette(key) for key in style.COLORS}
         self.register_theme(
             Theme(
@@ -235,6 +237,7 @@ class FleetApp(App[str]):
         if self.busy:
             return
         self.busy = True
+        self.operation_worker = get_current_worker()
         self.changing = action in ("update", "rollback")
         output = screen.query_one("#output", RichLog)
         output.clear()
@@ -273,21 +276,32 @@ class FleetApp(App[str]):
             if self.exit_requested:
                 self.exit()
 
-    def action_back(self):
+    async def stop_read(self):
+        if self.busy and not self.changing and self.operation_worker:
+            self.operation_worker.cancel()
+            try:
+                await self.operation_worker.wait()
+            except WorkerCancelled:
+                pass
+
+    async def action_back(self):
         if isinstance(self.screen, Review):
             self.screen.action_cancel()
-        elif self.busy:
+            return
+        if self.busy and self.changing:
             self.screen.query_one("#progress", Static).update(
                 "Wait for this operation to finish. q closes afterward."
             )
-        elif len(self.screen_stack) > 1:
+            return
+        await self.stop_read()
+        if len(self.screen_stack) > 1:
             self.pop_screen()
             self.worker = self.load_dashboard()
         else:
             self.exit()
 
-    def action_quit(self):
-        if self.busy:
+    async def action_quit(self):
+        if self.busy and self.changing:
             self.exit_requested = True
             if isinstance(self.screen, Review):
                 self.screen.action_cancel()
@@ -296,6 +310,7 @@ class FleetApp(App[str]):
                     "Will close when this operation finishes."
                 )
         else:
+            await self.stop_read()
             self.exit()
 
     def _fatal_error(self):
