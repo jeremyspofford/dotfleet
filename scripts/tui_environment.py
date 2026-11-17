@@ -132,7 +132,7 @@ def launch(home, root):
                     ("Environment", "missing; the plain commands still work"),
                     ("Inspect", f"{name} status · {name} diff · {name} doctor"),
                     ("Updates", f"{name} check · {name} update"),
-                    ("Backups", f"{name} backups list · {name} rollback"),
+                    ("Backups", f"{name} backups list · {name} backups restore"),
                     ("Machines", f"{name} machines list"),
                     ("Setup", f"{name} configure"),
                     ("Restore interface", f"Run {name} update or the README one-line installer."),

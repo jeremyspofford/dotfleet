@@ -17,16 +17,15 @@ ACTIONS = {
     "diff-stat": ("Changed paths only", ("diff", "--stat")),
     "doctor": ("Doctor — check this machine", ("doctor",)),
     "topology": ("Topology — recorded connections", ("topology",)),
-    "profile": ("Profile — saved choices", ("profile", "show")),
     "domain": ("Domains — choices and current domain", ("domain", "list")),
     "domain-set": ("Choose a domain", ("domain", "set")),
     "groups": ("Groups — content switches", ("groups", "list")),
     "group-set": ("Turn a group on or off", ("groups", "set")),
-    "pins": ("Pins — exact tool versions", ("pins", "list")),
-    "pin-set": ("Install and pin an exact version", ("pins", "set")),
-    "pin-remove": ("Remove a pin", ("pins", "remove")),
+    "pins": ("Tools — exact versions", ("tools", "list")),
+    "pin-set": ("Install and select an exact version", ("tools", "set")),
+    "pin-remove": ("Remove a tool selection", ("tools", "remove")),
     "secrets": ("Secrets — names and set/unset", ("secrets", "list")),
-    "content": ("Content — checkout and Git state", ("content", "show")),
+    "content": ("Content — checkout and Git state", ("content",)),
     "configure": ("Configure — reopen the terminal wizard", ("configure",)),
     "machines": ("List saved machines", ("machines", "list")),
     "add-connection": ("Pick an SSH host", ("machines", "set-ssh")),
@@ -37,7 +36,7 @@ ACTIONS = {
     "backup-delete-selected": ("Delete selected backups", ("backups", "delete")),
     "backup-delete-all": ("Delete all backups", ("backups", "delete", "--all")),
     "backup": ("Create a backup now", ("backups", "create")),
-    "rollback": ("Restore a backup", ("rollback",)),
+    "rollback": ("Restore a backup", ("backups", "restore")),
     "version": ("Version — manager and content", ("version",)),
     "addons": ("Add-ons — installed records", ("addons", "list")),
     "help": ("Help — all commands", ("help",)),
@@ -48,7 +47,7 @@ ACTIONS = {
 
 AREAS = {
     "Machine": ("status", "check", "update", "diff", "doctor", "topology"),
-    "Configuration": ("profile", "domain", "groups", "pins", "secrets", "content", "configure"),
+    "Configuration": ("domain", "groups", "pins", "secrets", "content", "configure"),
     "Machines": (
         "machines",
         "add-connection",
@@ -62,7 +61,6 @@ AREAS = {
 
 RELATED = {
     "help": ("command-help",),
-    "profile": ("configure",),
     "domain": ("domain-set",),
     "groups": ("group-set",),
     "pins": ("pin-set", "pin-remove"),

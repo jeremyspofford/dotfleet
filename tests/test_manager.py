@@ -469,7 +469,7 @@ class EnrollmentTests(unittest.TestCase):
                     for pattern, answer in [
                         (rb"Content door \[[^]]+\]:", b"repo\n"),
                         (rb"Content repository \[[^]]+\]:", b"\n"),
-                        (rb"Pins \[accept\]:", b"accept\n"),
+                        (rb"Tools \[accept\]:", b"accept\n"),
                         (rb"(?:claude|codex|gemini|grok|pi|opencode) \[(?:on|off)\]:", b"\n"),
                         (rb"Review \[quit\]:", b"confirm\n"),
                         (
@@ -547,7 +547,7 @@ class EnrollmentTests(unittest.TestCase):
         self.seed_profile(legacy=True)
         output = self.terminal(self.gap_answers(), plain=True)
         self.assertIn("Press Enter: uses installed 24.14.1", output)
-        self.assertIn("Recorded exact pin: node = 24.14.1", output)
+        self.assertIn("Recorded exact version: node = 24.14.1", output)
         self.check_completed_gap_profile()
 
     def test_plain_rerun_repairs_existing_profile_gaps(self):
@@ -562,7 +562,7 @@ class EnrollmentTests(unittest.TestCase):
         )
         self.assertNotIn("Git author", output)
         self.assertNotIn("Domain:", output)
-        self.assertNotIn("node pin:", output)
+        self.assertNotIn("node version:", output)
         self.assertIn("warnings: none", output)
         self.check_completed_gap_profile()
 
@@ -578,7 +578,7 @@ class EnrollmentTests(unittest.TestCase):
         self.assertIn("Warnings:", output)
         self.assertIn("No domain choice confirmed", output)
         self.assertIn("No complete git identity recorded", output)
-        self.assertIn("node is unpinned", output)
+        self.assertIn("node has no selected version", output)
         profile = tomllib.loads((self.home / ".config/fleet/profile.toml").read_text())
         self.assertFalse(profile["domain_chosen"])
         self.assertNotIn("node", profile["pins"])
@@ -614,11 +614,11 @@ class EnrollmentTests(unittest.TestCase):
                 "Domain was never explicitly chosen (recorded: core)",
                 "Git name is empty",
                 "Git email is empty",
-                "node pin is floating (recorded: latest)",
+                "node tool version is floating (recorded: latest)",
                 "--domain",
                 "--git-name",
                 "--git-email",
-                "--pin node=VERSION",
+                "--tool node=VERSION",
             ]:
                 self.assertIn(text, result.stdout + result.stderr)
             self.assertEqual(path.read_bytes(), before)
@@ -637,9 +637,9 @@ class EnrollmentTests(unittest.TestCase):
             "Script Person",
             "--git-email",
             "script@example.invalid",
-            "--pin",
+            "--tool",
             "node=24.14.1",
-            "--pin",
+            "--tool",
             "python=3.13.0",
         ]
         result = subprocess.run(
@@ -656,7 +656,7 @@ class EnrollmentTests(unittest.TestCase):
             "Git author name;",
             "Git author email;",
             "Domain:",
-            "node pin:",
+            "node version:",
             "Press Enter",
         ]:
             self.assertNotIn(prompt, result.stdout + result.stderr)
@@ -701,11 +701,11 @@ class EnrollmentTests(unittest.TestCase):
     def test_profile_flags_reject_missing_and_invalid_arguments(self):
         cases = [
             [flag]
-            for flag in ["--domain", "--git-name", "--git-email", "--pin", "--group", "--agents"]
+            for flag in ["--domain", "--git-name", "--git-email", "--tool", "--group", "--agents"]
         ]
         cases += [
             ["--domain", "unknown"],
-            ["--pin", "node"],
+            ["--tool", "node"],
             ["--group", "docker=maybe"],
             ["--repo", "example", "--adopt"],
         ]
@@ -726,7 +726,7 @@ class EnrollmentTests(unittest.TestCase):
     def test_noninteractive_partial_flags_still_name_remaining_gaps(self):
         self.seed_profile(installed=False)
         result = subprocess.run(
-            ["bash", str(ROOT / "install.sh"), "--domain", "personal", "--pin", "node=latest"],
+            ["bash", str(ROOT / "install.sh"), "--domain", "personal", "--tool", "node=latest"],
             env=self.env,
             cwd=self.home,
             stdin=subprocess.DEVNULL,
@@ -737,7 +737,7 @@ class EnrollmentTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("Git name is empty", result.stdout + result.stderr)
         self.assertIn("Git email is empty", result.stdout + result.stderr)
-        self.assertIn("node pin is floating", result.stdout + result.stderr)
+        self.assertIn("node tool version is floating", result.stdout + result.stderr)
         self.assertNotIn("Domain was never explicitly chosen", result.stdout)
 
     def test_terminal_profile_and_update(self):

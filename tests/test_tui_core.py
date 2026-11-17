@@ -44,7 +44,7 @@ class RuntimeTests(unittest.TestCase):
             "check",
             "update",
             "backups",
-            "rollback",
+            "backups restore",
             "machines",
             "configure",
         ):

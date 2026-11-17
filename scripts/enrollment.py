@@ -24,7 +24,7 @@ import agent_detection
 import scan_view
 import updates
 
-STEPS = ["source", "domain", "identity", "pins", "groups", "agents"]
+STEPS = ["source", "domain", "identity", "tools", "groups", "agents"]
 PRIVATE_NAMES = re.compile(
     r"(^|/)(?:\.secrets(?:\..*)?|\.env(?:\..*)?|\.netrc|\.npmrc|\.pypirc|credentials[^/]*|.*_history|.*\.(?:key|pem|secret)|id_(?:rsa|ed25519).*)$",
     re.I,
@@ -288,17 +288,17 @@ def identity(home, profile, args):
 def pins(home, profile, checkout):
     defaults = content_defaults(checkout).get("tools", {})
     tools = installed(home)
-    print("\n6. Tool pins\nA pin selects an exact tool version. No tools are installed here.")
-    print("Tool | Installed versions | Content default | Saved pin")
+    print("\n6. Tools\nSelect exact tool versions. No tools are installed here.")
+    print("Tool | Installed versions | Content default | Saved version")
     for tool in sorted(set(tools) | set(defaults) | set(profile.get("pins", {}))):
         print(
             f"{tool} | {versions(tools.get(tool, []))} | {human(defaults.get(tool))} | {human(profile.get('pins', {}).get(tool))}"
         )
     action = manager.ask(
-        "Pins",
+        "Tools",
         "accept",
         ["accept", "edit"],
-        detail="accept: keep saved pins and use installed versions for matching defaults.\nedit: enter TOOL=VERSION pairs, separated by commas. Type none to clear pins.\nPress Enter to submit.",
+        detail="accept: keep saved versions and use installed versions for matching defaults.\nedit: enter TOOL=VERSION pairs, separated by commas. Type none to clear selections.\nPress Enter to submit.",
     )
     if action == "edit":
         while True:
@@ -473,7 +473,7 @@ def gap_warnings(profile):
     if not profile.get("git_name") or not profile.get("git_email"):
         result.append("No complete git identity recorded. Git commits will fail until one is set.")
     for tool in profile.get("unpinned_tools", []):
-        result.append(f"{tool} is unpinned. Content defaults will not select it.")
+        result.append(f"{tool} has no selected version. Content defaults will not select it.")
     return result
 
 
@@ -490,7 +490,7 @@ def review(profile, account, warnings):
     details += [
         "confirm: back up files and apply these choices.",
         "quit: cancel planned file changes; earlier store moves stay in place.",
-        "source, domain, identity, pins, groups, agents: return to that step, then review again.",
+        "source, domain, identity, tools, groups, agents: return to that step, then review again.",
         "Type a word and press Enter. Enter alone quits.",
     ]
     return manager.ask(

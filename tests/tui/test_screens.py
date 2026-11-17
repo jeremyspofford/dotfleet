@@ -202,7 +202,6 @@ class ScreenTests(unittest.IsolatedAsyncioTestCase):
             async with app.run_test(size=(80, 24)) as pilot:
                 await self.settle(pilot, app)
                 for action in (
-                    "profile",
                     "domain",
                     "groups",
                     "pins",

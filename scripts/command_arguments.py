@@ -18,6 +18,8 @@ GROUPS = {
         "remove": "Remove a stale machine record.\nKeep the active machine.",
     },
     "backups": {
+        "restore": "List backups or restore one after typing restore to confirm.\n"
+        "Restore the saved profile too. Press Enter after each answer.",
         "delete": "Delete saved backups after typing delete to confirm.\n"
         "Deleted backups cannot be rolled back to.",
         "create": "Copy managed files and the profile into a new private backup.\n"
@@ -25,7 +27,7 @@ GROUPS = {
         "list": "List saved copies with their dates, results, sizes, and locations.",
     },
     "secrets": {"list": "List declared variable names as set or unset.\nNever print a value."},
-    "pins": {
+    "tools": {
         "list": "List recorded tool versions and whether they are installed.",
         "set": "Install and record an exact tool version.",
         "remove": "Remove a recorded version without uninstalling the tool.",
@@ -38,8 +40,6 @@ GROUPS = {
         "list": "List content domains and show the chosen domain.",
         "set": "Choose a domain and apply its content additions.",
     },
-    "content": {"show": "Show the content checkout, repository, commit, and local Git state."},
-    "profile": {"show": "Show saved machine choices and the profile file's location."},
     "addons": {"list": "List installed add-on records.\nNo add-ons ship with Fleet."},
 }
 
@@ -47,13 +47,11 @@ EXAMPLES = {
     "machines": "machines list; machines set-ssh --target mini-pc; machines set-ssh --name beelink --target mini-pc; machines export --output FILE; machines remove --name NAME",
     "domain": "domain list; domain set --name personal",
     "groups": "groups list; groups set --name docker --state off",
-    "pins": "pins list; pins set --tool node --version 24.14.1; pins remove --tool node",
-    "backups": "backups create; backups list; backups delete --name BACKUP; backups delete --keep 2; backups delete --all",
+    "tools": "tools list; tools set node --version 26.13.1; tools remove node",
+    "backups": "backups create; backups list; backups restore --backup BACKUP; backups delete --name BACKUP; backups delete --keep 2; backups delete --all",
     "secrets": "secrets list",
-    "content": "content show",
-    "profile": "profile show",
+    "content": "content",
     "addons": "addons list",
-    "rollback": "rollback --backup BACKUP",
     "topology": "topology; topology --json",
     "help": "help machines; machines set-ssh help",
 }
@@ -123,6 +121,8 @@ def add_action_parameters(parser, name, action):
             "--keep", type=int, help="keep the newest N backups; delete older ones; zero keeps none"
         )
         selectors.add_argument("--name", help="one folder name from backups list")
+    elif name == "backups" and action == "restore":
+        parser.add_argument("--backup", help="saved folder name or path; omit to list and choose")
     elif name == "machines":
         if action == "set-ssh":
             # Keep the specifically promised old registration syntax out of help.
@@ -143,8 +143,8 @@ def add_action_parameters(parser, name, action):
         parser.add_argument(
             "--state", required=True, choices=["on", "off"], help="include or remove content"
         )
-    elif name == "pins" and action in ("set", "remove"):
-        parser.add_argument("--tool", required=True, help="tool name, such as node")
+    elif name == "tools" and action in ("set", "remove"):
+        parser.add_argument("tool", help="tool name, such as node")
         if action == "set":
             parser.add_argument(
                 "--version", required=True, help="exact tool version, such as 24.14.1"
@@ -156,10 +156,6 @@ def add_parameters(parser, name):
         parser.add_argument(
             "--stat", action="store_true", help="show paths only; keep the same exit codes"
         )
-    elif name == "rollback":
-        parser.add_argument("legacy_backup", nargs="?", help=argparse.SUPPRESS)
-        parser.add_argument("--backup", help="saved folder name or path; omit to list and choose")
-        parser.add_argument("machine", nargs="?", help=argparse.SUPPRESS)
     elif name == "topology":
         parser.add_argument(
             "--json", action="store_true", help="print JSON, a structured format for scripts"
@@ -180,13 +176,26 @@ def normalize(args, parser):
                 if getattr(args, name) is not None:
                     parser.error("Do not combine a flagged value with its old positional form.")
                 setattr(args, name, value)
-    if args.command == "rollback" and args.legacy_backup is not None:
-        if args.backup is not None:
-            parser.error("Do not combine --backup with an old positional backup.")
-        args.backup = args.legacy_backup
-    if args.command == "pins" and args.action in ("set", "remove"):
+    if args.command == "tools" and args.action in ("set", "remove"):
         args.pin = args.tool + "@" + args.version if args.action == "set" else args.tool
     return args
+
+
+def successor(arguments):
+    path = arguments[1:] if arguments[:1] == ["help"] else arguments
+    if not path:
+        return None
+    renamed = {
+        "backup": "backups create",
+        "rollback": "backups restore",
+        "pins": "tools",
+        "profile": "status",
+    }
+    if path[0] in renamed:
+        return renamed[path[0]]
+    if path[:2] == ["content", "show"]:
+        return "content"
+    return None
 
 
 def help_arguments(arguments, commands):

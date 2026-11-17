@@ -32,7 +32,7 @@ class WizardTests(unittest.TestCase):
             (b"Domain [core]:", b"\n"),
             (b"Git author name [", b"Wizard Person\n"),
             (b"Git author email [", b"wizard@example.invalid\n"),
-            (b"Pins [accept]:", b"\n"),
+            (b"Tools [accept]:", b"\n"),
         ]
         if door != "adopt" and repo != os.environ["DOTFLEET_ARCHIVE_FIXTURE"]:
             result += [
@@ -141,7 +141,7 @@ class WizardTests(unittest.TestCase):
         answers += [
             (b"Git author name [Wizard Person]:", b"Changed Person\n"),
             (b"Git author email [wizard@example.invalid]:", b"\n"),
-            (b"Pins [accept]:", b"\n"),
+            (b"Tools [accept]:", b"\n"),
         ]
         answers += [
             (f"{name} [on]:".encode(), b"\n")
@@ -205,7 +205,7 @@ class WizardTests(unittest.TestCase):
             "docker=off",
             "--agents",
             "none",
-            "--pin",
+            "--tool",
             "node=24.14.1",
         ]
         output = command(*args, env=self.env, cwd=self.home)
@@ -258,7 +258,7 @@ class WizardTests(unittest.TestCase):
             (b"Domain [core]:", b"\n"),
             (b"Git author name [", b"Wizard Person\n"),
             (b"Git author email [", b"wizard@example.invalid\n"),
-            (b"Pins [accept]:", b"\n"),
+            (b"Tools [accept]:", b"\n"),
             (b"Review [quit]:", b"confirm\n"),
         ]
         self.terminal(answers, flags=[], auto_wizard=False)

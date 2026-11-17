@@ -73,7 +73,7 @@ class HelpScopeTests(unittest.TestCase):
         text = (ROOT / "README.md").read_text().lower()
         for definition in (
             "profile stores machine choices",
-            "pins select exact tool versions",
+            "tools use exact selected versions",
             "groups select optional files or alias blocks",
             "domain selects content additions",
             "drift means that managed files differ",

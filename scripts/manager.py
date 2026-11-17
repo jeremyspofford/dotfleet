@@ -4,7 +4,7 @@ Usage: bash install.sh [OPTIONS]
 Parameters: --repo selects content; --configure asks again; --defaults skips prompts only for complete profiles.
 --format chooses plain (real names) or chezmoi (native source names).
 --domain, --git-name, and --git-email record explicit profile choices.
---pin TOOL=VERSION records a full version; repeat it for multiple tools.
+--tool TOOL=VERSION records a full version; repeat it for multiple tools.
 --adopt seeds a local repository. --group NAME=on|off selects content. --agents selects coding assistants.
 -h/--help prints help.
 Example: bash install.sh --domain core --git-name Example --git-email example@example.invalid
@@ -303,7 +303,7 @@ def profile_gaps(profile):
             version = item.get("version", "") if isinstance(item, dict) else item
             if not exact_version(version):
                 gaps.append(
-                    f"{tool} pin is floating (recorded: {version}). Supply --pin {tool}=VERSION with a full version."
+                    f"{tool} tool version is floating (recorded: {version}). Supply --tool {tool}=VERSION with a full version."
                 )
     return gaps
 
@@ -325,7 +325,7 @@ def pin_argument(text):
         or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9:._@/-]*", tool)
         or not version.strip()
     ):
-        raise argparse.ArgumentTypeError("--pin needs TOOL=VERSION, for example node=24.14.1")
+        raise argparse.ArgumentTypeError("--tool needs TOOL=VERSION, for example node=24.14.1")
     return tool, version.strip()
 
 
@@ -389,12 +389,17 @@ def validate_profile(home, profile, defaults=False, configure=False, checkout=No
                 recorded = str(version)
                 installed = resolve_installed_pin(home, tool, recorded)
                 action = (
-                    f"uses installed {installed}"
-                    if installed
-                    else "leaves this tool unpinned; no matching version is installed"
+                    f"uses installed {installed}" if installed else "leaves this tool unselected"
                 )
-                label = f"{tool} pin"
-                detail = f"Recorded value: {recorded}.\nPress Enter: {action}.\nType a full version (for example 24.14.1), or skip to leave it unpinned. Press Enter to submit."
+                label = f"{tool} version"
+                detail = f"Recorded value: {recorded}.\n"
+                if not installed:
+                    detail += "For this tool, no matching version is installed.\n"
+                detail += (
+                    f"Press Enter: {action}.\n"
+                    "Type a full version (for example 24.14.1), or skip to leave this tool unselected.\n"
+                    "Press Enter to submit."
+                )
                 while True:
                     answer = ask(
                         label,
@@ -415,10 +420,10 @@ def validate_profile(home, profile, defaults=False, configure=False, checkout=No
                     print("Use a full version, such as 24.14.1, or type skip.")
                 if version is None:
                     warnings.append(
-                        f"{tool}: skipped floating pin {recorded}. No version was recorded for this entry."
+                        f"{tool}: skipped floating version {recorded}. No version was recorded for this entry."
                     )
                     continue
-                print(f"Recorded exact pin: {tool} = {version}")
+                print(f"Recorded exact version: {tool} = {version}")
             resolved.append(dict(item, version=version) if isinstance(item, dict) else version)
         if resolved:
             unpinned.discard(tool)
@@ -429,7 +434,7 @@ def validate_profile(home, profile, defaults=False, configure=False, checkout=No
     if unpinned or "unpinned_tools" in profile:
         profile["unpinned_tools"] = sorted(unpinned)
     for tool in sorted(unpinned):
-        warnings.append(f"{tool} is unpinned. Content defaults will not select it.")
+        warnings.append(f"{tool} has no selected version. Content defaults will not select it.")
     return warnings
 
 
@@ -988,12 +993,16 @@ def parse_arguments(argv):
         "--git-email", help="Git author email; required when missing without a terminal"
     )
     parser.add_argument(
-        "--pin",
+        "--tool",
+        dest="pin",
         action="append",
         type=pin_argument,
         default=[],
         metavar="TOOL=VERSION",
         help="record an exact version; repeat for more tools",
+    )
+    parser.add_argument(
+        "--pin", dest="pin", action="append", type=pin_argument, help=argparse.SUPPRESS
     )
     parser.add_argument(
         "--group",
@@ -1075,7 +1084,7 @@ def main(argv=None, edit=None, software=None, before_apply=None, manage_tui=Fals
                     "source": ["repo", "adopt"],
                     "domain": ["domain"],
                     "identity": ["git_name", "git_email"],
-                    "pins": ["pin"],
+                    "tools": ["pin"],
                     "groups": ["group"],
                     "agents": ["agents"],
                 }[choice]:

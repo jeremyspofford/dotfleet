@@ -19,6 +19,7 @@ Use Prettier, the JavaScript formatter, for release helpers.
 Use flags for optional parameters and for values that a reader can confuse with each other.
 Commands and action words stay positional. A positional argument is a value without a named flag.
 The single trailing machine in status, check, diff, doctor, and update is the subject. Keep that machine name positional.
+Tools set and remove take one tool name as their subject. Keep the version as a named flag.
 Use --name and --target for SSH registration. One flag supplies both values unless the other flag gives a different value.
 Help and examples show flags. Keep promised positional SSH-registration forms readable, but do not document them as the main interface.
 Command groups require explicit action verbs. A bare group prints its action list.
@@ -38,13 +39,13 @@ The command audit uses these forms:
 | machines export | --output |
 | domain list / set | set requires --name |
 | groups list / set | set requires --name and --state |
-| pins set | --tool, --version |
-| pins remove | --tool |
-| rollback | --backup; no flag lists backups |
+| tools set | TOOL, --version |
+| tools remove | TOOL |
+| backups restore | --backup; no flag lists backups |
 | status, check, diff, doctor, update | One optional machine subject; diff also has --stat |
 | topology | --json selects structured output |
-| profile show, content show | No value parameters |
-| machines list, backups list, secrets list, pins list, addons list | No value parameters |
+| content | No value parameters |
+| machines list, backups list, secrets list, tools list, addons list | No value parameters |
 | backups create, tui, configure, version, uninstall | No value parameters |
 | Installer and agent generator | Existing named flags |
 | Converter | --checkout, --output, --profile, --format |

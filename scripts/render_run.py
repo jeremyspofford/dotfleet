@@ -51,11 +51,14 @@ def wrap(text, indent="", continuation="    "):
     ) or [indent.rstrip()]
 
 
-def block(pairs, home):
+def block(pairs, home, inline_keys=()):
     width = min(max((len(key) for key, _ in pairs), default=0), 28)
     lines = []
     for key, value in pairs:
         text = human(value, home)
+        if key in inline_keys:
+            lines += wrap(key + " — " + text, "  ")
+            continue
         prefix = "  " + key.ljust(width) + "  "
         if len(key) <= width and len(prefix + text) <= WIDTH:
             lines.append(prefix + text)
@@ -78,6 +81,7 @@ def change_marker(line):
 
 def profile_key(name):
     labels = {
+        "pins": "Tools",
         "git_name": "Git name",
         "git_email": "Git email",
         "domain": "Domain",
@@ -86,10 +90,10 @@ def profile_key(name):
         "format": "Content format",
     }
     for prefix, label in [
-        ("pins.", "Pin"),
+        ("pins.", "Tool"),
         ("groups.", "Group"),
         ("agents.", "Agent"),
-        ("defaults.", "Content pin"),
+        ("defaults.", "Content tool version"),
     ]:
         if name.startswith(prefix):
             return label + " " + name[len(prefix) :]
@@ -333,10 +337,10 @@ def render(record, future=False):
     return "\n".join(lines) + "\n"
 
 
-def render_view(title, pairs, home=""):
+def render_view(title, pairs, home="", inline_keys=()):
     """Use the same width, path, and column rules for read-only command results."""
     pairs = [(key, value) for key, value in pairs if value is not None and value != ""]
-    return "\n".join([section(title), *block(pairs, home)]) + "\n"
+    return "\n".join([section(title), *block(pairs, home, inline_keys)]) + "\n"
 
 
 def render_entities(title, entities, home="", empty="None recorded."):

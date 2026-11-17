@@ -106,9 +106,9 @@ class CommandSurfaceTests(unittest.TestCase):
             (
                 "pin-set",
                 {"tool": "node", "version": "24.14.1"},
-                ["pins", "set", "--tool", "node", "--version", "24.14.1"],
+                ["tools", "set", "node", "--version", "24.14.1"],
             ),
-            ("pin-remove", {"tool": "python"}, ["pins", "remove", "--tool", "python"]),
+            ("pin-remove", {"tool": "python"}, ["tools", "remove", "python"]),
             ("machine-export", {"output": ""}, ["machines", "export"]),
             (
                 "machine-export",
@@ -144,11 +144,9 @@ class CommandSurfaceTests(unittest.TestCase):
     def test_every_primary_command_output_has_a_golden(self):
         # Mutations snapshot their completed reviews; screens and the wizard also test their input views.
         expected = {
-            "help": "views/help.txt",
             "topology": "topology.txt",
             "tui": "tui/dashboard-80x24.txt",
             "check": "views/check.txt",
-            "profile": "views/profile.txt",
             "backups": "views/backups.txt",
             "secrets": "views/secrets.txt",
             "content": "views/content.txt",
@@ -157,10 +155,9 @@ class CommandSurfaceTests(unittest.TestCase):
             "update": "views/update review.txt",
             "status": "views/status.txt",
             "diff": "views/diff changed.txt",
-            "rollback": "views/rollback review.txt",
             "domain": "views/domain.txt",
             "groups": "views/groups.txt",
-            "pins": "views/pins.txt",
+            "tools": "views/tools.txt",
             "configure": "views/configure review.txt",
             "doctor": "views/doctor.txt",
             "version": "views/version.txt",
@@ -180,12 +177,20 @@ class CommandSurfaceTests(unittest.TestCase):
                 break
             reachable = expanded
         self.assertEqual(reachable, set(ACTIONS))
-        commands = {ACTIONS[action][1][0] for action in reachable}
-        self.assertEqual(commands, set(command.DESCRIPTIONS))
+        import argparse
+
+        parser = command.parser()
+        subcommands = next(
+            action for action in parser._actions if isinstance(action, argparse._SubParsersAction)
+        ).choices
+        commands = {ACTIONS[action][1][0] for action in reachable} - {"help"}
+        self.assertEqual(commands, set(subcommands))
         expected = {
             (name, action)
-            for name, actions in command_arguments.GROUPS.items()
-            for action in actions
+            for name, child in subcommands.items()
+            for subparser in child._actions
+            if isinstance(subparser, argparse._SubParsersAction)
+            for action in subparser.choices
         }
         available = {
             tuple(args[:2]) for _, args in ACTIONS.values() if args[0] in command_arguments.GROUPS

@@ -10,7 +10,7 @@
   ~ ~/.config/mise/config.toml
 
 4 · Profile changes — 1 changed.
-  Pin node  not set → 24.14.1
+  Tool node  not set → 24.14.1
 
 5 · Locations
   Content  ~/dotfiles

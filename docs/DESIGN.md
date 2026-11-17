@@ -33,7 +33,7 @@ New connection records may have no machine facts yet. Record refreshes preserve 
 
 `last_run` uses UTC time in ISO format. UTC is the common time reference; ISO format stores an unambiguous date and time.
 Paths remain absolute. `home` records the machine's home path so reports can print its saved paths with `~`.
-The registry does not store identity, pins, or credentials.
+The registry does not store identity, tools, or credentials.
 Use unique hostnames when combining records manually.
 
 Example record; the values below describe an illustrative machine:
@@ -115,7 +115,7 @@ Use the existing manager path for changes. One renderer prints plans and complet
 The renderer shows readable paths and commit identifiers; machine records retain full values.
 
 The terminal interface uses Textual in `~/.local/share/fleet/tui-venv`, a manager-owned virtual environment with separate Python packages.
-The installer and update maintain it after review and backup. Pinned requirements define its contents; Software records each change.
+The installer and update maintain it after review and backup. Exact requirements define its contents; Software records each change.
 The plain command core uses only the standard library. Missing interface packages never prevent plain commands.
 
 Interface actions run the existing command dispatcher in a separate process. This isolates terminal input, environment variables, and Python output streams.

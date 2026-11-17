@@ -27,7 +27,7 @@ class OwnedViewTests(unittest.TestCase):
         profile = self.home / ".config/fleet/profile.toml"
         before = profile.read_bytes()
         backups = sorted((self.home / "fleet-backups").iterdir())
-        output = self.cli("profile", "show")
+        output = self.cli("status")
         for value in [
             "core",
             "chosen",
@@ -38,13 +38,13 @@ class OwnedViewTests(unittest.TestCase):
             self.assertIn(value, output)
         self.assertIn("SUCCESS", self.cli("backups", "list"))
         self.assertIn("bytes", self.cli("backups", "list"))
-        self.assertIn("clean", self.cli("content", "show"))
-        self.assertIn("0 behind", self.cli("content", "show"))
-        self.assertIn("~/dotfiles", self.cli("content", "show"))
+        self.assertIn("clean", self.cli("content"))
+        self.assertIn("0 behind", self.cli("content"))
+        self.assertIn("~/dotfiles", self.cli("content"))
         self.assertIn("this machine", self.cli("machines", "export"))
         self.assertEqual(profile.read_bytes(), before)
         self.assertEqual(sorted((self.home / "fleet-backups").iterdir()), backups)
-        for name in ["profile", "backups", "content", "secrets"]:
+        for name in ["status", "backups", "content", "secrets"]:
             self.assertIn("Usage:", self.cli(name, "--help"))
 
     def test_secrets_never_print_values_or_execute_assignments(self):
