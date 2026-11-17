@@ -5,10 +5,9 @@ Help: python3 scripts/preview_diff.py --help.
 Direct execution without help keeps its existing behavior.
 """
 
-from common import atomic, read_toml, run, toml
+from common import atomic, run, toml
 from convert import source_name
 from installation import COMMAND, launcher
-import agent_configs
 
 
 def patches(home, profile, plan, folder, root):
@@ -22,22 +21,20 @@ def patches(home, profile, plan, folder, root):
     }
     if plan["native"]:
         payloads.update(plan["generated"])
-    manifest = read_toml(root / "agents/manifest.toml")
-    for agent in manifest["agents"].values():
-        name = agent.get("config_paths", {}).get(agent_configs.native_os())
-        if name in plan["agents"]:
-            payloads[name] = agent["content"]
+    agents = plan["agents"].payloads(home)
     extra_names = set()
     for name in sorted(plan["changed"] | plan["removed"]):
         if name.startswith(".local/state/dotfleet/"):
             continue  # Inventories describe writes; they are not rendered settings.
         target = extra / source_name(name, "100755" if name == COMMAND else "100644")
-        if name in plan["stale"]:
+        if name in plan["stale"] or (name in agents and agents[name] is None):
             target = target.with_name("remove_" + target.name)
             atomic(target, "")
-        elif name in plan["agents"] and "link" in plan["agents"][name]:
+        elif isinstance(agents.get(name), tuple):
             target = extra / source_name(name, "120000")
-            atomic(target, plan["agents"][name]["link"])
+            atomic(target, agents[name][1])
+        elif name in agents:
+            atomic(target, agents[name])
         elif name in payloads:
             atomic(target, payloads[name])
         else:

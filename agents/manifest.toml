@@ -26,6 +26,9 @@ wsl = ".claude/skills"
 
 [agents.codex]
 render = true
+# Codex accepts no pointer. Fleet writes owned entries in these shared files.
+mcp_file = ".codex/config.toml"
+hooks_file = ".codex/hooks.json"
 command = "codex"
 mise_packages = ["codex", "@openai/codex"]
 format = "toml"
@@ -86,6 +89,7 @@ wsl = ".grok/skills"
 
 [agents.pi]
 render = true
+mcp_file = ".pi/agent/mcp.json"
 command = "pi"
 mise_packages = ["pi", "pi-coding-agent", "@mariozechner/pi-coding-agent", "@earendil-works/pi-coding-agent"]
 format = "json"
@@ -105,6 +109,7 @@ wsl = ".pi/agent/skills"
 
 [agents.opencode]
 render = true
+mcp_file = ".config/opencode/opencode.json"
 command = "opencode"
 mise_packages = ["opencode", "opencode-ai"]
 format = "json"

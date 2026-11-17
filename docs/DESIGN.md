@@ -206,3 +206,16 @@ Read-only commands never create entries. Queries can refresh their existing fixe
 Cancellation preserves managed files and keeps a small cancellation entry. Earlier store moves remain recorded separately.
 The Logs screen and commands read the same index. Applied attempts use the existing review renderer.
 See [RUNS.md](RUNS.md) for storage, cleanup, and diagnostic limits.
+
+## Deploy agent configuration through one tree
+
+The agents table in content declares agent configuration. The catalog in the manager names native paths. The profile saves this machine's choices.
+Fleet renders one payload per machine into `~/.local/share/fleet/agents`, a Fleet-owned tree.
+Updates change the tree. Each agent gets one pointer to it, set once. See [agent configuration](AGENTS.md).
+Agents that accept no pointer receive owned entries in their shared settings files.
+
+The foundation is the tracked content that Fleet installs. Updates and diffs apply only there.
+Skills are ordinary content at `~/.agents/skills`. Whole instruction files stay ordinary content.
+The inventory at `~/.local/state/dotfleet/agents.json` lists every owned path and entry. Schema 2 replaced the earlier flat record.
+Fleet compares only keys that it wrote. A conflict stops the run before backup; unattended runs never choose overwrite.
+Stale outputs that still match their record leave. Changed stale outputs stay, with one report line. Turning an agent off keeps its outputs.

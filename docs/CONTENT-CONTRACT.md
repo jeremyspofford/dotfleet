@@ -104,7 +104,9 @@ An unknown agent name prints a warning and is skipped. Content can name an agent
 A domain must be one that the content declares.
 
 Skills are ordinary content. Each folder under `.agents/skills/` that holds `SKILL.md` is one skill.
+chezmoi installs skills at `~/.agents/skills`, as it installs other content.
 A skill entry accepts `domains` only. It needs a tracked `.agents/skills/NAME/SKILL.md`.
+A machine omits a skill when its domain is not listed. Plain content only; native chezmoi content installs every skill.
 
 A rule set's `file` and a hook's `command` name files that Git tracks, relative to the repository root.
 Absolute paths and parent traversal fail. A hook command must be executable in Git, mode 100755.
@@ -140,6 +142,9 @@ Native chezmoi content must leave reserved paths unmanaged. Other native outputs
 Fleet also owns `~/.config/chezmoi/chezmoi.toml`. Content config templates never write that file.
 After writing it, Fleet updates chezmoi's saved template checksum, an identifier for template contents.
 Without a template, it removes the obsolete checksum. It preserves file history and script history.
+
+Fleet owns the agent tree, `~/.local/share/fleet/agents`, and each agent pointer that it records. See [agent configuration](AGENTS.md).
+Content cannot manage an agent pointer or a settings file where Fleet writes owned entries. That overlap stops the run before any write.
 
 The local Git file holds profile identity and retains other existing local settings.
 The domain file contains one domain name. Shell code reads it at startup.

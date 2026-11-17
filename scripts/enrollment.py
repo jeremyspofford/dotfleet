@@ -463,8 +463,9 @@ def choose_agents(home, profile):
                 "on" if selections.get(name, False) else "off",
                 ["on", "off"],
                 heading="Agent: " + name,
-                detail="on: generate settings and skill links. off: skip configuration.\n"
-                "Existing unmanaged settings stop setup before writes.\n"
+                detail="on: render the content's agent configuration for this agent.\n"
+                "off: write nothing new for it; earlier outputs stay.\n"
+                "A value that Fleet did not write stops setup before writes.\n"
                 "Press Enter to keep the shown choice.",
             )
             == "on"

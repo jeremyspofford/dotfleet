@@ -11,9 +11,9 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-import agent_configs
 import agent_detection
 import enrollment
+from test_manager import command
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -77,21 +77,28 @@ class AgentDetectionTests(unittest.TestCase):
         )
         self.assertNotIn("commas", output.getvalue())
 
-    def test_mise_only_agent_generates_settings_without_path_command(self):
+    def test_mise_only_agent_is_detected_and_rendered_without_path_command(self):
+        import agent_deploy
+        import agent_table
+
         with tempfile.TemporaryDirectory() as folder:
             home = Path(folder)
+            checkout = home / "dotfiles"
+            checkout.mkdir()
+            command("git", "init", "-q", str(checkout))
             tools = {"gemini-cli": [{"version": "1.0.0"}]}
+            catalog = enrollment.agent_manifest()
             with (
                 patch.object(agent_detection, "inventory", return_value=tools),
                 patch.object(agent_detection.shutil, "which", return_value=None),
-                contextlib.redirect_stdout(io.StringIO()),
             ):
-                planned = agent_configs.generate(
-                    home, "linux", True, profile={"agents": {"gemini": True}}
+                table = agent_table.load(checkout, {}, catalog)
+                result = agent_deploy.plan(
+                    home, checkout, {"agents": {"gemini": True}}, table, catalog
                 )
-                self.assertIn(".gemini/settings.json", planned)
-                agent_configs.generate(home, "linux", False, profile={"agents": {"gemini": True}})
-            self.assertEqual((home / ".gemini/settings.json").read_text(), "{}\n")
+                agent_deploy.apply(home, result)
+            self.assertTrue((home / ".gemini/extensions/fleet").is_symlink())
+            self.assertFalse((home / ".gemini/settings.json").exists())
 
 
 def usage():

@@ -192,7 +192,8 @@ Restore the saved profile too. Keep the backup and rerun setup when you want to 
 
 ## Agents, add-ons, and releases
 
-An agent is a coding assistant. The optional [agent generator](docs/AGENTS.md) writes settings and links content skills; it installs no agents.
+An agent is a coding assistant. The content's agents table declares skills, rules, servers, connectors, and hooks; see [agent configuration](docs/AGENTS.md).
+Fleet deploys them through one Fleet-owned tree and one pointer per agent. It installs and starts no agent.
 The [add-on contract](docs/ADDON-INTERFACE.md) remains a proposal. The enrollment wizard uses terminal prompts. The terminal interface uses the same command cores. No add-on runtime, custom sync engine, or daemon exists here.
 `VERSION` starts at 0.1.0. Release automation stays in 0.x; only the owner can approve a manual 1.0.0 release.
 Read [release rules](docs/RELEASES.md) and [writing rules](docs/WRITING.md).

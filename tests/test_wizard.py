@@ -242,19 +242,45 @@ class WizardTests(unittest.TestCase):
         self.assertIn("Preparing Mise", output)
         self.assertEqual(self.snapshot(), before)
 
-    def test_agent_selection_generates_reviewed_settings_and_skill_links(self):
+    def test_agent_selection_renders_reviewed_entries_and_content_skills(self):
+        content = self.base / "agents-content"
+        command("git", "clone", "-q", os.environ["DOTFLEET_CONTENT_FIXTURE"], str(content))
+        manifest = manifest_path(content)
+        manifest.write_text(
+            manifest.read_text()
+            + '\n[agents]\nschema = 1\n[agents.mcp.docs]\ndescription = "Search docs."\n'
+            + 'transport = "stdio"\ncommand = "npx"\n'
+        )
+        skill = content / ".agents/skills/review-change/SKILL.md"
+        skill.parent.mkdir(parents=True)
+        skill.write_text("---\nname: review-change\ndescription: Review.\n---\n")
+        command("git", "-C", str(content), "add", ".")
+        command(
+            "git",
+            "-C",
+            str(content),
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "-q",
+            "-m",
+            "feat: agents",
+        )
         bin_dir = self.home / ".local/bin"
         bin_dir.mkdir(parents=True)
         executable = bin_dir / "opencode"
         executable.write_text("#!/bin/sh\nexit 0\n")
         executable.chmod(0o755)
         self.env["PATH"] = str(bin_dir) + ":" + self.env["PATH"]
-        answers = self.answers("repo", os.environ["DOTFLEET_CONTENT_FIXTURE"])
+        answers = self.answers("repo", content)
         answers.insert(-1, (b"opencode [off]:", b"on\n"))
         output = self.terminal(answers, flags=[], auto_wizard=False)
         self.assertIn(".config/opencode/opencode.json", output)
-        self.assertEqual(json.loads((self.home / ".config/opencode/opencode.json").read_text()), {})
-        self.assertTrue((self.home / ".config/opencode/skills/review-change").is_symlink())
+        settings = json.loads((self.home / ".config/opencode/opencode.json").read_text())
+        self.assertIn("mcp", settings)
+        self.assertTrue((self.home / ".agents/skills/review-change/SKILL.md").is_file())
         backup = next((self.home / "fleet-backups").iterdir())
         inventory = json.loads((backup / "MANIFEST.json").read_text())
         self.assertIn(".config/opencode/opencode.json", {item["path"] for item in inventory})
