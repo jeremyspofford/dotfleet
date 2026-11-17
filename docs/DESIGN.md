@@ -87,7 +87,7 @@ Local commits stay intact when the remote adds nothing. Adopted content without 
 Check quietly fetches each source with a ten-second limit.
 Update first refreshes that comparison and reads local drift. Current sources without drift stop before backup or review. A small run-index entry records the attempt.
 A failed check stops without applying files. Behind sources or drift proceed through the existing installer path.
-Update records manager update, content update, and drift repair as its triggers. Both review views use those recorded reasons.
+Update records manager update, content update, drift repair, and profile change as its triggers. Both review views use those recorded reasons.
 The terminal interface and remote targets call this same update core. Installer enrollment and repair keep their existing behavior.
 Neither substitutes the remote's default branch for the selected upstream. New commits after a check can change the next update's result.
 
@@ -140,7 +140,11 @@ SSH runs the target's installed command. The target owns execution, profile vali
 The local manager validates status, check, diff, doctor, or update before starting SSH. Both ends validate the request.
 A fixed remote shell command starts the receiver. User arguments never enter that command.
 A versioned JSON request travels through standard input. JSON is a structured transfer format; it is never printed to the terminal.
-Requests contain one action and a boolean option for diff paths. The old status-check field must remain false. They cannot name a profile, path, executable, or another target.
+Version 1 requests contain one action and a boolean option for diff paths. The old status-check field must remain false.
+Version 2 requests carry one profile choice: domain, groups, agents, or tools, with named values that both ends validate.
+No request can name a profile file, path, executable, or another target.
+A profile request saves the target's profile only. The target's manager is its only writer.
+The update gate compares the profile with the one that the last apply recorded. A difference triggers a profile change update.
 
 Before dispatch, a fixed probe checks for the installed command. Missing commands and remote exit 127 receive the same installation guidance.
 Each SSH call uses batch mode, no terminal, one connection attempt, and a ten-second connection timeout.
@@ -148,6 +152,7 @@ Keepalive checks stop a dead connection. Live updates have no artificial time li
 The target disables terminal decisions and Git password prompts. Update passes --defaults to the existing installer.
 Incomplete profiles fail before action dispatch. Unattended file conflicts fail without overwriting local edits.
 Configure, rollback, and uninstall remain local-only. There is no persistent network listener, remote file editing, or cross-machine profile transfer.
+The wizard stays local. Remote profile choices travel as validated values, never as files.
 
 The target's shared renderer supplies human output. The caller adds the machine name and result, without recording a local install run.
 Target shell errors never reach the terminal interface or CLI. CLI means the plain command interface.

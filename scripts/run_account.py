@@ -134,7 +134,7 @@ class RunAccount:
         self.agent_steps = []
         self.update_triggers = json.loads(os.environ.get("FLEET_UPDATE_TRIGGERS", "[]"))
         if not isinstance(self.update_triggers, list) or any(
-            trigger not in ("manager update", "content update", "drift repair")
+            trigger not in ("manager update", "content update", "drift repair", "profile change")
             for trigger in self.update_triggers
         ):
             raise ValueError("Invalid update reasons. Run update again.")

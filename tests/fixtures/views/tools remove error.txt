@@ -1,5 +1,5 @@
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   fleet tools remove
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Usage: fleet tools remove [-h] tool
-Error: Does not accept --version 26.3.1; accepts TOOL, --help.
+Usage: fleet tools remove [-h] [--machine MACHINE] tool
+Error: Does not accept --version 26.3.1; accepts TOOL, --help, --machine.

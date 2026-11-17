@@ -408,7 +408,8 @@ When both sources are current and no drift exists, update prints:
 Fleet is up to date — manager and content match upstream, checked just now. No backup taken.
 ```
 
-Otherwise, the review names the trigger: manager update, content update, drift repair, or their combination.
+Otherwise, the review names the trigger: manager update, content update, drift repair, profile change, or their combination.
+A profile change is a saved choice that no update has applied yet, such as a remote domain assignment.
 Existing conflict rules still apply. Local edits require a terminal decision; unattended conflicts stop safely.
 The same gate applies to terminal-interface and remote updates. The one-line installer still handles enrollment and repair.
 
@@ -518,6 +519,19 @@ SSH keeps your host checks and never forwards your authentication agent or extra
 Target runs never prompt. Incomplete profiles name the missing choices and stop; file conflicts stop without choosing overwrite.
 Configure requires a terminal on the target. Remote rollback and uninstall are refused because they are destructive.
 Run those commands on the target itself.
+
+Profile choices also run on a registered machine. Add `--machine NAME` to `domain`, `groups`, `agents`, or `tools` list and set actions, and to `tools remove`:
+
+```sh
+fleet domain set --name work --machine mini-pc
+fleet update mini-pc
+```
+
+1. The target validates the choice against its own content and saves its own profile, with a backup and run record.
+2. The target's next update applies the saved choice. Its review names the reason: profile change.
+
+The target's manager is the only writer of its profile. `tools set` also installs that exact version on the target through Mise.
+An invalid or undeclared value fails on the target with exit 2; nothing is saved.
 
 The target renders results under its machine header. Updates that change files write RUN.json in its backup folder, using the local run renderer.
 The caller creates no backup or install run record for remote execution. It saves the contact's outcome and time locally.

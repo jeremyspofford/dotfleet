@@ -209,6 +209,12 @@ def parser():
                 "\nAdd MACHINE to use one registered machine and its own saved choices."
                 "\nRemote runs never prompt; connection failures exit nonzero."
             )
+        elif name in remote.PROFILE_ACTIONS:
+            detail += (
+                "\nSSH securely connects to another machine."
+                "\nAdd --machine NAME to list or save a choice on one registered machine."
+                "\nThat machine saves the choice; its next update applies it."
+            )
         elif name in remote.REASONS:
             detail += "\nRemote use is refused: " + remote.REASONS[name] + "."
         epilog = command_arguments.help_epilog(name, display)
@@ -514,6 +520,12 @@ def update(home):
     triggers = [source["name"] + " update" for source in checked["sources"] if source["behind"]]
     if drift:
         triggers.append("drift repair")
+    from run_account import RECORD
+
+    # A remote choice saves the profile only. The last apply recorded the profile it used.
+    applied = load_json(home / RECORD, {}).get("profile_sha256")
+    if applied and applied != profile_digest(home):
+        triggers.append("profile change")
     if not triggers:
         run_index.outcome("NO_CHANGE")
         print(updates.CURRENT_MESSAGE)
@@ -913,6 +925,8 @@ def main(argv=None):
         return 0
     if args.command == "version":
         return read_view(args, home, {})
+    if getattr(args, "machine", None) and args.command in remote.PROFILE_ACTIONS:
+        return remote_profile(home, args)
     if getattr(args, "machine", None):
         return remote.execute(
             home,
@@ -944,6 +958,91 @@ def main(argv=None):
         label = args.command + (" " + args.action if getattr(args, "action", None) else "")
         return run_index.run(home, label, lambda: dispatch(args, argument_parser, home))
     return dispatch(args, argument_parser, home)
+
+
+def remote_profile(home, args):
+    """Send one profile choice to a registered machine. Its manager validates and saves it."""
+    names = remote.PROFILE_ACTIONS[args.command][args.action]
+    values = {"tool": getattr(args, "tool", None), "version": getattr(args, "version", None)}
+    values.update(name=getattr(args, "name", None), state=getattr(args, "state", None))
+    try:
+        request = remote.profile_request(
+            args.command, args.action, {key: values[key] for key in names}
+        )
+    except ValueError as error:
+        print("Error: " + str(error), file=sys.stderr)
+        return 2
+    return remote.execute(home, args.machine, args.command + " " + args.action, request=request)
+
+
+def save_remote_choice(home, request):
+    """Save one choice in this machine's profile without applying it.
+
+    The update gate sees the saved change and applies it on the next update.
+    """
+    import copy
+
+    from convert import require_domain
+
+    saved = profile(home)
+    display = command_name(saved)
+    command, action, values = request["command"], request["action"], request["arguments"]
+    changed = copy.deepcopy(saved)
+    manifest = content_manifest(home / "dotfiles")
+    if command == "domain":
+        require_domain(manifest, values["name"], display)
+        changed.update(domain=values["name"], domain_chosen=True)
+    elif command == "groups":
+        if values["name"] not in manifest.get("groups", {}):
+            raise ValueError(f"Unknown group {values['name']}. Run {display} groups list.")
+        changed.setdefault("groups", {})[values["name"]] = values["state"] == "on"
+    elif command == "agents":
+        name, state = values["name"], values["state"]
+        if name not in agent_items(home):
+            raise ValueError(f"Unknown agent item {name}. Run {display} agents list.")
+        if name.startswith("skills.") and state == "local":
+            raise ValueError("Skills are content files; choose on or off for a skill.")
+        exceptions = changed.setdefault("agent_items", {})
+        if state == "on":
+            exceptions.pop(name, None)
+        else:
+            exceptions[name] = state
+        if not exceptions:
+            changed.pop("agent_items")
+    elif action == "set":
+        tool, version = values["tool"], values["version"]
+        if not manager.exact_version(version):
+            raise ValueError("tools set needs an exact version, such as 24.14.1.")
+        installed = enrollment.installed(home).get(tool, [])
+        if not any(item.get("version") == version for item in installed):
+            # Installing software is not an apply; the next update selects the version.
+            run("mise", "install", tool + "@" + version)
+        changed.setdefault("pins", {})[tool] = version
+        unpinned = set(changed.get("unpinned_tools", [])) - {tool}
+        if unpinned or "unpinned_tools" in changed:
+            changed["unpinned_tools"] = sorted(unpinned)
+    else:
+        changed.setdefault("pins", {}).pop(values["tool"], None)
+        changed["unpinned_tools"] = sorted(
+            set(changed.get("unpinned_tools", [])) | {values["tool"]}
+        )
+    if changed == saved:
+        print("No change. The profile already holds this choice.")
+        return 0
+    with tempfile.TemporaryDirectory(prefix="dotfleet-profile-") as folder:
+        source = Path(folder) / "profile.toml"
+        atomic(source, toml(changed))
+        result = transaction(home, [(PROFILE, source)], "Save the profile choice.")
+    if result == 0:
+        print(f"Saved. The next update applies this change: run {display} update.")
+    return result
+
+
+def profile_digest(home):
+    import hashlib
+
+    path = home / PROFILE
+    return hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else ""
 
 
 def changes_state(args):

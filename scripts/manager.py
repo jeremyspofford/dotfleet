@@ -943,7 +943,9 @@ def apply_confirmed_plan(
 
     publish(home, ROOT, backup_path)
     account.applied_checkouts.add("Manager")
-    atomic(home / RECORD, json.dumps({"manager_commit": account.checkouts[0]["new"]}) + "\n")
+    previous = json.loads((home / RECORD).read_text()) if (home / RECORD).is_file() else {}
+    previous["manager_commit"] = account.checkouts[0]["new"]
+    atomic(home / RECORD, json.dumps(previous) + "\n")
     account.applied_software.add("dotfleet")
     account.save()
     if any(item["name"] == tui_environment.NAME for item in account.software):
@@ -997,6 +999,12 @@ def apply_confirmed_plan(
     status = run("chezmoi", "status")
     if status.strip():
         raise ValueError("Managed files still differ:\n" + status)
+    # Record the applied profile. A later saved-only change then triggers an update.
+    record = json.loads((home / RECORD).read_text())
+    record["profile_sha256"] = hashlib.sha256(
+        (home / ".config/fleet/profile.toml").read_bytes()
+    ).hexdigest()
+    atomic(home / RECORD, json.dumps(record) + "\n")
     names = plan["names"] | set(plan["generated"])
     atomic(
         home / ".local/state/dotfleet/outputs.json",
