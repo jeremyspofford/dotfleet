@@ -161,6 +161,14 @@ class DeployTests(Fixture):
         self.assertIn("codex: sign in to calendar: run codex mcp login calendar", result.steps)
         self.assertIn("codex: trust new or changed Fleet hooks in /hooks.", result.steps)
 
+    def test_steps_print_in_the_run_that_first_renders_their_item(self):
+        first = self.run_plan()
+        self.assertIn("codex: sign in to calendar: run codex mcp login calendar", first.steps)
+        self.assertIn("codex: trust new or changed Fleet hooks in /hooks.", first.steps)
+        self.assertEqual(self.run_plan().steps, [])
+        changed = self.run_plan(MANIFEST.replace("timeout = 10", "timeout = 20"))
+        self.assertEqual(changed.steps, ["codex: trust new or changed Fleet hooks in /hooks."])
+
     def test_shared_files_keep_other_values_comments_and_agent_added_keys(self):
         config = self.home / ".codex/config.toml"
         config.parent.mkdir()
@@ -200,7 +208,7 @@ class DeployTests(Fixture):
         )
         with self.assertRaises(ValueError) as caught:
             agent_deploy.require_no_conflicts(result)
-        self.assertIn("Move each existing value aside", str(caught.exception))
+        self.assertIn("agents set --name ITEM --state local", str(caught.exception))
         rendered = agent_deploy.server("pi", tomllib.loads(MANIFEST)["agents"]["mcp"]["docs"])
         settings.write_text(json.dumps({"mcpServers": {"docs": dict(rendered, disabled=True)}}))
         result = self.plan()

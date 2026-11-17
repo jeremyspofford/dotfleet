@@ -1,0 +1,26 @@
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Agents
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+mcp.docs
+  Kind     MCP server
+  Adds     Search the documentation.
+  Agents   every selected agent that supports it
+  Domains  every domain
+  State    local value on this machine
+
+mcp.issues
+  Kind     MCP server
+  Adds     Read work issues.
+  Agents   every selected agent that supports it
+  Domains  work
+  State    not in domain personal
+
+skills.notes
+  Kind     Skill
+  Adds     Skill folder .agents/skills/notes
+  Agents   every selected agent that supports it
+  Domains  every domain
+  State    on
+
+Change: fleet agents set --name ITEM --state on, off, or local

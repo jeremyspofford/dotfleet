@@ -201,6 +201,7 @@ class Plan:
     plugin_installs: list = field(default_factory=list)
     plugin_removals: list = field(default_factory=list)
     released_plugins: list = field(default_factory=list)
+    reported: list = field(default_factory=list)
 
     def changed_paths(self, home):
         """Home-relative paths that apply would create, replace, or remove."""
@@ -869,7 +870,15 @@ def plan(home, checkout, profile, table, catalog, managed=frozenset()):
         if outcome is not None:
             after = {"sha256": hashlib.sha256(outcome[0].encode()).hexdigest(), "mode": outcome[1]}
             result.files[relative] = (fingerprint(home / relative), after, outcome[0])
-    result.steps = list(dict.fromkeys(result.steps))
+    # Print a step in the run that first renders its item. Hook trust follows each hook change.
+    hooks_file = catalog.get("codex", {}).get("hooks_file")
+    trust = [step for step in result.steps if step.startswith("codex: trust")]
+    others = list(dict.fromkeys(step for step in result.steps if step not in trust))
+    reported = set(inventory.get("reported", []))
+    result.reported = others
+    result.steps = [step for step in others if step not in reported]
+    if trust and hooks_file in result.files:
+        result.steps.append(trust[0])
     result.notes = list(dict.fromkeys(result.notes))
     return result
 
@@ -987,12 +996,41 @@ def apply_plugins(home, result, catalog, inventory, account=None):
             account.applied_software.add(plugin_software(Plan(plugin_installs=[record]))[0]["name"])
 
 
+def drift(home, profile):
+    """List recorded outputs and entries that differ from their records or are missing.
+
+    Read local files only. Outputs of agents that are off stay recorded but never count.
+    """
+    inventory = load_inventory(home)
+    off = {name for name, enabled in profile.get("agents", {}).items() if not enabled}
+    lines = []
+    for relative, record in sorted(inventory.get("paths", {}).items()):
+        if record.get("item") == "legacy" or record.get("agent") in off:
+            continue
+        if not matches(home / relative, record["fingerprint"]):
+            lines.append(f"~/{relative}")
+    for item in inventory.get("entries", []):
+        entry = entry_from(item)
+        if entry.agent in off:
+            continue
+        try:
+            _, data = read_shared(home, entry.file, entry.format)
+        except ValueError:
+            lines.append(f"~/{entry.file} cannot be read")
+            continue
+        found, current = owned(lookup(data, entry.container) or {}, entry)
+        if not found or not same(current, entry.value):
+            lines.append(f"{entry.agent} {entry.item} in ~/{entry.file}")
+    return lines
+
+
 def require_no_conflicts(result, display="fleet"):
     if result.conflicts:
         raise ValueError(
             "Agent outputs conflict with existing values. Nothing was written:\n- "
             + "\n- ".join(result.conflicts)
-            + "\nMove each existing value aside, then run the update again."
+            + f"\nKeep a value with {display} agents set --name ITEM --state local,"
+            + " or move it aside. Then run the update again."
         )
 
 
@@ -1014,6 +1052,7 @@ def apply(home, result, catalog=None, account=None):
             if entry_from(item).key() not in {entry.key() for entry in result.stale_entries}
         ],
         "plugins": list(result.previous.get("plugins", [])),
+        "reported": result.reported,
     }
     if not (result.outputs or result.entries or result.previous.get("paths")) and not (
         result.previous.get("entries") or (home / INVENTORY).exists()

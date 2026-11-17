@@ -668,7 +668,7 @@ def generated_files(home, profile, manifest, defaults):
     )
 
 
-def prepare(home, checkout, profile, manifest, folder):
+def prepare(home, checkout, profile, manifest, folder, preview=False):
     import enrollment as wizard
     import agent_deploy
 
@@ -807,7 +807,9 @@ def prepare(home, checkout, profile, manifest, folder):
     agents = agent_deploy.plan(
         home, checkout, profile, agents_table, wizard.agent_manifest(), names | set(generated)
     )
-    agent_deploy.require_no_conflicts(agents, command_name(profile))
+    if not preview:
+        # A preview reports conflicts as differences; an apply stops before any write.
+        agent_deploy.require_no_conflicts(agents, command_name(profile))
     changed |= agents.changed_paths(home)
     # Agent installers change their own settings. Back those files up; they are not Fleet outputs.
     plugin_agents = {record["agent"] for record in agents.plugin_installs + agents.plugin_removals}

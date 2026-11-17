@@ -8,6 +8,7 @@ Manage enrolled machines.
 commands:
   COMMAND
     addons     List optional manager extensions.
+    agents     Show or switch agent items on this machine.
     backups    Create, list, restore, or delete saved copies.
     check      Fetch new update results.
     configure  Reopen the enrollment wizard.

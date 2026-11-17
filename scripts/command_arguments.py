@@ -11,6 +11,12 @@ import sys
 import remote
 
 GROUPS = {
+    "agents": {
+        "list": "List declared agent items and their state on this machine.\n"
+        "An item is one skill, rule set, server, connector, plugin, or hook.",
+        "set": "Turn one agent item on or off, or keep this machine's own value.\n"
+        "The profile saves the choice; the update applies it.",
+    },
     "logs": {
         "list": "List the newest change-making attempts first.\nLimit the number with --limit.",
         "show": "Show the latest attempt, or select its saved timestamp or backup with --name.\n"
@@ -52,6 +58,7 @@ GROUPS = {
 }
 
 EXAMPLES = {
+    "agents": "agents list; agents set --name mcp.docs --state off; agents set --name mcp.docs --state local",
     "logs": "logs list; logs list --limit 10; logs show; logs show --name BACKUP; logs show --json",
     "machines": "machines list; machines set-ssh --target mini-pc; machines set-ssh --name beelink --target mini-pc; machines export --output FILE; machines remove --name NAME",
     "domain": "domain list; domain set --name personal",
@@ -157,6 +164,14 @@ def add_action_parameters(parser, name, action):
             parser.add_argument("--name", dest="hostname", required=True, help="saved machine name")
         elif action == "export":
             parser.add_argument("--output", help="new private TOML file; omit to show the record")
+    elif name == "agents" and action == "set":
+        parser.add_argument("--name", required=True, help="item from agents list, such as mcp.docs")
+        parser.add_argument(
+            "--state",
+            required=True,
+            choices=["local", "off", "on"],
+            help="on: Fleet manages it; off: removed here; local: keep this machine's value",
+        )
     elif name == "domain" and action == "set":
         parser.add_argument("--name", required=True, help="domain from domain list")
     elif name == "groups" and action == "set":

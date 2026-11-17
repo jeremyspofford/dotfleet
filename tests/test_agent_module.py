@@ -145,6 +145,43 @@ class AgentModuleTests(unittest.TestCase):
         record = json.loads((self.home / agent_deploy.INVENTORY).read_text())
         self.assertEqual(record["plugins"][0]["id"], "review-kit@example")
 
+    def test_exceptions_turn_items_off_or_local_and_drift_is_reported(self):
+        self.enroll()
+        self.add_agents()
+        self.assertIn("mcp.docs", self.cli("agents", "list"))
+        refused = self.cli("agents", "set", "--name", "mcp.absent", "--state", "off", expected=1)
+        self.assertIn("Unknown agent item mcp.absent", refused)
+        self.assertIn(
+            "choose on or off",
+            self.cli("agents", "set", "--name", "skills.notes", "--state", "local", expected=1),
+        )
+
+        output = self.cli("agents", "set", "--name", "mcp.docs", "--state", "off")
+        self.assert_review_golden("agents", output)
+        profile = tomllib.loads((self.home / ".config/fleet/profile.toml").read_text())
+        self.assertEqual(profile["agent_items"], {"mcp.docs": "off"})
+        config = tomllib.loads((self.home / ".codex/config.toml").read_text())
+        self.assertNotIn("docs", config["mcp_servers"])
+
+        self.cli("agents", "set", "--name", "mcp.docs", "--state", "on")
+        config_path = self.home / ".codex/config.toml"
+        config_path.write_text(config_path.read_text().replace('"npx"', '"my-npx"'))
+        self.assertIn("present; run dotfleet diff", self.cli("status"))
+        self.assertIn("FAIL", self.cli("doctor", expected=1))
+        stopped = self.cli("update", expected=1)
+        self.assertIn("mcp.docs in ~/.codex/config.toml changed since Fleet wrote it", stopped)
+        self.assertIn("agents set --name ITEM --state local", " ".join(stopped.split()))
+
+        self.cli("agents", "set", "--name", "mcp.docs", "--state", "local")
+        self.assertIn('"my-npx"', config_path.read_text())
+        self.assertIn("Drift             none", self.cli("status"))
+        self.assertIn("mcp.docs", self.cli("agents", "list"))
+        self.assertIn("local value on this machine", self.cli("agents", "list"))
+
+    assert_review_golden = test_command.CommandTests.assert_review_golden
+    assert_golden = test_command.CommandTests.assert_golden
+    record = test_command.CommandTests.record
+
 
 if __name__ == "__main__":
     unittest.main()

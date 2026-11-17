@@ -68,6 +68,30 @@ OpenCode and Pi run hooks only through code plugins. Fleet reports their hooks a
 OpenCode merges `opencode.jsonc` after `opencode.json`. A same-name server there overrides Fleet's entry.
 Fleet then skips that server for OpenCode and reports the override. The run continues.
 
+## Per-machine exceptions
+
+An item is one declared skill, rule set, server, connector, plugin, or hook. Its name is `KIND.NAME`, such as `mcp.docs`.
+The profile keeps this machine's exception list under `agent_items`. Content never holds it.
+
+1. Run `fleet agents list` to see each item, the agents and domains it reaches, and its state here.
+2. Run `fleet agents set --name ITEM --state STATE`. The command saves the profile, then applies the change.
+
+| State | Effect on this machine |
+| --- | --- |
+| `on` | Fleet manages the item. This removes the item's exception. |
+| `off` | Fleet removes its output for the item and renders it no longer. |
+| `local` | Fleet stops managing the item. The current value stays, and Fleet never reports it as drift. |
+
+Skills accept `on` and `off` only; they are content files. Updates honor the list.
+
+## Drift
+
+Drift means a recorded output differs from its record or is missing.
+`fleet status` counts agent drift in its Drift line. `fleet doctor` fails its managed-files check.
+`fleet diff` prints one patch per changed output and lists each agent conflict. It exits 1.
+The update gate treats agent drift as a drift repair trigger. A missing output returns; a changed output stops the update with its fix.
+Outputs of an agent that is off never count as drift.
+
 ## Plugins
 
 A plugin is a package that an agent installs to add skills, commands, hooks, or servers.
@@ -105,7 +129,7 @@ Fleet compares only the keys that it wrote. Keys that an agent adds inside an en
 | A recorded output is missing | Create it again. |
 
 A conflict stops the run before backup. Fleet lists each item, its file, and the fix.
-Move the existing value aside, then run the update again.
+Keep the local value with `fleet agents set --name ITEM --state local`, or move the existing value aside. Then run the update again.
 
 An output becomes stale when its declaration disappears or no longer selects this machine.
 Fleet removes a stale output that still matches its record. A changed stale output stays, with one report line.

@@ -47,7 +47,7 @@ def profile_changes(old, new):
     for field in ("domain", "domain_chosen", "git_name", "git_email", "content_repo", "format"):
         if old.get(field) != new.get(field):
             changes.append({"name": field, "old": old.get(field), "new": new.get(field)})
-    for field in ("pins", "groups", "agents"):
+    for field in ("pins", "groups", "agents", "agent_items"):
         for key in sorted(set(old.get(field, {})) | set(new.get(field, {}))):
             before, after = old.get(field, {}).get(key), new.get(field, {}).get(key)
             if before != after:
