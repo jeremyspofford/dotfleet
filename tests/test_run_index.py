@@ -149,6 +149,9 @@ class IndexTests(unittest.TestCase):
             self.assertEqual(command.main(["logs", "list"]), 0)
             self.assertEqual(command.main(["logs", "show"]), 0)
         self.assertEqual(list(self.home.iterdir()), [])
+        with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit) as stopped:
+            command.main(["logs", "list", "--limit", "0"])
+        self.assertEqual(stopped.exception.code, 2)
         with self.assertRaisesRegex(ValueError, "recorded timestamp"):
             run_logs.records(self.home, "missing")
 

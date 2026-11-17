@@ -865,6 +865,8 @@ def main(argv=None):
     if args.command == "logs":
         import run_logs
 
+        if args.action == "list" and args.limit < 1:
+            argument_parser.error("--limit needs a positive count")
         return run_logs.show_command(home, args)
     if changes_state(args):
         label = args.command + (" " + args.action if getattr(args, "action", None) else "")
