@@ -209,7 +209,9 @@ The one-line installer remains the first-install and recovery path.
 | `dotfleet backups` | List backup dates, results, and sizes without changing files. |
 | `dotfleet secrets` | List declared secret names as set or unset. Values stay private. |
 | `dotfleet content` | Show the content checkout, repository, commit, behind state, and short Git status. |
-| `dotfleet status` | Show this machine's choices, installed pins, drift, last run, and last backup. |
+| `dotfleet status` | Show choices, installed pins, drift, recent runs and backups, and the last update check. |
+| `dotfleet check` | Fetch both upstreams and save their update counts. An upstream is the remote branch tracked by a checkout. |
+| `dotfleet status --check` | Run check first, then show status. Return the check exit code. |
 | `dotfleet diff` | Show pending patches. Use `--stat` for paths only. Exit 0 means clean; exit 1 means differences. |
 | `dotfleet rollback` | List backups and choose one in a terminal. Include the saved profile when restoring. |
 | `dotfleet rollback BACKUP` | Review one backup folder, then type restore to confirm. |
@@ -226,10 +228,12 @@ The one-line installer remains the first-install and recovery path.
 | `dotfleet version` | Print the manager version and content commit. |
 | `dotfleet uninstall` | Review removal, then type uninstall. Keep the content checkout and all backups. |
 
-A checkout is a local Git copy. Status reports how far content trails the last fetched remote state; it does not fetch.
+A checkout is a local Git copy. Plain status reports saved update results and never fetches.
+Its content behind count compares the last fetched remote state.
 Drift means that managed files differ from the selected content. Groups select optional files or alias blocks.
 The profile stores machine choices. Pins select exact tool versions.
 Every command supports `--help`. Exit codes are 0 for success or cancellation, 1 for failed checks or operations, and 2 for arguments.
+Check and `status --check` use 0 for current, 1 for available updates, and 2 when a check fails.
 
 Change-making commands write RUN.json and print the standard review. File lists come from the plan and backup inventory.
 Rollback makes another backup first. It restores only recorded paths, including original symlinks and recorded external targets.
@@ -239,6 +243,27 @@ A content checkout remains at its current commit after rollback. Use diff to rev
 Uninstall offers to restore the oldest backup. Otherwise, it removes known managed files and the manager's command, checkout, and converted source.
 Uninstall keeps installed tools, the content checkout, and all backups. Removal includes local edits, which the new backup preserves.
 Rollback and uninstall require terminal confirmation. A scripted rollback without a folder only lists backups.
+
+## Check for updates
+
+1. Run `fleet check` to fetch manager and content changes without applying them.
+2. Read `fleet status` for the last result and its check time.
+3. Run `fleet update` to fetch and apply changes. Run check again to refresh the saved result.
+
+The `fleet` alias runs `dotfleet`. Use `dotfleet` directly if your content does not provide that alias.
+Use `dotfleet status --check` to check and display status together.
+Each fetch stops after ten seconds. Network or repository failures print a warning and return exit code 2.
+A failed check preserves the previous result and its time.
+
+Check and update use each checkout's configured upstream, including a branch other than the remote's default.
+Both preserve local commits when the remote has no new commits. Both refuse local edits, missing upstreams, and histories with conflicting new commits.
+Locally adopted content without a remote has no updates to fetch.
+Update fetches again, so commits published after a check can also arrive.
+
+Successful checks save both results in `~/.local/share/dotfleet/check.json` with owner-only permissions.
+This cache is saved check data. It contains the check time, full commit identifiers, and source paths.
+Check creates no backup or run record and never writes the profile or managed files.
+Status shows “not checked” until a valid result exists. Plain status keeps working offline.
 
 ## Recorded machines
 

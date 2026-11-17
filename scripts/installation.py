@@ -6,7 +6,6 @@ Direct execution without help keeps its existing behavior.
 """
 
 import shutil
-import subprocess
 from common import atomic, run
 
 MANAGER = ".local/share/dotfleet/manager"
@@ -40,11 +39,9 @@ def publish(home, root, backup):
         destination.parent.mkdir(parents=True, exist_ok=True)
         staged = backup / "manager-staging"
         run("git", "clone", "--no-hardlinks", str(root), str(staged))
-        remote_result = subprocess.run(
-            ["git", "-C", str(root), "remote", "get-url", "origin"], text=True, capture_output=True
-        )
-        remote = remote_result.stdout.strip() if remote_result.returncode == 0 else str(root)
-        run("git", "-C", str(staged), "remote", "set-url", "origin", remote)
+        from updates import copy_tracking
+
+        copy_tracking(root, staged)
         # Working-tree bytes allow local development tests without installing stale committed code.
         # Production installers run clean checkouts; update refuses local manager edits.
         for name in run("git", "-C", str(root), "ls-files", "-z").split("\0"):
