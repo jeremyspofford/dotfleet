@@ -1,0 +1,10 @@
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Marketplaces
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+agent-market
+  Source     https://example.invalid/agent-market
+  Version    v1.0.0 @ abcdef01
+  Pin        v1.0.0
+  Installed  review-kit
+  Updates    2 newer commits; the pin blocks them

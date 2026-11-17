@@ -112,6 +112,12 @@ DESCRIPTIONS = {
         "Read-only commands do not add entries.\n"
         "Backup deletion removes its detailed run record; the index entry remains until pruned."
     ),
+    "marketplaces": (
+        "Manage marketplaces of agent packages.\n"
+        "A marketplace is a Git repository with a fleet-marketplace.toml catalog.\n"
+        "A package bundles skills, rule sets, servers, connectors, plugins, or hooks.\n"
+        "Installed packages live in an untracked library; records stay in the manager store."
+    ),
     "machines": (
         "Manage saved machine connections.\n"
         "The registry, registry.toml, stores machine records.\n"
@@ -353,6 +359,7 @@ def read_view(args, home, saved_profile):
         "backups",
         "secrets",
         "machines",
+        "marketplaces",
         "addons",
         "domain",
         "groups",
@@ -365,6 +372,7 @@ def read_view(args, home, saved_profile):
             "tools": "No tool versions recorded.",
             "groups": "No content groups declared.",
             "agents": "No agent items declared.",
+            "marketplaces": f"No marketplaces. Run {display} marketplaces add --source URL.",
             "addons": "No installed add-ons. None ship with Fleet.",
         }.get(name, "None recorded.")
         command_views.directory(name.capitalize(), entities, home, empty)
@@ -1051,7 +1059,17 @@ def changes_state(args):
     action = getattr(args, "action", None)
     if args.command == "machines" and action == "export":
         return bool(args.output)
-    return action in ("set", "remove", "set-ssh", "create", "restore", "delete", "uninstall")
+    return action in (
+        "add",
+        "set",
+        "remove",
+        "set-ssh",
+        "create",
+        "restore",
+        "delete",
+        "uninstall",
+        "update",
+    )
 
 
 def dispatch(args, argument_parser, home):
@@ -1182,6 +1200,8 @@ def dispatch(args, argument_parser, home):
             return manager.main(["--defaults", "--group", args.name + "=" + args.state])
         if args.command == "agents":
             return set_agent_item(home, args.name, args.state, display)
+        if args.command == "marketplaces":
+            return change_marketplace(home, args, display)
         if args.command == "tools":
             if args.action == "uninstall":
                 from tool_actions import uninstall
@@ -1259,9 +1279,13 @@ def agent_items(home):
 
     checkout = home / "dotfiles"
     table = agent_table.load(checkout, content_manifest(checkout), enrollment.agent_manifest())
+    import marketplaces
+
     items = {item.key: item for item in table.items}
     for skill in agent_table.skills(checkout):
         items.setdefault("skills." + skill, agent_table.Item("skills", skill, {}))
+    # Pulled-in items follow content items; their names never collide with content names.
+    items.update(marketplaces.items(home, enrollment.agent_manifest()))
     return items
 
 
@@ -1282,6 +1306,43 @@ def set_agent_item(home, name, state, display):
             value.pop("agent_items")
 
     return manager.main(["--defaults"], edit=edit)
+
+
+def comma_list(value):
+    return [part.strip() for part in (value or "").split(",") if part.strip()]
+
+
+def change_marketplace(home, args, display):
+    """Stage a marketplace change, then render it through the shared review and apply."""
+    import marketplaces
+
+    saved = marketplaces.load_records(home)["marketplaces"]
+    with tempfile.TemporaryDirectory(prefix="dotfleet-marketplace-") as workspace:
+        if args.action == "delete":
+            if args.name not in saved:
+                raise ValueError(
+                    f"No marketplace named {args.name}. Run {display} marketplaces list."
+                )
+            marketplaces.PENDING[args.name] = None
+            return manager.main(["--defaults"])
+        name = args.name or marketplaces.default_name(args.source)
+        if not marketplaces.NAME.fullmatch(name):
+            raise ValueError("Marketplace names use lowercase letters, digits, and hyphens.")
+        if name in saved:
+            raise ValueError(f"Marketplace {name} exists. Choose another --name.")
+        staged, commit = marketplaces.stage(home, args.source, workspace, args.pin or "")
+        catalog = marketplaces.read_catalog(staged)
+        take = marketplaces.take_from(comma_list(args.packages), comma_list(args.features))
+        marketplaces.selection(catalog, take)
+        marketplaces.PENDING[name] = {
+            "source": args.source,
+            "pin": args.pin or "",
+            "commit": commit,
+            "version": marketplaces.version(staged),
+            "take": take,
+            "staged": str(staged),
+        }
+        return manager.main(["--defaults"])
 
 
 def remove_machine(home, hostname):

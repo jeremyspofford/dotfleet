@@ -391,7 +391,7 @@ class Planner:
             return None
         parts = []
         for item in chosen:
-            text = blob(self.checkout, item.spec["file"]).decode()
+            text = blob(item.root or self.checkout, item.spec["file"]).decode()
             parts.append(f"<!-- Fleet rule set: {item.name} -->\n" + text.rstrip("\n") + "\n")
         relative = f"{TREE}/rules/{agent}.md"
         self.add(relative, agent, "rules", "\n".join(parts).encode())
@@ -406,7 +406,8 @@ class Planner:
                 self.plan.notes.append(f"{agent}: hook {item.name} is unsupported for this agent.")
                 continue
             script = f"{TREE}/hooks/{item.name}/{Path(spec['command']).name}"
-            self.add(script, "", item.key, blob(self.checkout, spec["command"]), 0o700)
+            source = blob(item.root or self.checkout, spec["command"])
+            self.add(script, "", item.key, source, 0o700)
             wrapper = f"{TREE}/hooks/{item.name}/run-{agent}"
             environment = {
                 "FLEET_AGENT": agent,
@@ -464,7 +465,7 @@ class Planner:
         if events:
             hooks = {event: [group for _, group in groups] for event, groups in events.items()}
             self.add(f"{base}/hooks/hooks.json", "claude", "hooks", json_bytes({"hooks": hooks}))
-        if agent_table.skills(self.checkout):
+        if agent_table.skills(self.checkout) or self.pulled_skills:
             self.add(f"{base}/skills", "claude", "skills", link=str(self.home / SKILLS))
         self.add(".claude/skills/fleet", "claude", "pointer", link=str(self.home / base))
         rules = self.rules("claude")
@@ -554,7 +555,27 @@ class Planner:
                 }
             )
 
+    def library_skills(self):
+        """Copy pulled-in skills into the tree and link each one into ~/.agents/skills."""
+        for item in self.table.items:
+            if item.kind != "skills" or item.origin == "content":
+                continue
+            if not agent_table.applies(item, self.profile):
+                continue
+            folder = item.spec["path"].rstrip("/")
+            for name, mode in sorted(agent_table.tracked(item.root).items()):
+                if name.startswith(folder + "/"):
+                    relative = f"{TREE}/skills/{item.name}/{name[len(folder) + 1 :]}"
+                    data = blob(item.root, name)
+                    self.add(relative, "", item.key, data, 0o700 if mode == "100755" else 0o600)
+            target = str(self.home / TREE / "skills" / item.name)
+            self.add(f"{SKILLS}/{item.name}", "", item.key, link=target)
+            self.pulled_skills = True
+
     def build(self, agents):
+        self.pulled_skills = False
+        if agents:
+            self.library_skills()
         for agent in agents:
             getattr(self, agent)()
             self.plugins(agent)
@@ -790,7 +811,12 @@ def plan(home, checkout, profile, table, catalog, managed=frozenset()):
         path = home / relative
         current = fingerprint(path)
         saved = recorded_paths.get(relative, {}).get("fingerprint")
-        if current is None or current == output.fingerprint() or relative.startswith(TREE + "/"):
+        if relative.startswith(TREE + "/"):
+            if saved is not None and current not in (None, saved, output.fingerprint()):
+                # Refresh replaces an edited copy. The run backup keeps the edited file.
+                result.notes.append(f"Replaced edited ~/{relative}; the backup keeps your copy.")
+            continue
+        if current is None or current == output.fingerprint():
             continue
         if path.is_dir() and not path.is_symlink():
             result.conflicts.append(f"~/{relative} is a folder; move it aside, then update.")

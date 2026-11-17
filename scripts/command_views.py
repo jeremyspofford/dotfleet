@@ -43,6 +43,7 @@ def agent_entities(home, profile):
         agents = spec.get("agents") or (sorted(spec["sources"]) if item.kind == "plugins" else [])
         fields = [
             ("Kind", KIND_LABELS[item.kind]),
+            *([("Source", "marketplace " + item.origin)] if item.origin != "content" else []),
             ("Adds", spec.get("description", f"Skill folder .agents/skills/{item.name}")),
             ("Agents", ", ".join(agents) or "every selected agent that supports it"),
             ("Domains", ", ".join(spec.get("domains", [])) or "every domain"),
@@ -61,6 +62,10 @@ def collection(name, home, profile, manifest):
         return owned_views.backup_entities(home, command.records(home))
     if name == "agents":
         return agent_entities(home, profile)
+    if name == "marketplaces":
+        import marketplaces
+
+        return marketplaces.entities(home)
     if name == "groups":
         return [
             {

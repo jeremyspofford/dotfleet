@@ -69,6 +69,9 @@ class Item:
     kind: str
     name: str
     spec: dict = field(hash=False)
+    # Pulled-in items read their files from the library, not from the content checkout.
+    root: object = field(default=None, hash=False, compare=False)
+    origin: str = "content"
 
     @property
     def key(self):

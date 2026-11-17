@@ -7,27 +7,28 @@ Manage enrolled machines.
 
 commands:
   COMMAND
-    addons     List optional manager extensions.
-    agents     Show or switch agent items on this machine.
-    backups    Create, list, restore, or delete saved copies.
-    check      Fetch new update results.
-    configure  Reopen the enrollment wizard.
-    content    Show the content checkout and Git state.
-    diff       Show pending file differences.
-    doctor     Check this machine and name any fixes.
-    domain     Show or choose content additions.
-    groups     Show or switch optional content.
-    logs       Show saved change-making attempts.
-    machines   Manage saved machine connections.
-    secrets    List secret names as set or unset.
-    status     Show saved state without network requests.
-    tools      Show or set exact tool versions.
-    topology   Show this machine’s connection tree.
-    tui        Open the full-screen terminal interface.
-    uninstall  Remove Fleet and its managed files.
-    update     Check updates and drift before applying.
-    version    Show manager and content versions.
+    addons        List optional manager extensions.
+    agents        Show or switch agent items on this machine.
+    backups       Create, list, restore, or delete saved copies.
+    check         Fetch new update results.
+    configure     Reopen the enrollment wizard.
+    content       Show the content checkout and Git state.
+    diff          Show pending file differences.
+    doctor        Check this machine and name any fixes.
+    domain        Show or choose content additions.
+    groups        Show or switch optional content.
+    logs          Show saved change-making attempts.
+    machines      Manage saved machine connections.
+    marketplaces  Manage marketplaces of agent packages.
+    secrets       List secret names as set or unset.
+    status        Show saved state without network requests.
+    tools         Show or set exact tool versions.
+    topology      Show this machine’s connection tree.
+    tui           Open the full-screen terminal interface.
+    uninstall     Remove Fleet and its managed files.
+    update        Check updates and drift before applying.
+    version       Show manager and content versions.
 
 global options:
-  -h, --help   show this help message and exit
-  --version    show manager and content versions, then exit
+  -h, --help      show this help message and exit
+  --version       show manager and content versions, then exit
