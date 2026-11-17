@@ -14,6 +14,34 @@ Use [WRITING.md](WRITING.md) for headers, help, comments, and documentation.
 
 Use Prettier, the JavaScript formatter, for release helpers.
 
+## Command parameters
+
+Use flags for optional parameters and for values that a reader can confuse with each other.
+Commands and action words stay positional. A positional argument is a value without a named flag.
+The single trailing machine in status, check, diff, doctor, and update is the subject. Keep that machine name positional.
+Use --name and --target for SSH registration. One flag supplies both values unless the other flag gives a different value.
+Help and examples show flags. Parse supported old forms without documenting them as the main interface.
+
+The command audit uses these forms:
+
+| Command | Parameters |
+| --- | --- |
+| machines set-ssh | --name, --target; no flags opens the terminal picker |
+| machines remove | --name |
+| machines export | --output |
+| domain | --name; no flag lists choices |
+| groups | --name, --state; no flags lists groups |
+| pins set | --tool, --version |
+| pins remove | --tool |
+| rollback | --backup; no flag lists backups |
+| status, check, diff, doctor, update | One optional machine subject; status also has --check and diff has --stat |
+| topology | --json selects structured output |
+| tui, profile, backups, secrets, content, addons, configure, backup, version, uninstall | No value parameters |
+| Installer and agent generator | Existing named flags |
+| Converter | --checkout, --output, --profile, --format |
+
+Internal bridges also label optional values, such as --backup and --machine. Function arguments are not command-line parameters.
+
 ## Preserve behavior
 
 Run the same tests after a style change. Keep output, exit codes, and golden files unchanged.

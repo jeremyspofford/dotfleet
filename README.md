@@ -169,9 +169,9 @@ bash install.sh --domain personal --git-name "Example Person" --git-email person
 Repeat `--pin TOOL=VERSION` for each full version. A floating value in a flag still fails unattended validation.
 Complete profiles need no flags on later runs. New group defaults are printed during scripted setup.
 
-`domain_chosen` records a human choice in this wizard, through `--domain`, or through `dotfleet domain NAME`.
+`domain_chosen` records a human choice in this wizard, through `--domain`, or through `dotfleet domain --name NAME`.
 A missing field means UNCHOSEN, including profiles saved before the wizard existed. Carried and defaulted domains remain unchosen until confirmed.
-Status and doctor show that gap. Run `dotfleet domain` to read the choices, then `dotfleet domain NAME` to confirm one.
+Status and doctor show that gap. Run `dotfleet domain` to read the choices, then `dotfleet domain --name NAME` to confirm one.
 `unpinned_tools` records skipped tools, so content defaults cannot select them later. Remove a tool there to allow its defaults again.
 Content defaults fill gaps only when the requested versions are installed. The summary lists other defaults as available, without installing them.
 The manager creates Git identity, domain, Mise settings, and a private secrets file. Keep secret references in the content manifest, never values. Imported profile references remain valid.
@@ -224,18 +224,19 @@ The one-line installer remains the first-install and recovery path.
 | `dotfleet secrets` | List declared secret names as set or unset. Values stay private. |
 | `dotfleet content` | Show the content checkout, repository, commit, behind state, and short Git status. |
 | `dotfleet status` | Show choices, installed pins, drift, recent runs and backups, and the last update check. |
+| `dotfleet topology` | Show this machine’s recorded connection tree. Use --json for structured output. |
 | `dotfleet check` | Fetch both upstreams and save their update counts. An upstream is the remote branch tracked by a checkout. |
 | `dotfleet status --check` | Run check first, then show status. Return the check exit code. |
 | `dotfleet diff` | Show pending patches. Use `--stat` for paths only. Exit 0 means clean; exit 1 means differences. |
 | `dotfleet rollback` | List backups and choose one in a terminal. Include the saved profile when restoring. |
-| `dotfleet rollback BACKUP` | Review one backup folder, then type restore to confirm. |
+| `dotfleet rollback --backup BACKUP` | Review one backup folder, then type restore to confirm. |
 | `dotfleet domain` | Show the current domain, its confirmation state, and each domain's description. |
-| `dotfleet domain personal` | Record the personal domain as chosen and apply it. |
+| `dotfleet domain --name personal` | Record the personal domain as chosen and apply it. |
 | `dotfleet groups` | List content groups, their states, and descriptions. |
-| `dotfleet groups docker off` | Exclude Docker content. Use on to restore it. |
+| `dotfleet groups --name docker --state off` | Exclude Docker content. Use on to restore it. |
 | `dotfleet pins` | List saved exact versions and installed versions. |
-| `dotfleet pins set node@24.14.1` | Explicitly install and record that exact version. Content defaults still never install software. |
-| `dotfleet pins remove node` | Remove the pin and prevent content defaults from filling it again. Keep installed software. |
+| `dotfleet pins set --tool node --version 24.14.1` | Explicitly install and record that exact version. Content defaults still never install software. |
+| `dotfleet pins remove --tool node` | Remove the pin and prevent content defaults from filling it again. Keep installed software. |
 | `dotfleet configure` | Reopen the enrollment wizard. |
 | `dotfleet doctor` | Check profile completeness, drift, checkout edits, and backups. Print a fix for each failed check. |
 | `dotfleet backup` | Snapshot managed files and the profile without applying content. |
@@ -359,48 +360,113 @@ A test fixture validates the contract. It is not installed or offered as a produ
 Use `dotfleet machines export` to view this machine’s saved record alone.
 Use `dotfleet machines export --output FILE` to save a private TOML copy for transfer. FILE must not exist.
 TOML is the configuration format used by the registry. Export never prints its raw contents.
-Use `dotfleet machines remove HOSTNAME` to remove another machine’s stale record. Fleet backs up the registry and records the change.
+Use `dotfleet machines remove --name HOSTNAME` to remove another machine’s stale record. Fleet backs up the registry and records the change.
 The active machine’s record cannot be removed this way.
 
 ## Remote commands
 
-SSH is the secure connection tool used to run commands on another machine.
-Both machines need an enrolled Fleet manager with remote command support.
-The target uses its own profile, pins, repositories, and backup store. Your machine sends an action, never a profile or file paths.
-
-1. Configure SSH access with your existing keys. Confirm access without a password prompt.
-2. Run `fleet machines set-ssh beelink mini-pc` on this machine. Replace the names for your machines.
-3. Run `fleet machines` to inspect the connection. A record without a target shows `no connection`.
-4. Run one command below. The machine name is the final argument.
-
 ```sh
-fleet status beelink
-fleet status --check beelink
-fleet check beelink
-fleet diff beelink
-fleet diff --stat beelink
-fleet doctor beelink
-fleet update beelink
+fleet machines set-ssh --target mini-pc
 ```
 
-`beelink` is the local record name. `mini-pc` is a host entry in your SSH configuration; `user@host` also works.
-Set-ssh creates or updates a connection record without contacting the target. It backs up the registry and prints the standard review.
+The name defaults to the SSH target. SSH is the secure connection tool used to run commands on another machine.
+These forms do the same job unless you supply different values:
+
+```sh
+fleet machines set-ssh --target mini-pc
+fleet machines set-ssh --name mini-pc
+fleet machines set-ssh --name beelink --target mini-pc
+```
+
+Run `fleet machines set-ssh` without flags to pick a numbered host from your SSH config.
+The picker follows Include files. It omits wildcard patterns, duplicate names, and registered hosts.
+Without a config or available hosts, type a target instead. Press Enter to select or submit; cancel stops without saving.
+The picker requires a terminal. Scripted runs supply --name or --target.
+The TUI Machines screen has an Add SSH connection action with the same choices.
+
+Registration saves the connection, backs up the registry, and prints its run review. It then tests SSH once with the fixed command `true`.
+The test uses batch mode: no password prompts. It has a ten-second total timeout.
+A passed test exits 0. A failed test exits 2, explains the next step, and keeps the saved connection.
+A saved target may be asleep. Passing this test proves SSH command access, not Fleet enrollment or profile completeness.
+
+1. Register a target with one of the commands above.
+2. Run `fleet machines` to inspect it. Equal names appear once; records without a target show `no connection`.
+3. Confirm the target has an enrolled Fleet manager with a complete profile.
+4. Run one command below. The registered machine name is the final argument.
+
+```sh
+fleet status mini-pc
+fleet status --check mini-pc
+fleet check mini-pc
+fleet diff mini-pc
+fleet diff --stat mini-pc
+fleet doctor mini-pc
+fleet update mini-pc
+```
+
+Only registered machines can receive commands. An unknown name never starts SSH.
+Targets use their own profiles, pins, repositories, and backups. Your machine sends an action, never a profile or file paths.
 Existing machine facts stay intact. Connection targets survive local record refreshes.
-Omit the machine name to keep each command local. There is no all-machines command or background service.
+Omit the machine name to keep a command local. There is no all-machines command or background service.
 
-Connections use batch mode: SSH never asks for a password. Connection setup has a ten-second limit and one attempt.
-SSH uses your configured keys and host checks. It does not forward your authentication agent or open extra forwarding channels.
-An unreachable or unauthenticated machine produces one error line. Fix access outside Fleet, then retry.
+### No SSH setup yet?
 
-Target runs never prompt. An incomplete profile stops the action and lists the missing choices.
-Complete those choices on the target. File conflicts stop unattended updates without choosing overwrite.
+A reachable `user@host` or `user@IP` target needs no SSH config file. The target must run an SSH server and accept your key.
+
+1. Check the SSH client. OpenSSH ships with macOS and most Linux systems; install your Linux distribution's client package if missing.
+2. Run `ssh-keygen` if you need a key. Copy only the public key with `ssh-copy-id user@host`, where that tool is available.
+3. Confirm normal SSH access and the host key. Then register the target with Fleet.
+
+On Windows clients, enable the OpenSSH Client optional feature.
+On Windows targets, add the public key to the user's `.ssh/authorized_keys` file.
+Administrator accounts use `%ProgramData%\ssh\administrators_authorized_keys` instead. Restrict that file's permissions to Administrators and SYSTEM.
+See Microsoft's [Windows key instructions](https://learn.microsoft.com/en-us/windows-server/administration/openssh/openssh_keymanagement).
+Tailscale is one option for making machines reachable; it is not required.
+Fleet never installs or configures a VPN, Tailscale, or a relay. A VPN is a private network connection.
+Fleet reads SSH configuration but never edits it. It uses the SSH client, keys, and network access you already have.
+
+A missing client, unresolved target, or failed authentication prints an error and one next step.
+Remote commands use one SSH connection attempt with a ten-second connection timeout. Dead connections stop through SSH keepalive checks.
+SSH keeps your host checks and never forwards your authentication agent or extra network channels.
+
+Target runs never prompt. Incomplete profiles name the missing choices and stop; file conflicts stop without choosing overwrite.
 Configure requires a terminal on the target. Remote rollback and uninstall are refused because they are destructive.
 Run those commands on the target itself.
 
-The target renders results under its machine header. Updates write RUN.json in the target's backup folder, with the same review as local updates.
-The calling machine creates no backup or run record for a remote action. Read-only commands keep their normal rules; check refreshes the target's cache.
-Exit 0 means success. Check and diff retain exit 1 for updates and differences; other failures return nonzero.
-Each result names the machine and outcome. A lost connection cannot prove whether an update finished; inspect the target before retrying.
+The target renders results under its machine header. Updates write RUN.json in its own backup folder, using the local run renderer.
+The caller creates no backup or install run record for remote execution. It saves the contact's outcome and time locally.
+Check refreshes the target's update cache. Exit 0 means success; check and diff retain exit 1 for updates and differences.
+Other failures return nonzero. A lost connection cannot prove whether an update finished; inspect the target before retrying.
+
+### View connections from this machine
+
+Run `fleet topology` for a text tree. Run `fleet topology --json` for the same facts as JSON, a structured format for scripts.
+The TUI Topology screen shows the same tree. Select a connected machine for its remote actions; unconnected records are display-only.
+These are recorded observations with times, never claims of live state. Viewing the tree makes no network requests.
+The local check cache supplies this machine's update state. Contact observations supply other machines' last-known results.
+Unknown domains say not recorded. New targets say never contacted, including a target changed since its last observation.
+Fleet keeps no shared machine state. Another machine's tree can differ.
+
+Example from the test fixture:
+
+```text
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Topology from example-dell
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Recorded observations only; no live checks. Other machines may have different views.
+
+example-dell · domain personal
+  updates current · recorded 2026-11-17T14:05:00+00:00
+├── mini-pc · SSH uses this name · domain personal
+│   status succeeded · recorded 2026-11-17T14:00:00+00:00
+├── retired · no connection · domain client
+│   never contacted
+└── workstation · SSH user@lab · domain work
+    never contacted
+```
+
+Contact observations live in `~/.local/share/fleet/contacts.json`, with private file permissions.
+Topology is the human view of that cache. No profile data enters the content repository.
 
 Use `dotfleet profile` to inspect saved choices. Change them through `domain`, `pins`, `groups`, or `configure`; do not edit profile.toml.
 The manager’s chezmoi configuration and converted source are internal files. Inspect their locations through `status` and their health through `doctor`.

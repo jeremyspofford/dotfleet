@@ -83,7 +83,7 @@ class CommandDisplayTests(unittest.TestCase):
         self.assert_cached_update_hint("fleet")
         self.assertIn("Use fleet domain, pins, groups, or configure.", self.cli("profile"))
         self.assertIn("Run fleet --help", self.cli("check", "--help"))
-        self.assertIn("fleet domain NAME", self.cli("domain"))
+        self.assertIn("fleet domain --name NAME", self.cli("domain"))
         self.assertIn("Run fleet configure", self.cli("configure", expected=1))
         alias = command("bash", "-c", 'source "$HOME/.aliases"; alias fleet', env=self.env)
         self.assertEqual(alias, "alias fleet='dotfleet'\n")

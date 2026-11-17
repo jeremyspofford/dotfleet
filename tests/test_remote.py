@@ -19,6 +19,7 @@ from test_manager import ROOT, command
 from common import atomic, read_toml, toml
 import registry
 import remote
+import topology
 
 
 class RemoteTests(unittest.TestCase):
@@ -90,7 +91,7 @@ sys.exit(result.returncode)
         return {
             str(path.relative_to(self.controller)): path.read_bytes()
             for path in self.controller.rglob("*")
-            if path.is_file()
+            if path.is_file() and path.name not in ("contacts.json", ".contacts.lock")
         }
 
     def change_content(self):
@@ -159,15 +160,16 @@ sys.exit(result.returncode)
         self.assertEqual(self.caller_files(), before)
         self.assert_quiet_status()
 
-    def test_unreachable_is_one_line_one_attempt_and_no_local_writes(self):
+    def test_unreachable_has_next_step_one_attempt_and_only_contact_cache_writes(self):
         self.connect()
         before = self.caller_files()
         self.controller_env["FAKE_SSH_OFFLINE"] = "1"
         output = self.call("status", "beelink", expected=2)
-        self.assertEqual(len(output.splitlines()), 1)
+        self.assertEqual(len(output.splitlines()), 2)
         self.assertIn("beelink: ssh: connect", output)
         self.assertIn("Connection refused", output)
         self.assertEqual(len(self.ssh_log.read_text().splitlines()), 1)
+        self.assertIn("beelink", topology.load(self.controller)["machines"])
         self.assertEqual(self.caller_files(), before)
 
     def test_incomplete_target_stops_and_names_all_gaps(self):
@@ -225,6 +227,9 @@ sys.exit(result.returncode)
 
     def test_set_ssh_creates_records_preserves_facts_and_survives_refresh(self):
         self.enroll()
+        from test_connections import fake_ssh
+
+        fake_ssh(self.home, self.env)
         self.assertIn("no connection", self.cli("machines"))
         output = self.cli("machines", "set-ssh", "beelink", "mini-pc")
         self.assertIn("~ ~/.local/share/fleet/registry.toml", output)

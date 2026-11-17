@@ -164,8 +164,12 @@ def rows(home, manager_version):
     ):
         output += [
             ("Machine", key + (" · this machine" if key == local else " · recorded only")),
-            ("Hostname", record["hostname"]),
-            ("Connection", record.get("ssh_target") or "no connection"),
+            (
+                "Connection",
+                "SSH uses this name"
+                if record.get("ssh_target") == key
+                else record.get("ssh_target") or "no connection",
+            ),
             ("OS", record["os"]),
             (
                 "Domain",

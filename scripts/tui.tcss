@@ -87,3 +87,22 @@ Review {
     height: 3;
     min-width: 8;
 }
+
+ConnectionPicker {
+    align: center middle;
+}
+
+#host-options {
+    height: 1fr;
+    min-height: 1;
+}
+
+#target-error {
+    height: auto;
+    color: $error;
+}
+
+#machine-actions {
+    height: auto;
+    max-height: 8;
+}

@@ -25,7 +25,7 @@ class CoreSession:
         environment[CHANNEL] = str(child.fileno())
         arguments = [sys.executable, "-u", str(self.root / "scripts/tui_core.py"), action]
         if backup:
-            arguments.append(backup)
+            arguments.extend(["--backup", backup])
         if machine:
             arguments.extend(["--machine", machine])
         process = None
@@ -52,7 +52,7 @@ class CoreSession:
             async def read_events():
                 while line := await reader.readline():
                     message = json.loads(line)
-                    if message["kind"] == "review":
+                    if message["kind"] in ("review", "choose"):
                         answer = await confirm(message)
                         writer.write((json.dumps({"answer": answer}) + "\n").encode())
                         await writer.drain()

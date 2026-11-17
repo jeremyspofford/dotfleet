@@ -4,7 +4,6 @@
   Scope            Recorded data only; no live queries to other machines.
   Registry         ~/.local/share/fleet/registry.toml
   Machine          example-hub · this machine
-  Hostname         example-hub
   Connection       no connection
   OS               Linux
   Domain           personal · chosen

@@ -1,9 +1,10 @@
 """Convert plain content into a chezmoi source, the files chezmoi reads.
 
-Usage: python3 scripts/convert.py CHECKOUT OUTPUT [--profile FILE] [--format FORMAT]
+Usage: python3 scripts/convert.py --checkout PATH --output PATH [--profile FILE] [--format FORMAT]
 Parameters: CHECKOUT is a Git copy; OUTPUT is an empty staging directory.
 --profile reads local group selections. --format selects plain or chezmoi when detection is unclear.
--h/--help prints help. Example: python3 scripts/convert.py ~/dotfiles /tmp/source
+-h/--help prints help.
+Example: python3 scripts/convert.py --checkout ~/dotfiles --output /tmp/source
 Exit codes: 0 success/help; 1 invalid content; 2 invalid arguments.
 Author: Jeremy Spofford / Aria Labs; Version: read from ../VERSION.
 """
@@ -227,8 +228,10 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="Version: " + (ROOT / "VERSION").read_text().strip(),
     )
-    parser.add_argument("checkout", type=Path, help="content Git checkout")
-    parser.add_argument("output", type=Path, help="empty converted-source directory")
+    parser.add_argument("legacy_checkout", nargs="?", type=Path, help=argparse.SUPPRESS)
+    parser.add_argument("legacy_output", nargs="?", type=Path, help=argparse.SUPPRESS)
+    parser.add_argument("--checkout", type=Path, help="content Git checkout; required")
+    parser.add_argument("--output", type=Path, help="empty converted-source directory; required")
     parser.add_argument("--profile", type=Path, help="machine profile TOML file")
     parser.add_argument(
         "--format",
@@ -236,6 +239,13 @@ def main():
         help="plain=real names; chezmoi=native source names",
     )
     args = parser.parse_args()
+    for name in ("checkout", "output"):
+        old = getattr(args, "legacy_" + name)
+        if old is not None and getattr(args, name) is not None:
+            parser.error("Do not combine flagged and positional paths.")
+        setattr(args, name, getattr(args, name) or old)
+        if getattr(args, name) is None:
+            parser.error("--checkout and --output are required")
     try:
         source, _, _ = convert(
             args.checkout, args.output, read_toml(args.profile) if args.profile else {}, args.format
