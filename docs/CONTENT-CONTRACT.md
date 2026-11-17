@@ -19,7 +19,10 @@ Native templates and hooks can execute commands. Use only trusted repositories.
 
 ## Included files
 
-Only tracked Git files convert. Local edits must be preserved before an update.
+Only tracked Git files convert. The foundation is the tracked content that Fleet installs, plus the manifest.
+Uncommitted edits to foundation files block setup and updates. Commit or move them first.
+Unmanaged files, such as untracked notes, never block and never change. Update does not mention them.
+An update that would change an unmanaged file with local edits stops before backup and names the file.
 Include root dotfiles, dot directories such as `.config`, and paths explicitly declared in `paths`.
 Exclude Git metadata, `.github`, `.gitignore`, `.gitattributes`, `.gitmodules`, `.editorconfig`, and release metadata.
 Exclude README, LICENSE, AGENTS.md, docs, scripts, tests, package files, and the manifest itself.

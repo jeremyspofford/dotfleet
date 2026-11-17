@@ -79,7 +79,9 @@ Provenance records how a choice was made. Passing a domain explicitly records a 
 
 `dotfleet check` and update share upstream selection and comparison. An upstream is the remote branch tracked by a checkout's current branch.
 They compare both manager and content. Update preserves these upstream settings when replacing its manager checkout.
-Both refuse uncommitted edits and diverged histories. Diverged histories contain new local and remote commits that cannot combine by moving forward.
+Both refuse diverged histories. Diverged histories contain new local and remote commits that cannot combine by moving forward.
+Both refuse uncommitted manager edits and uncommitted edits to managed content files.
+Unmanaged content files never block. An update that would change one with local edits stops before backup.
 Local commits stay intact when the remote adds nothing. Adopted content without a remote stays local.
 
 Check quietly fetches each source with a ten-second limit.

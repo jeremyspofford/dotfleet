@@ -109,8 +109,8 @@ def stage_repo(home, repo, workspace):
         updates.validate_content(canonical, repo)
         if not os.environ.get("DOTFLEET_LOCAL_CONTENT"):
             local_only = str(canonical) == repo
-            return updates.stage(canonical, destination, local_only=local_only)
-        updates.require_clean(canonical)
+            return updates.stage(canonical, destination, local_only=local_only, content=True)
+        updates.require_clean(canonical, content=True)
     source = (
         str(canonical) if os.environ.get("DOTFLEET_LOCAL_CONTENT") and canonical.exists() else repo
     )

@@ -182,7 +182,8 @@ Migration also saves existing Mise settings in the profile. Existing Fleet profi
 Conflict menus explain letter keys and require Enter. Skipping changes can leave differences; the summary reports that as incomplete enrollment.
 
 1. Edit content files in `~/dotfiles`. Change profile choices through `dotfleet domain`, `tools`, `groups`, or `configure`.
-2. Commit and push content changes before updating. Setup refuses a checkout with uncommitted edits.
+2. Commit and push content changes before updating. Setup refuses uncommitted edits to managed files.
+   Unmanaged files, such as untracked notes, never block setup.
 3. Run `dotfleet update` to convert and apply. The one-liner remains available for manager recovery.
 4. Run `dotfleet status` to check for differences.
 
@@ -392,7 +393,10 @@ Each fetch stops after ten seconds. Network or repository failures print a warni
 A failed check preserves the previous result and its time.
 
 Check and update use each checkout's configured upstream, including a branch other than the remote's default.
-Both preserve local commits when the remote has no new commits. Both refuse local edits, missing upstreams, and histories with conflicting new commits.
+Both preserve local commits when the remote has no new commits. Both refuse missing upstreams and histories with conflicting new commits.
+Both refuse uncommitted edits in the manager checkout and uncommitted edits to managed content files.
+A managed content file is a tracked file that Fleet installs, or the manifest. Other content files are unmanaged.
+Unmanaged content files never block. Both stop when an update would change an unmanaged file with local edits.
 Locally adopted content without a remote has no updates to fetch.
 Update fetches again, so commits published after a check can also arrive.
 It also checks local drift before creating any backup. A failed fetch or drift check stops the update without applying files.

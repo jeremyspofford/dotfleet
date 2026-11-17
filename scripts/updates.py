@@ -29,7 +29,7 @@ class CheckError(RuntimeError):
     """A source cannot be compared or safely fast-forwarded."""
 
 
-def git(path, *arguments, optional=False, fetch=False):
+def git(path, *arguments, optional=False, fetch=False, raw=False):
     environment = dict(
         os.environ,
         GIT_TERMINAL_PROMPT="0",
@@ -61,7 +61,10 @@ def git(path, *arguments, optional=False, fetch=False):
         if fetch:
             raise CheckError("remote fetch failed; check your connection and repository access")
         raise CheckError("Git could not read the checkout or its upstream")
-    return stdout.strip() if process.returncode == 0 else ""
+    if process.returncode:
+        return ""
+    # Porcelain status lines start with a space; raw output keeps them intact.
+    return stdout if raw else stdout.strip()
 
 
 def repo_id(url):
@@ -90,10 +93,58 @@ def validate_content(path, repo):
         raise CheckError("~/dotfiles belongs to another repository; nothing was overwritten")
 
 
-def require_clean(path):
+def edited_paths(path):
+    """List tracked paths with uncommitted edits. Untracked files never appear."""
+    records = git(path, "status", "--porcelain=v1", "-z", "--untracked-files=no", raw=True).split(
+        "\0"
+    )
+    names, index = [], 0
+    while index < len(records):
+        record = records[index]
+        index += 1
+        if len(record) < 4:
+            continue
+        names.append(record[3:])
+        if record[0] in "RC":
+            names.append(records[index])  # A rename also records its original path.
+            index += 1
+    return names
+
+
+def managed_edits(path):
+    """Return uncommitted edits to content that Fleet installs, including the manifest.
+
+    The foundation is the tracked content that Fleet installs. Unmanaged files, such as
+    untracked notes or an edited README, never block setup. Native chezmoi content
+    treats every tracked file as managed.
+    """
+    from convert import detect, selected_paths
+
+    edited = edited_paths(path)
+    if not edited:
+        return []
+    try:
+        kind, manifest = detect(path)
+    except (OSError, ValueError):
+        return edited
+    if kind == "chezmoi":
+        return edited
+    sources = {name for name, _ in selected_paths(path, manifest, {}).values()}
+    return [name for name in edited if name in sources or name in ("fleet.toml", "dotfleet.toml")]
+
+
+def require_clean(path, content=False):
     if path.is_symlink() or not (path / ".git").exists():
         raise CheckError("checkout is missing; use the one-line installer to recover it")
-    if git(path, "status", "--porcelain"):
+    if content:
+        edits = managed_edits(path)
+        if edits:
+            raise CheckError(
+                "content checkout has uncommitted edits to managed files: "
+                + ", ".join(sorted(edits)[:5])
+                + "; commit or move them before updating"
+            )
+    elif git(path, "status", "--porcelain"):
         raise CheckError("checkout has local edits; commit or move them before updating")
 
 
@@ -117,8 +168,8 @@ def upstream(path, local_only=False):
     }
 
 
-def compare(path, local_only=False):
-    require_clean(path)
+def compare(path, local_only=False, content=False):
+    require_clean(path, content)
     source = upstream(path, local_only)
     current = git(path, "rev-parse", "HEAD")
     remote_commit = current
@@ -133,6 +184,8 @@ def compare(path, local_only=False):
     )
     if ahead and behind:
         raise CheckError("checkout and upstream have diverged; reconcile them before updating")
+    if content and behind:
+        require_no_collision(path, current, remote_commit)
     return dict(
         source,
         path=str(path),
@@ -165,8 +218,8 @@ def copy_tracking(source, destination):
             git(destination, "config", f"branch.{branch}.merge", reference)
 
 
-def stage(path, destination, local_only=False):
-    require_clean(path)
+def stage(path, destination, local_only=False, content=False):
+    require_clean(path, content)
     upstream(path, local_only)  # Reject unsupported tracking before creating a staged copy.
     git(path, "clone", "--quiet", "--no-hardlinks", str(path), str(destination))
     copy_tracking(path, destination)
@@ -174,8 +227,26 @@ def stage(path, destination, local_only=False):
         git(destination, "remote", "remove", "origin")
     result = compare(destination, local_only)
     if result["behind"]:
+        if content:
+            # The staged clone holds the target commit; the checkout holds the local files.
+            require_no_collision(path, result["current"], result["target"], destination)
         git(destination, "merge", "--ff-only", "--no-edit", result["target"])
     return destination
+
+
+def require_no_collision(path, current, target, history=None):
+    """Stop before backup when an update would change a local file that Fleet does not manage."""
+    history = history or path
+    changed = set(git(history, "diff", "--name-only", "-z", current, target, raw=True).split("\0"))
+    local = set(edited_paths(path))
+    local |= set(git(path, "ls-files", "--others", "-z", raw=True).split("\0"))
+    collisions = sorted((changed & local) - {""})
+    if collisions:
+        raise CheckError(
+            "the update changes files with local edits in ~/dotfiles: "
+            + ", ".join(collisions[:5])
+            + "; commit or move them before updating"
+        )
 
 
 def check(home, profile, display=True):
@@ -186,7 +257,7 @@ def check(home, profile, display=True):
             if name == "content":
                 validate_content(path, profile["content_repo"])
             local_only = name == "content" and profile["content_repo"] == str(path)
-            sources.append(dict(compare(path, local_only), name=name))
+            sources.append(dict(compare(path, local_only, name == "content"), name=name))
         record = {
             "schema_version": 1,
             "checked_at": datetime.datetime.now().astimezone().isoformat(timespec="seconds"),

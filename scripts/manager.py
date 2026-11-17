@@ -874,7 +874,9 @@ def publish_checkout(home, checkout, profile, backup_path):
     canonical = home / "dotfiles"
     if canonical.exists():
         # Recheck local edits after review. Fetch exactly the reviewed commit, never a newer remote tip.
-        if run("git", "-C", str(canonical), "status", "--porcelain").strip():
+        from updates import managed_edits
+
+        if managed_edits(canonical):
             raise ValueError("Content changed during review. Preserve edits and run setup again.")
         commit = run("git", "-C", str(checkout), "rev-parse", "HEAD").strip()
         if (
@@ -888,7 +890,18 @@ def publish_checkout(home, checkout, profile, backup_path):
             shutil.copytree(checkout, canonical, symlinks=True)
         else:
             run("git", "-C", str(canonical), "fetch", str(checkout), commit)
-            run("git", "-C", str(canonical), "merge", "--ff-only", commit)
+            merged = subprocess.run(
+                ["git", "-C", str(canonical), "merge", "--ff-only", commit],
+                text=True,
+                capture_output=True,
+            )
+            if merged.returncode:
+                # Only an unmanaged local file that this update also changes reaches here.
+                raise ValueError(
+                    "The update changes a file that has uncommitted local edits in ~/dotfiles."
+                    " Commit or move that file, then run the update again.\n"
+                    + merged.stderr.strip()
+                )
     else:
         shutil.copytree(checkout, canonical, symlinks=True)
     # A newly adopted repository intentionally has no remote or saved credentials.

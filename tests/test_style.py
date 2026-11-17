@@ -103,6 +103,7 @@ def command_goldens():
             patch.object(command, "commit", return_value=machine["content_commit"]),
             patch.object(owned_views, "run", return_value=""),
             patch.object(command, "run", return_value=""),
+            patch.object(updates, "managed_edits", return_value=[]),
             patch.object(command, "records", return_value=[backup]),
             patch.object(
                 command.enrollment,
