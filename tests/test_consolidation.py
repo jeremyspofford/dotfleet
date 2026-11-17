@@ -54,7 +54,7 @@ class ConsolidationTests(unittest.TestCase):
         names = next(
             item for item in parser._actions if isinstance(item, argparse._SubParsersAction)
         ).choices
-        self.assertEqual(len(names), 20)  # The agents group joined the consolidated 19.
+        self.assertEqual(len(names), 21)  # Agents and marketplaces joined the consolidated 19.
         self.assertTrue({"backups", "tools", "status", "content"}.issubset(names))
         self.assertFalse({"backup", "rollback", "pins", "profile"}.intersection(names))
 
