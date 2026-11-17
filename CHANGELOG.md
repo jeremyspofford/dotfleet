@@ -2,6 +2,22 @@
 
 This file follows Keep a Changelog. Versions use SemVer: major.minor.patch.
 
+## [0.5.0] - 2026-11-17
+
+### Added
+
+- keep bounded run attempts and expose logs
+- uninstall extra tool versions with clear argument errors
+- consolidate backup actions and tool commands
+- check updates before backups and add confirmed cleanup
+- unify command actions and terminal access
+- simplify connections and show fleet topology
+- run Fleet commands on enrolled machines over SSH
+
+### Fixed
+
+- scope help to each command and group backup creation
+
 ## [0.4.0] - 2026-11-17
 
 ### Added
