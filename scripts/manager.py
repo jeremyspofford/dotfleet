@@ -389,12 +389,17 @@ def validate_profile(home, profile, defaults=False, configure=False, checkout=No
                 recorded = str(version)
                 installed = resolve_installed_pin(home, tool, recorded)
                 action = (
-                    f"uses installed {installed}"
-                    if installed
-                    else "leaves this tool without a selected version; no matching version is installed"
+                    f"uses installed {installed}" if installed else "leaves this tool unselected"
                 )
                 label = f"{tool} version"
-                detail = f"Recorded value: {recorded}.\nPress Enter: {action}.\nType a full version (for example 24.14.1), or skip to leave it without a selected version. Press Enter to submit."
+                detail = f"Recorded value: {recorded}.\n"
+                if not installed:
+                    detail += "For this tool, no matching version is installed.\n"
+                detail += (
+                    f"Press Enter: {action}.\n"
+                    "Type a full version (for example 24.14.1), or skip to leave this tool unselected.\n"
+                    "Press Enter to submit."
+                )
                 while True:
                     answer = ask(
                         label,
