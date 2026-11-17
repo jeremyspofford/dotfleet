@@ -20,6 +20,7 @@ from textual.widgets import Button, Input, OptionList, RichLog, Static
 from textual.widgets.option_list import Option
 
 from render_run import human, render
+import remote
 import style
 from tui_session import CoreSession
 
@@ -29,7 +30,7 @@ MENU = [
     ("check", "Updates — check, then update"),
     ("diff", "Diff — pending file changes"),
     ("backups", "Backups — list and restore"),
-    ("machines", "Machines — saved records only"),
+    ("machines", "Machines — records and SSH actions"),
     ("doctor", "Doctor — check this machine"),
     ("configure", "Configure — open the wizard"),
 ]
@@ -95,13 +96,17 @@ class Review(ModalScreen[str]):
 
 
 class ActionScreen(Screen):
-    def __init__(self, action):
+    def __init__(self, action, machine=None):
         super().__init__()
         self.action = action
+        self.machine = machine
         self.backups = []
+        self.connections = []
 
     def compose(self) -> ComposeResult:
         title = "Updates" if self.action == "check" else self.action.capitalize()
+        if self.machine:
+            title += " · " + self.machine
         yield Static("Fleet · " + title, classes="heading")
         yield RichLog(id="output", wrap=True, highlight=False, min_width=1)
         yield Static("Working…", id="progress")
@@ -126,6 +131,12 @@ class ActionScreen(Screen):
         elif self.action == "backups":
             for index, backup in enumerate(self.backups):
                 options.add_option(Option("Restore " + Path(backup).name, id=f"restore-{index}"))
+        elif self.action == "machines":
+            for index, machine in enumerate(self.connections):
+                for action in remote.CAPABLE:
+                    options.add_option(
+                        Option(action.capitalize() + " · " + machine, id=f"remote-{index}-{action}")
+                    )
         options.add_option(Option("Back", id="back"))
         options.disabled = False
         options.highlighted = 0
@@ -140,6 +151,9 @@ class ActionScreen(Screen):
             self.app.perform_action(
                 self, "rollback", self.backups[int(choice.removeprefix("restore-"))]
             )
+        elif choice.startswith("remote-"):
+            _, index, action = choice.split("-", 2)
+            self.app.push_screen(ActionScreen(action, self.connections[int(index)]))
         else:
             self.app.perform_action(self, choice)
 
@@ -243,11 +257,19 @@ class FleetApp(App[str]):
         output.clear()
         screen.query_one("#actions", OptionList).disabled = True
         progress = screen.query_one("#progress", Static)
-        progress.update("Working… Changes require review." if self.changing else "Working…")
+        progress.update(
+            "Working on " + screen.machine + ". The target runs without prompts."
+            if screen.machine
+            else "Working… Changes require review."
+            if self.changing
+            else "Working…"
+        )
 
         def event(message):
             if message["kind"] == "backups":
                 screen.backups = message["items"]
+            elif message["kind"] == "connections":
+                screen.connections = message["items"]
 
         try:
             result = await self.session.run(
@@ -256,11 +278,14 @@ class FleetApp(App[str]):
                 event,
                 self.confirm,
                 backup,
+                **({"machine": screen.machine} if screen.machine else {}),
             )
             normal = result == 0 or action in ("check", "diff") and result == 1
             progress.update(
                 "Finished."
                 if normal
+                else "Stopped on " + screen.machine + ". Resolve the target error before retrying."
+                if screen.machine
                 else "Stopped. Read the error above. Configure returns to the terminal wizard."
             )
             if action == "doctor" and result == 1:

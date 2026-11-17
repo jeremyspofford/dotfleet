@@ -18,6 +18,8 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts"))
 from common import toml
 import command
+import registry
+import remote
 import tui_core
 import ui_channel
 import updates
@@ -29,7 +31,7 @@ from textual.widgets import Input, OptionList, RichLog, Static
 class FixtureSession:
     """Use the actual dispatcher; mock only external core operations in tests."""
 
-    async def run(self, action, output, event, confirm, backup=None):
+    async def run(self, action, output, event, confirm, backup=None, machine=None):
         loop = asyncio.get_running_loop()
 
         def send(message, reply=False):
@@ -44,7 +46,7 @@ class FixtureSession:
                 patch.object(ui_channel, "send", side_effect=send),
                 contextlib.redirect_stdout(captured),
             ):
-                result = tui_core.dispatch(action, backup)
+                result = tui_core.dispatch(action, backup, machine)
             for line in captured.getvalue().splitlines():
                 loop.call_soon_threadsafe(output, line)
             return result
@@ -155,6 +157,50 @@ class ScreenTests(unittest.IsolatedAsyncioTestCase):
                 text = "\n".join(line.text for line in app.screen.query_one(RichLog).lines)
                 self.assertIn("6 · Next steps", text)
                 self.assertIn("fleet update", text)
+
+    async def test_machines_offer_remote_actions_only_for_connections(self):
+        data = {"schema_version": 1, "machines": {}}
+        for name, target in (("beelink", "mini-pc"), ("offline-record", "")):
+            record = registry.machine(self.home, "0.2.0")
+            record.update(hostname=name, ssh_target=target)
+            data["machines"][name] = record
+        path = self.home / registry.REGISTRY
+        path.parent.mkdir(parents=True)
+        path.write_text(registry.serialize(data))
+
+        def execute(home, machine, action, **options):
+            print("Machine · " + machine)
+            if action == "update":
+                print(render(self.record), end="")
+            else:
+                print(action + " finished on target")
+            return 0
+
+        app = FleetApp(FixtureSession())
+        with patch.object(remote, "execute", side_effect=execute) as called:
+            async with app.run_test(size=(80, 24)) as pilot:
+                await self.settle(pilot, app)
+                await pilot.press("down", "down", "down", "down", "enter")
+                await self.settle(pilot, app)
+                options = app.screen.query_one("#actions", OptionList)
+                self.assertEqual(options.option_count, len(remote.CAPABLE) + 1)
+                text = "\n".join(line.text for line in app.screen.query_one(RichLog).lines)
+                self.assertIn("offline-record", text)
+                self.assertIn("no connection", text)
+                for action in remote.CAPABLE:
+                    options.highlighted = options.get_option_index("remote-0-" + action)
+                    options.focus()
+                    await pilot.press("enter")
+                    await self.settle(pilot, app)
+                    called.assert_called_with(self.home, "beelink", action, check=False, stat=False)
+                    self.assertEqual(app.screen.machine, "beelink")
+                    text = "\n".join(line.text for line in app.screen.query_one(RichLog).lines)
+                    self.assertIn("Machine · beelink", text)
+                    if action == "update":
+                        self.assertIn("6 · Next steps", text)
+                    await pilot.press("escape")
+                    await self.settle(pilot, app)
+                self.assertEqual(called.call_count, 5)
 
     async def test_rollback_requires_exact_typed_word_and_escape_cancels(self):
         restored = []

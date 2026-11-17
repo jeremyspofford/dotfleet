@@ -272,7 +272,7 @@ Status shows the full values. Scroll the other screens to read long results.
 | Updates | Check both sources live. Offer update when the check finds new commits. |
 | Diff | Show pending file patches, or one clean-state line. |
 | Backups | List saved backups. Select one, review its changes, then type `restore` to confirm. |
-| Machines | Show saved registry records. No remote actions exist. |
+| Machines | Show saved records. Connected machines offer Status, Check, Diff, Doctor, and Update. |
 | Doctor | Run the existing local checks and show each result. |
 | Configure | Close the interface and run the existing terminal wizard. |
 
@@ -282,6 +282,7 @@ Mouse selection also works. Set `NO_COLOR`, even empty, or `TERM=dumb` for the p
 
 The interface calls the existing command cores. Updates and rollback show the standard review and write the same RUN.json records.
 Type `confirm` for an update. Type `restore` for rollback. Empty or incorrect answers never approve changes.
+Remote Update runs unattended on the selected machine. It shows that machine's completed review; it never asks for target input.
 Incomplete profiles stop updates; choose Configure to finish them. Local file conflicts also stop unattended apply.
 Use the plain update command in a terminal to resolve those conflicts. No interface action guesses an overwrite choice.
 
@@ -334,7 +335,7 @@ Status shows “not checked” until a valid result exists. Plain status keeps w
 
 The fleet registry records machines in `~/.local/share/fleet/registry.toml`, inside the manager store. It is not content and never enters your dotfiles checkout.
 Run `dotfleet machines` to read this machine's record and any other records in that file.
-These are saved facts, not live results. Cross-machine queries and automatic registry transfer are deferred.
+These are saved facts, not live results. Named remote commands query one machine on demand. Automatic registry transfer remains deferred.
 
 Each completed apply, update, restore, or backup refreshes this hostname's record. Other machine records stay intact.
 The record contains hostname, operating system, domain, domain confirmation, content repository and commit, manager version, last run, and last backup.
@@ -360,6 +361,46 @@ Use `dotfleet machines export --output FILE` to save a private TOML copy for tra
 TOML is the configuration format used by the registry. Export never prints its raw contents.
 Use `dotfleet machines remove HOSTNAME` to remove another machine’s stale record. Fleet backs up the registry and records the change.
 The active machine’s record cannot be removed this way.
+
+## Remote commands
+
+SSH is the secure connection tool used to run commands on another machine.
+Both machines need an enrolled Fleet manager with remote command support.
+The target uses its own profile, pins, repositories, and backup store. Your machine sends an action, never a profile or file paths.
+
+1. Configure SSH access with your existing keys. Confirm access without a password prompt.
+2. Run `fleet machines set-ssh beelink mini-pc` on this machine. Replace the names for your machines.
+3. Run `fleet machines` to inspect the connection. A record without a target shows `no connection`.
+4. Run one command below. The machine name is the final argument.
+
+```sh
+fleet status beelink
+fleet status --check beelink
+fleet check beelink
+fleet diff beelink
+fleet diff --stat beelink
+fleet doctor beelink
+fleet update beelink
+```
+
+`beelink` is the local record name. `mini-pc` is a host entry in your SSH configuration; `user@host` also works.
+Set-ssh creates or updates a connection record without contacting the target. It backs up the registry and prints the standard review.
+Existing machine facts stay intact. Connection targets survive local record refreshes.
+Omit the machine name to keep each command local. There is no all-machines command or background service.
+
+Connections use batch mode: SSH never asks for a password. Connection setup has a ten-second limit and one attempt.
+SSH uses your configured keys and host checks. It does not forward your authentication agent or open extra forwarding channels.
+An unreachable or unauthenticated machine produces one error line. Fix access outside Fleet, then retry.
+
+Target runs never prompt. An incomplete profile stops the action and lists the missing choices.
+Complete those choices on the target. File conflicts stop unattended updates without choosing overwrite.
+Configure requires a terminal on the target. Remote rollback and uninstall are refused because they are destructive.
+Run those commands on the target itself.
+
+The target renders results under its machine header. Updates write RUN.json in the target's backup folder, with the same review as local updates.
+The calling machine creates no backup or run record for a remote action. Read-only commands keep their normal rules; check refreshes the target's cache.
+Exit 0 means success. Check and diff retain exit 1 for updates and differences; other failures return nonzero.
+Each result names the machine and outcome. A lost connection cannot prove whether an update finished; inspect the target before retrying.
 
 Use `dotfleet profile` to inspect saved choices. Change them through `domain`, `pins`, `groups`, or `configure`; do not edit profile.toml.
 The manager’s chezmoi configuration and converted source are internal files. Inspect their locations through `status` and their health through `doctor`.

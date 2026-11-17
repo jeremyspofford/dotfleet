@@ -276,6 +276,8 @@ def resolve_installed_pin(home, tool, request):
 
 
 def has_terminal():
+    if os.environ.get("FLEET_REMOTE_RUN") == "1":
+        return False
     try:
         descriptor = os.open("/dev/tty", os.O_RDWR)
     except OSError:

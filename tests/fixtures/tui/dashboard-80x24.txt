@@ -13,7 +13,7 @@
  │Updates — check, then update                                                │
  │Diff — pending file changes                                                 │
  │Backups — list and restore                                                  │
- │Machines — saved records only                                               │
+ │Machines — records and SSH actions                                          │
  │Doctor — check this machine                                                 │
  │Configure — open the wizard                                                 │
  │                                                                            │

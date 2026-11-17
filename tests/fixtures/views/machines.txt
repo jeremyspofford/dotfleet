@@ -5,6 +5,7 @@
   Registry         ~/.local/share/fleet/registry.toml
   Machine          example-hub · this machine
   Hostname         example-hub
+  Connection       no connection
   OS               Linux
   Domain           personal · chosen
   Content repo     https://example.invalid/dotfiles

@@ -96,7 +96,7 @@ show_apply_output() {
 }
 
 log_info "Applying managed files"
-if { exec 3<>/dev/tty; } 2>/dev/null; then
+if [[ ${FLEET_REMOTE_RUN:-0} != 1 ]] && { exec 3<>/dev/tty; } 2>/dev/null; then
 	# A plain line prompt also lets users correct input before pressing Enter.
 	chezmoi --no-tty --no-pager apply <&3 | show_apply_output
 	exec 3>&-

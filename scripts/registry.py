@@ -59,6 +59,8 @@ def load(home):
         for name, kind in FIELDS.items():
             if name not in record or type(record[name]) is not kind:
                 raise ValueError(f"Fleet record {key}: {name} must be {kind.__name__}.")
+        if "ssh_target" in record and not isinstance(record["ssh_target"], str):
+            raise ValueError(f"Fleet record {key}: ssh_target must be str.")
         for name in ("home", "last_backup", "last_run_record"):
             if record[name] and not Path(record[name]).is_absolute():
                 raise ValueError(f"Fleet record {key}: {name} must be an absolute path.")
@@ -103,6 +105,7 @@ def machine(home, manager_version, fallback=None):
         "last_run_record": "",
         "result": "not recorded",
         "enrolled": profile_path.exists(),
+        "ssh_target": "",
     }
 
 
@@ -137,6 +140,7 @@ def refresh(home, manager_version, backup, result, fallback=None):
     with os.fdopen(descriptor, "a") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
         data = load(home)
+        current["ssh_target"] = data["machines"].get(current["hostname"], {}).get("ssh_target", "")
         data["machines"][current["hostname"]] = current
         atomic(path, serialize(data))
     return current
@@ -161,6 +165,7 @@ def rows(home, manager_version):
         output += [
             ("Machine", key + (" · this machine" if key == local else " · recorded only")),
             ("Hostname", record["hostname"]),
+            ("Connection", record.get("ssh_target") or "no connection"),
             ("OS", record["os"]),
             (
                 "Domain",
