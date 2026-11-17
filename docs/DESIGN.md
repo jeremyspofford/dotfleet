@@ -231,3 +231,10 @@ A marketplace is a Git repository with a `fleet-marketplace.toml` catalog. See [
 Pulled-in components live in an untracked library under the manager store. The installation record lives there too.
 No pulled-in file enters the user's tracked content. Updates never rewrite the user's own files.
 A refresh replaces a pulled-in component, keeps any edited copy in the run backup, and prints one line.
+
+## Serve MCP servers through one gateway
+
+The Fleet gateway is a stdio MCP server in the manager. Each agent receives one entry for it.
+The gateway serves every declared downstream server's tools, prompts, and read-only resources.
+Served is a render kind beside the file kinds. Connectors, hooks, plugins, settings, and skill folders stay on files.
+The gateway reads its downstream list from the tree. Updates change that list, never the agent's entry.

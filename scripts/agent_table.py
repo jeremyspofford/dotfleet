@@ -212,6 +212,8 @@ def check_item(kind, name, spec, entries, domains, catalog, warnings):
     elif kind == "mcp":
         check_mcp(where, spec)
     elif kind == "connectors":
+        if name == "fleet":
+            fail(where, "fleet is the gateway's entry name; choose another connector name")
         if "url" in spec and not spec["url"].startswith("https://"):
             fail(where, "url must start with https://")
     elif kind == "plugins":

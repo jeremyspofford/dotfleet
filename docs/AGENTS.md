@@ -19,11 +19,11 @@ Updates change the tree. Each agent gets one pointer to the tree, set once:
 
 | Agent | Pointer | Contents |
 | --- | --- | --- |
-| claude | `~/.claude/skills/fleet` links to the tree's plugin folder. `~/.claude/rules/fleet.md` links to its rule file. | Servers, hooks, and a link to `~/.agents/skills`. |
-| gemini | `~/.gemini/extensions/fleet` links to the tree's extension folder. | Servers, hooks, and a `GEMINI.md` rule file. |
-| codex | Skills: Codex reads `~/.agents/skills` itself. | Owned entries in `~/.codex/config.toml` and `~/.codex/hooks.json`. |
-| opencode | Skills: OpenCode reads `~/.agents/skills` itself. Rules: one `instructions` entry names the tree's rule file. | Owned server entries in `~/.config/opencode/opencode.json`. |
-| pi | Skills: Pi reads `~/.agents/skills` itself. | Owned server entries in `~/.pi/agent/mcp.json`. |
+| claude | `~/.claude/skills/fleet` links to the tree's plugin folder. `~/.claude/rules/fleet.md` links to its rule file. | The gateway entry, connectors, hooks, and a link to `~/.agents/skills`. |
+| gemini | `~/.gemini/extensions/fleet` links to the tree's extension folder. | The gateway entry, connectors, hooks, and a `GEMINI.md` rule file. |
+| codex | Skills: Codex reads `~/.agents/skills` itself. Servers: one gateway entry in `~/.codex/config.toml`. | Owned connector entries and hook entries in `~/.codex/hooks.json`. |
+| opencode | Skills: OpenCode reads `~/.agents/skills` itself. Rules: one `instructions` entry names the tree's rule file. Servers: one gateway entry. | Owned connector entries in `~/.config/opencode/opencode.json`. |
+| pi | Skills: Pi reads `~/.agents/skills` itself. Servers: one gateway entry in `~/.pi/agent/mcp.json`. | Owned connector entries in the same file. |
 
 After the pointer, Fleet does not write inside an agent's own files.
 Codex, OpenCode, and Pi accept no pointer for servers or hooks. They receive owned entries instead.
@@ -51,9 +51,20 @@ Earlier releases linked each skill into each agent's folder. The update removes 
 
 ## Servers, connectors, rules, and hooks
 
-Fleet renders each MCP server in the agent's own format. MCP means Model Context Protocol.
-Variable names render in the agent's own reference form, such as `${NAME}` or `{env:NAME}`. Fleet never writes a secret value.
-A connector with a `url` renders as an HTTP server. Next steps lists the agent's sign-in command.
+MCP means Model Context Protocol. An MCP server offers tools, prompts, and resources to an agent.
+Fleet serves every declared MCP server through its gateway. Served is a render kind beside the file kinds.
+Each agent receives one server entry, named `fleet`. It runs `~/.local/share/fleet/agents/gateway/run-AGENT`.
+That wrapper starts `scripts/gateway.py` in the manager with the agent's gateway file from the tree.
+
+The gateway starts each downstream server on demand. It serves their tools and prompts as `SERVER__NAME`.
+It serves their resources for reading only. A server that fails to start is skipped; the others keep working.
+Downstream stdio servers start with the gateway's environment plus their `env` values.
+The gateway entry passes each variable that a downstream server reads, in the agent's own reference form, such as `${NAME}` or `{env:NAME}`.
+Fleet never writes a secret value. The wrapper finds `python3` through the agent's `PATH`.
+Hooks, plugins, settings, and skill folders stay on files.
+
+A connector with a `url` renders as an HTTP server entry, because the agent itself handles the sign-in. Next steps lists the agent's sign-in command.
+A connector cannot be named `fleet`; the gateway uses that name.
 A connector without a `url` appears in Next steps as a manual step.
 
 Rule sets combine into one file per agent in the tree. Codex and Pi read no include file, so Fleet reports their rule sets as unsupported.

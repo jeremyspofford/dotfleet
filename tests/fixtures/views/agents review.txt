@@ -3,10 +3,14 @@
 
 2 · Manager and content — no changes.
 
-3 · Files — 3 changed.
+3 · Files — 3 changed, 4 removed.
   ~ ~/.codex/config.toml
   ~ ~/.config/fleet/profile.toml
   ~ ~/.local/share/fleet/agents/claude/.mcp.json
+  − ~/.local/share/fleet/agents/gateway/claude.json
+  − ~/.local/share/fleet/agents/gateway/codex.json
+  − ~/.local/share/fleet/agents/gateway/run-claude
+  − ~/.local/share/fleet/agents/gateway/run-codex
 
 4 · Profile changes — 1 changed.
   Agent item mcp.docs  not set → off
