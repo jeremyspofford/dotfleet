@@ -63,9 +63,15 @@ def remember(home, name, target, action, state, code):
                 "state": state,
                 "exit_code": code,
                 "observed_at": datetime.datetime.now(datetime.timezone.utc).isoformat(
-                    timespec="seconds"
+                    timespec="microseconds"
                 ),
             }
+            # Contact diagnostics retain one current observation for the newest 100 machines.
+            data["machines"] = dict(
+                sorted(
+                    data["machines"].items(), key=lambda item: item[1]["observed_at"], reverse=True
+                )[:100]
+            )
             atomic(path, json.dumps(data, indent=2) + "\n")
     except (OSError, ValueError) as error:
         print("Warning: Could not save the contact observation: " + str(error))

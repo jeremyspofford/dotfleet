@@ -16,6 +16,7 @@ commands:
     doctor     Check this machine and name any fixes.
     domain     Show or choose content additions.
     groups     Show or switch optional content.
+    logs       Show saved change-making attempts.
     machines   Manage saved machine connections.
     secrets    List secret names as set or unset.
     status     Show saved state without network requests.

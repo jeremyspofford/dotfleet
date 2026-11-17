@@ -288,7 +288,7 @@ class ConnectionUnitTests(unittest.TestCase):
             patch.object(tui_core, "dispatch", return_value=0) as dispatch,
         ):
             self.assertEqual(tui_core.main(["rollback", "/saved/backup"]), 0)
-            dispatch.assert_called_once_with("rollback", "/saved/backup", None, None)
+            dispatch.assert_called_once_with("rollback", "/saved/backup", None, None, None)
 
 
 if __name__ == "__main__":

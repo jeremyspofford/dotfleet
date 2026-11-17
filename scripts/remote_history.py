@@ -12,6 +12,8 @@ from pathlib import Path
 import sys
 import uuid
 
+import run_index
+
 from common import atomic
 
 STORE = ".local/share/fleet/remote-runs"
@@ -19,7 +21,8 @@ STORE = ".local/share/fleet/remote-runs"
 
 def output_text(result, name):
     value = getattr(result, name, "") or ""
-    return value.decode(errors="replace") if isinstance(value, bytes) else value
+    text = value.decode(errors="replace") if isinstance(value, bytes) else value
+    return text[:65536] + ("\n[diagnostic truncated]" if len(text) > 65536 else "")
 
 
 def save(home, machine, target, action, phase, result):
@@ -42,9 +45,10 @@ def save(home, machine, target, action, phase, result):
         "exit_code": getattr(result, "returncode", None),
         "stdout": output_text(result, "stdout"),
         "stderr": output_text(result, "stderr"),
-        "error": str(result) if isinstance(result, Exception) else "",
+        "error": str(result)[:2000] if isinstance(result, Exception) else "",
     }
     atomic(path, json.dumps(record, indent=2) + "\n")
+    run_index.prune_diagnostics(home, STORE)
     return path
 
 

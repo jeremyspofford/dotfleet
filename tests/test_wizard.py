@@ -58,6 +58,12 @@ class WizardTests(unittest.TestCase):
         result = {}
         for path in self.home.rglob("*"):
             name = str(path.relative_to(self.home))
+            if name in (".local", ".local/share", ".local/share/fleet") and name not in getattr(
+                self, "prior_directories", set()
+            ):
+                continue
+            if name == ".local/share/fleet/runs" or name.startswith(".local/share/fleet/runs/"):
+                continue
             value = (
                 ("link", os.readlink(path))
                 if path.is_symlink()
@@ -123,10 +129,13 @@ class WizardTests(unittest.TestCase):
         self.assertTrue((self.home / ".zshrc").is_file())
         self.assert_quiet_status()
 
-    def test_review_quit_leaves_entire_home_unchanged(self):
+    def test_review_quit_keeps_home_files_and_records_cancellation(self):
         self.defaults_origin()
         (self.home / ".zshrc").write_text("# keep exactly\n")
         (self.home / ".link").symlink_to(".zshrc")
+        self.prior_directories = {
+            str(path.relative_to(self.home)) for path in self.home.rglob("*") if path.is_dir()
+        }
         before = self.snapshot()
         answers = self.answers()
         answers[-1] = (b"Review [quit]:", b"quit\n")
@@ -222,6 +231,9 @@ class WizardTests(unittest.TestCase):
         self.defaults_origin()
         self.env["PATH"] = "/usr/bin:/bin"
         (self.home / ".zshrc").write_text("# preserve before tool downloads\n")
+        self.prior_directories = {
+            str(path.relative_to(self.home)) for path in self.home.rglob("*") if path.is_dir()
+        }
         before = self.snapshot()
         answers = self.answers()
         answers[-1] = (b"Review [quit]:", b"quit\n")

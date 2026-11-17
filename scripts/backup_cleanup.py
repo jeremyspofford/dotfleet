@@ -15,6 +15,8 @@ import shutil
 import sys
 import uuid
 
+import run_index
+
 from common import atomic, read_toml
 from command_display import current_command
 from render_run import render
@@ -117,19 +119,28 @@ def save(record):
     path = Path(record["record_path"])
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     atomic(path, json.dumps(record, indent=2) + "\n")
+    run_index.attach(record)
+    run_index.prune_diagnostics(Path(record["home"]), STORE)
 
 
 def delete_selected(home, names):
+    return run_index.run(home, "backups delete", lambda: delete_confirmed(home, names))
+
+
+def delete_confirmed(home, names):
     import command
     import ui_channel
 
     if not names:
+        run_index.outcome("NO_CHANGE")
         print("No backups to delete.")
         return 0
+    run_index.stage("review")
     record = planned_record(home, names)
     if not ui_channel.active():
         print(render(record, future=True), end="")
     if not command.confirm("delete", "Delete the listed backups permanently. " + WARNING, record):
+        run_index.outcome("CANCELLED")
         print("Cancelled. No backups deleted.")
         return 0
     # A backup must remain exactly as reviewed while the owner considers deletion.
@@ -140,6 +151,7 @@ def delete_selected(home, names):
                 "A selected backup changed after review. Nothing deleted; review again."
             )
     save(record)
+    run_index.stage("delete")
     try:
         for item in record["backup_cleanup"]:
             shutil.rmtree(item["path"])
@@ -164,6 +176,9 @@ def delete_selected(home, names):
         record["result"] = "FAILED"
         record["warnings"].append("Could not refresh the machine record: " + str(error))
     save(record)
+    run_index.outcome(
+        record["result"], record["warnings"][-1] if record["result"] == "FAILED" else ""
+    )
     print(render(record), end="")
     return int(record["result"] != "SUCCESS")
 

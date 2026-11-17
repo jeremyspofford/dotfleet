@@ -22,6 +22,7 @@ from render_run import render
 from installation import command_software, MANAGER
 import registry
 import style
+import run_index
 from store_migration import recorded_moves
 
 RECORD = ".local/state/dotfleet/last-run.json"
@@ -189,9 +190,11 @@ class RunAccount:
             )
         self.diff_path = plan["diff_path"]
         self.status = plan["status"]
+        run_index.stage("review")
 
     def bind_backup(self, path):
         self.backup = path
+        run_index.attach(self.record())
         recorded = json.loads((path / "MANIFEST.json").read_text())
         if recorded != self.manifest:
             raise ValueError(
@@ -199,6 +202,7 @@ class RunAccount:
             )
         atomic(path / "CHEZMOI-DIFF.patch", self.diff_path.read_bytes())
         self.save()
+        run_index.stage("apply")
 
     def record(self):
         return {
@@ -256,6 +260,10 @@ class RunAccount:
                 self.result = "FAILED"
                 self.warnings.append("Fleet registry was not refreshed: " + str(error))
         self.save()
+        run_index.attach(self.record())
+        run_index.outcome(
+            self.result, self.warnings[-1] if self.result == "FAILED" and self.warnings else ""
+        )
         print(render(self.record()), end="")
         marker = os.environ.get("DOTFLEET_SUMMARY_MARKER")
         if marker:

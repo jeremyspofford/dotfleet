@@ -19,13 +19,17 @@ class CoreSession:
     def __init__(self, root):
         self.root = root
 
-    async def run(self, action, output, event, confirm, backup=None, machine=None, selected=None):
+    async def run(
+        self, action, output, event, confirm, backup=None, machine=None, selected=None, entry=None
+    ):
         parent, child = socket.socketpair()
         environment = dict(os.environ, NO_COLOR="1", PYTHONDONTWRITEBYTECODE="1")
         environment[CHANNEL] = str(child.fileno())
         arguments = [sys.executable, "-u", str(self.root / "scripts/tui_core.py"), action]
         if backup:
             arguments.extend(["--backup", backup])
+        if entry:
+            arguments.extend(["--entry", entry])
         if machine:
             arguments.extend(["--machine", machine])
         for name in selected or []:

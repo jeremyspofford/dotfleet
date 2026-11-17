@@ -197,6 +197,9 @@ def check(home, profile, display=True):
             raise CheckError("the check cache must stay inside the manager store")
         atomic(cache, json.dumps(record, indent=2) + "\n")
     except (OSError, ValueError, RuntimeError, KeyError) as error:
+        import run_index
+
+        run_index.failure(f"Warning: Could not check {name}: {error}.")
         print(f"Warning: Could not check {name}: {error}.", file=sys.stderr)
         return 2
     if display:

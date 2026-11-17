@@ -74,8 +74,17 @@ class BackupCleanupTests(unittest.TestCase):
         before = {path: path.read_bytes() for path in self.home.rglob("*") if path.is_file()}
         output, _ = self.call("--all", answer="cancel")
         self.assertIn("No backups deleted", output)
+        import run_index
+
+        (entry,) = run_index.entries(self.home)
+        self.assertEqual(entry["result"], "CANCELLED")
         self.assertEqual(
-            {path: path.read_bytes() for path in self.home.rglob("*") if path.is_file()}, before
+            {
+                path: path.read_bytes()
+                for path in self.home.rglob("*")
+                if path.is_file() and not path.is_relative_to(run_index.folder(self.home))
+            },
+            before,
         )
         for flags in (
             [],

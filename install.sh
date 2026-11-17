@@ -16,7 +16,86 @@ if [[ -n ${BASH_SOURCE[0]:-} && -f ${BASH_SOURCE[0]} ]]; then
 	script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 fi
 work_dir=$(mktemp -d)
-trap 'rm -rf -- "$work_dir"' EXIT
+export DOTFLEET_SUMMARY_MARKER="$work_dir/summary-reported"
+export DOTFLEET_APPLY_MARKER="$work_dir/apply-started"
+summary_expected=1
+index_script=''
+run_stage=preflight
+run_error=''
+run_command=install
+for argument in "$@"; do
+	case $argument in
+	-h | --help) summary_expected=0 ;;
+	--configure) run_command=configure ;;
+	esac
+done
+# Keep a minimal attempt even when Python or the downloaded logger cannot start.
+fallback_attempt() {
+	local store="$HOME/.local/share/fleet" identifier stamp machine error path
+	if [[ -d $HOME/.local/share/dotfleet && ! -e $store ]]; then store="$HOME/.local/share/dotfleet"; fi
+	[[ ! -L $store && ! -L $store/runs ]] || return 1
+	local prefix
+	for prefix in .local .local/share .local/share/fleet .local/share/dotfleet; do
+		[[ ! -L $HOME/$prefix ]] || return 1
+	done
+	umask 077
+	mkdir -p "$store/runs" || return 1
+	chmod 700 "$store/runs"
+	path=$(cd -- "$store/runs" && pwd -P)
+	[[ $path == "$(cd -- "$HOME" && pwd -P)"/* ]] || return 1
+	stamp=$(date -u +%Y-%m-%dT%H:%M:%S+00:00)
+	identifier="$(date -u +%Y%m%d-%H%M%S)-000000-$(printf '%04x%04x%04x' "$RANDOM" "$RANDOM" "$RANDOM")"
+	machine=${HOSTNAME:-unknown}
+	error=${run_error:-"Setup stopped during $run_stage (exit $1)."}
+	# Bash escaping keeps this fallback independent of Python, Git, and curl.
+	json_string() {
+		local value=$1
+		value=${value//\\/\\\\}
+		value=${value//\"/\\\"}
+		value=${value//$'\n'/ }
+		value=${value//$'\r'/ }
+		value=${value//$'\t'/ }
+		printf '"%s"' "$value"
+	}
+	local temporary="$path/.$identifier"
+	(
+		umask 077
+		printf '{"schema_version":1,"id":"%s","time":"%s","command":"%s","machine":' "$identifier" "$stamp" "$run_command"
+		json_string "$machine"
+		printf ',"remote":%s,"result":"FAILED","stage":' "$([[ ${FLEET_REMOTE_RUN:-} == 1 ]] && printf true || printf false)"
+		json_string "$run_stage"
+		printf ',"error":'
+		json_string "${error:0:2000}"
+		printf ',"backup":null,"record_path":null}\n'
+	) >"$temporary"
+	chmod 600 "$temporary"
+	mv -- "$temporary" "$path/$identifier.json"
+	local entries=("$path"/????????-??????-??????-????????????.json) index
+	for ((index = 0; index < ${#entries[@]} - 100; index++)); do rm -f -- "${entries[index]}"; done
+}
+finish_run() {
+	local result=$?
+	trap - EXIT
+	if [[ $summary_expected == 1 && -z ${FLEET_RUN_ID:-} && $result != 0 ]]; then
+		fallback_attempt "$result" || printf 'Warning: Could not save the run index entry.\n' >&2
+	fi
+	if [[ -n $index_script && -n ${FLEET_RUN_ID:-} ]]; then
+		python3 -B "$index_script" finish --code "$result" --error "${run_error:-Setup stopped during $run_stage (exit $result).}" || log_warn 'Could not finish the run index entry.'
+	fi
+	if [[ $summary_expected == 1 && ! -e $DOTFLEET_SUMMARY_MARKER ]] && declare -F log_error >/dev/null; then
+		# Early failures have an index entry, but no apply review.
+		log_error "Setup stopped (exit $result) before the run renderer completed."
+		if [[ -e $DOTFLEET_APPLY_MARKER ]]; then
+			log_warn 'Inspect the latest ~/fleet-backups/ folder for RUN.json before retrying.'
+		else
+			log_info 'No apply review was saved. Use fleet logs show to read the attempt.'
+		fi
+	fi
+	rm -rf -- "$work_dir"
+	exit "$result"
+}
+trap finish_run EXIT
+trap 'run_error="Setup failed during $run_stage: ${BASH_COMMAND%% *} exited $?."' ERR
 if [[ -n $script_dir && -r $script_dir/scripts/logger.sh ]]; then
 	logger=$script_dir/scripts/logger.sh
 else
@@ -31,25 +110,6 @@ else
 fi
 # shellcheck source=scripts/logger.sh
 source "$logger"
-export DOTFLEET_SUMMARY_MARKER="$work_dir/summary-reported"
-export DOTFLEET_APPLY_MARKER="$work_dir/apply-started"
-summary_expected=1
-finish_run() {
-	local result=$?
-	trap - EXIT
-	if [[ $summary_expected == 1 && ! -e $DOTFLEET_SUMMARY_MARKER ]]; then
-		# No record exists yet. Do not invent an account of unknown operations.
-		log_error "Setup stopped (exit $result) before the run renderer completed."
-		if [[ -e $DOTFLEET_APPLY_MARKER ]]; then
-			log_warn 'Inspect the latest ~/fleet-backups/ folder for RUN.json before retrying.'
-		else
-			log_info 'Run record: not created; setup stopped before apply.'
-		fi
-	fi
-	rm -rf -- "$work_dir"
-	exit "$result"
-}
-trap finish_run EXIT
 usage() {
 	log_section "Fleet help"
 	log_heredoc '' <<EOF
@@ -92,7 +152,8 @@ The scan cannot prove a file contains no secrets. Review the local repository be
 Review lists planned software, checkout, file, and profile changes, plus locations and next steps. Type confirm to apply, quit to cancel, or a step name to go back.
 Old stores move to the Fleet paths before setup. Profiles and backup folders stay intact.
 The review lists those moves. Cancelling apply keeps them. Other home changes wait for confirmation.
-Temporary tool downloads stay outside your home.
+Temporary tool downloads stay outside your home. Each attempt keeps a small private entry, even before apply.
+Use fleet logs list or fleet logs show to read attempts. The newest 100 entries stay; read-only commands add none.
 Adopted file contents stay unchanged, including existing Mise files. Profile choices do not rewrite adopted files.
 Tools use full versions. Enter accepts the prompt's stated action; skip leaves a choice incomplete.
 Complete profiles need no profile prompts. Every summary prints all six categories, including scripted runs.
@@ -142,16 +203,32 @@ while [[ $# -gt 0 ]]; do
 		;;
 	esac
 done
+# Start before preflight. Reuse the installed writer if a bootstrap download fails.
+if [[ -n $script_dir && -r $script_dir/scripts/run_index.py ]]; then
+	index_script="$script_dir/scripts/run_index.py"
+elif [[ -r $HOME/.local/share/fleet/manager/scripts/run_index.py ]]; then
+	index_script="$HOME/.local/share/fleet/manager/scripts/run_index.py"
+else
+	index_script="$work_dir/run_index.py"
+	curl -fsSL "$raw/scripts/run_index.py" -o "$index_script"
+fi
+FLEET_RUN_ID=$(python3 -B "$index_script" begin --command "$run_command")
+export FLEET_RUN_ID
 require_commands git curl tar python3
 python3 -c 'import sys; sys.exit(sys.version_info < (3, 11))' || error_exit 'Python 3.11 or newer is required.'
+run_stage="manager checkout"
+python3 -B "$index_script" stage --name "$run_stage"
 if [[ -z $script_dir ]]; then
 	script_dir="$work_dir/manager"
 	git clone "$manager_repo" "$script_dir" </dev/null
 fi
+run_stage="store migration"
+python3 -B "$index_script" stage --name "$run_stage"
 python3 -B "$script_dir/scripts/store_migration.py" --record "$work_dir/store-moves.json"
 export DOTFLEET_STORE_MOVES_FILE="$work_dir/store-moves.json"
 if [[ $script_dir == "$HOME/.local/share/dotfleet/"* ]]; then
 	script_dir="$HOME/.local/share/fleet/${script_dir#"$HOME/.local/share/dotfleet/"}"
+	index_script="$script_dir/scripts/run_index.py"
 fi
 case $(uname -s) in
 Linux)
@@ -165,6 +242,8 @@ log_section "Fleet setup"
 log_info "Host: $host / $(uname -m)"
 export PATH="$HOME/.local/bin:$PATH"
 umask 077
+run_stage="software preparation"
+python3 -B "$index_script" stage --name "$run_stage"
 mkdir -p "$work_dir/bin"
 if ! command -v chezmoi >/dev/null; then
 	log_info 'Preparing chezmoi; it moves to ~/.local/bin only after confirmation'
@@ -179,5 +258,6 @@ if ! command -v mise >/dev/null; then
 	export DOTFLEET_STAGED_MISE="$work_dir/bin/mise"
 fi
 export PATH="$work_dir/bin:$PATH"
+run_stage="enrollment"
 # Python uses the same logger style for output and terminal prompts.
 python3 -u "$script_dir/scripts/manager.py" "${arguments[@]}" </dev/null

@@ -66,7 +66,7 @@ def send_backups(home):
     )
 
 
-def dispatch(action, backup=None, machine=None, selected=None):
+def dispatch(action, backup=None, machine=None, selected=None, entry=None):
     home = Path.home()
     if action == "backup-delete-selected":
         import backup_cleanup
@@ -80,6 +80,19 @@ def dispatch(action, backup=None, machine=None, selected=None):
     if action == "dashboard":
         ui_channel.send({"kind": "dashboard", "rows": dashboard(home)})
         return 0
+    if action == "logs":
+        import run_index
+        import run_logs
+
+        ui_channel.send(
+            {
+                "kind": "logs",
+                "items": [
+                    {"id": item["id"], "label": run_logs.label(item)}
+                    for item in run_index.entries(home)
+                ],
+            }
+        )
     if action == "backups":
         send_backups(home)
     if action in ("machines", "topology"):
@@ -94,6 +107,8 @@ def dispatch(action, backup=None, machine=None, selected=None):
         return 0
     if backup:
         args.extend(["--backup", backup])
+    if entry:
+        args.extend(["--name", entry])
     try:
         result = command.main(args)
     except SystemExit as error:
@@ -114,6 +129,7 @@ def main(argv=None):
     parser.add_argument("action", choices=ACTIONS, help="existing core action to run")
     # An interface opened before a manager update can still send the old argument.
     parser.add_argument("legacy_backup", nargs="?", help=argparse.SUPPRESS)
+    parser.add_argument("--entry", help="one saved attempt name, only for log-show")
     parser.add_argument("--backup", help="saved folder for rollback; no other action accepts it")
     parser.add_argument(
         "--selected-backup",
@@ -136,7 +152,9 @@ def main(argv=None):
         parser.error("only selected backup deletion accepts backup selections")
     if not ui_channel.active():
         parser.error("this internal bridge requires the terminal interface channel")
-    return dispatch(args.action, args.backup, args.machine, args.selected_backup)
+    if args.entry and args.action != "log-show":
+        parser.error("only log-show accepts a run entry")
+    return dispatch(args.action, args.backup, args.machine, args.selected_backup, args.entry)
 
 
 if __name__ == "__main__":
