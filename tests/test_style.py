@@ -56,7 +56,8 @@ def command_goldens():
         root.mkdir()
         (root / "VERSION").write_text("0.4.0\n")
         (home / "dotfiles/fleet.toml").write_text(
-            'format = "plain"\n[domains]\ncore = "Base files only."\npersonal = "Personal shortcuts."\n'
+            'format = "plain"\noverlays = ["core", "personal", "work", "client"]\n'
+            '[domains]\ncore = "Base files only."\npersonal = "Personal shortcuts."\n'
             '[groups.helpers]\ndescription = "Fleet command shortcut."\n'
             '[groups.docker]\ndescription = "Container shortcuts."\n'
             "[secrets]\nEXAMPLE_API_TOKEN = {}\nUNSET_TOKEN = {}\n"

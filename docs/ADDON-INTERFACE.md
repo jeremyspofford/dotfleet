@@ -1,7 +1,7 @@
 # Add-on contract
 
 An add-on is an optional Fleet extension. Fleet is its host: the manager that controls access, installation, and removal.
-A profile saves machine choices. A domain selects personal, employer, client, or shared content.
+A profile saves machine choices. A domain selects content additions that the content repository declares.
 This document defines manifest schema 1. A manifest is a file that declares an add-on's requirements and owned outputs.
 
 No add-on ships with Fleet. The repository contains a test fixture only.

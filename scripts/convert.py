@@ -71,6 +71,39 @@ def content_manifest(checkout):
     return read_toml(manifest_path(checkout))
 
 
+LEGACY_DOMAINS = ("core", "personal", "work", "client")
+DOMAIN_NAME = re.compile(r"[a-z][a-z0-9]*(?:-[a-z0-9]+)*")
+
+
+def content_domains(manifest):
+    """Return the domains that content declares, with core first.
+
+    Content declares domains through `overlays` and the `domains` table.
+    Content that declares neither keeps the four names that earlier releases fixed.
+    """
+    declared = list(manifest.get("overlays", [])) + list(manifest.get("domains", {}))
+    if "overlays" not in manifest and "domains" not in manifest:
+        declared = list(LEGACY_DOMAINS)
+    for name in declared:
+        if not isinstance(name, str) or not DOMAIN_NAME.fullmatch(name):
+            raise ValueError(
+                f"Invalid domain name in the content manifest: {name!r}. "
+                "Use lowercase letters, digits, and single hyphens."
+            )
+    return ["core", *dict.fromkeys(name for name in declared if name != "core")]
+
+
+def require_domain(manifest, domain, display="fleet"):
+    """Stop when the saved domain is not one that the content declares."""
+    names = content_domains(manifest)
+    if domain not in names:
+        raise ValueError(
+            f"The content does not declare domain {domain}. Declared domains: "
+            + ", ".join(names)
+            + f". Run {display} domain list, then {display} domain set --name NAME."
+        )
+
+
 def detect(checkout, explicit=None):
     manifest = content_manifest(checkout)
     names = tracked(checkout)

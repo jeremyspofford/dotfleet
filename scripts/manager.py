@@ -14,7 +14,7 @@ Messages use logger.sh. Prompts use /dev/tty.
 """
 
 import argparse
-from convert import content_manifest
+from convert import content_domains, content_manifest, require_domain
 import style
 import run_index
 from updates import CACHE
@@ -35,6 +35,7 @@ import tempfile
 import textwrap
 
 from common import atomic, read_toml, relative, run, toml
+from command_display import command_name
 from render_run import change_marker
 from convert import GENERATED, convert, detect, source_name, tracked
 
@@ -123,12 +124,14 @@ def domain_details(checkout):
                 base.append(label)
         if base:
             lines += ["Base files in this checkout: " + ", ".join(base) + ".", ""]
-    descriptions = content_manifest(checkout).get("domains", {}) if checkout else {}
+    manifest = content_manifest(checkout) if checkout else {}
+    descriptions = manifest.get("domains", {})
     lines.append("  core      Base configuration only. No domain additions.")
     if descriptions.get("core"):
         lines.append("            " + descriptions["core"])
     empty = 0
-    for domain in ["personal", "work", "client"]:
+    additions = content_domains(manifest)[1:]
+    for domain in additions:
         name = f".config/dotfiles/aliases/{domain}.zsh"
         if entries.get(name) not in ("100644", "100755"):
             summary = (
@@ -156,17 +159,11 @@ def domain_details(checkout):
         lines.append(f"  {domain:<9} {summary}")
         if descriptions.get(domain):
             lines.append("            " + descriptions[domain])
-    if empty == 3:
-        lines += [
-            "",
-            "Personal, work, and client currently add no domain commands. Start with core.",
-        ]
+    if additions and empty == len(additions):
+        lines += ["", "No declared domain adds commands yet. Start with core."]
     lines += [
         "",
-        (
-            "Names describe intended use: personal for yourself, work for an employer, "
-            "client for a customer."
-        ),
+        "Your content declares these domains. Add or remove domains in its fleet.toml.",
         "Choosing a domain does not install software or create accounts.",
         "Your choice is saved in ~/.config/fleet/profile.toml.",
         "The default is core for a new profile, or your saved domain on later runs.",
@@ -330,6 +327,16 @@ def pin_argument(text):
     return tool, version.strip()
 
 
+def domain_argument(text):
+    from convert import DOMAIN_NAME
+
+    if not DOMAIN_NAME.fullmatch(text):
+        raise argparse.ArgumentTypeError(
+            "--domain needs a domain name: lowercase letters, digits, and single hyphens"
+        )
+    return text
+
+
 def group_argument(text):
     name, separator, choice = text.partition("=")
     if not separator or not name or choice not in ("on", "off"):
@@ -348,7 +355,7 @@ def validate_profile(home, profile, defaults=False, configure=False, checkout=No
         domain = ask(
             "Domain",
             profile.get("domain", "core"),
-            ["core", "personal", "work", "client", "skip"],
+            [*content_domains(content_manifest(checkout) if checkout else {}), "skip"],
             defaults,
             heading="Choose your domain",
             detail=domain_details(checkout),
@@ -664,6 +671,8 @@ def prepare(home, checkout, profile, manifest, folder):
     import agent_configs
 
     folder.mkdir()
+    # Content defines the domains. A removed domain stops before any plan or write.
+    require_domain(manifest, profile.get("domain", "core"), command_name(profile))
     defaults = wizard.content_defaults(checkout)
     generated, pins, available = generated_files(home, profile, manifest, defaults)
     source, items, _ = convert(checkout, folder / "source", profile, profile["format"])
@@ -985,8 +994,9 @@ def parse_arguments(argv):
     )
     parser.add_argument(
         "--domain",
-        choices=["core", "personal", "work", "client"],
-        help="record a human domain choice; content defines its additions",
+        type=domain_argument,
+        metavar="NAME",
+        help="record a human domain choice; the content declares each domain",
     )
     parser.add_argument(
         "--git-name", help="Git author name; required when missing without a terminal"

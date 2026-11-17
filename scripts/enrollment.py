@@ -18,7 +18,7 @@ import subprocess
 
 from common import atomic, read_toml, run, toml
 from render_run import human
-from convert import FURNITURE, detect
+from convert import FURNITURE, content_domains, detect
 import manager
 import agent_detection
 import scan_view
@@ -404,7 +404,7 @@ def steps(home, args, workspace, profile, found, excluded, start=0, checkout=Non
         domain = manager.ask(
             "Domain",
             profile.get("domain", "core"),
-            ["core", "personal", "work", "client", "skip"],
+            [*content_domains(manifest), "skip"],
             heading="4. Choose your domain",
             detail=manager.domain_details(checkout),
         )

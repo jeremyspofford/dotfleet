@@ -27,7 +27,7 @@ Prompts read the terminal, never piped input. Complete profiles update without e
 1. Read the welcome screen. Backups come before replacement; review comes before apply.
 2. Review the scan: operating system, installed Mise tools, home dotfiles, and existing enrollment.
 3. Choose a source. **Adopt** keeps this machine's files; **defaults** uses our examples; **repo** accepts your Git URL.
-4. Choose a domain. The prompt shows manifest descriptions and commands found in each overlay file.
+4. Choose a domain. The prompt lists the domains that your content declares, with descriptions and overlay commands.
 5. Confirm Git name and email. Enter keeps the displayed value; type `skip` explicitly to leave it empty.
 6. Compare installed tools, content defaults, and saved tools. Accept them or enter exact versions.
 7. Choose groups. On includes their content; off excludes it. New groups say NEW.
@@ -76,7 +76,7 @@ Without a terminal, incomplete profiles stop and list their gaps. No prompt or d
 | --- | --- |
 | `--repo URL` | Use a content Git URL or local repository. |
 | `--adopt` | Create a local repository from scanned home files. Cannot combine with `--repo`. |
-| `--domain NAME` | Confirm core, personal, work, or client. Content defines the additions. |
+| `--domain NAME` | Confirm a domain that your content declares. Content defines the additions. |
 | `--git-name NAME` | Set the Git commit author name. |
 | `--git-email EMAIL` | Set the Git commit author email. |
 | `--tool TOOL=VERSION` | Record an exact version. Repeat for more tools. |

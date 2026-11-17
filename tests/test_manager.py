@@ -704,7 +704,7 @@ class EnrollmentTests(unittest.TestCase):
             for flag in ["--domain", "--git-name", "--git-email", "--tool", "--group", "--agents"]
         ]
         cases += [
-            ["--domain", "unknown"],
+            ["--domain", "Unknown_Domain"],
             ["--tool", "node"],
             ["--group", "docker=maybe"],
             ["--repo", "example", "--adopt"],
@@ -1025,7 +1025,7 @@ class ConverterTests(unittest.TestCase):
             self.assertIn("Command names: project, review.", detail)
             self.assertNotIn("ignored", detail)
             self.assertIn("client    Additions are not described here", detail)
-            self.assertNotIn("Personal, work, and client currently add no domain commands", detail)
+            self.assertNotIn("No declared domain adds commands yet", detail)
 
     def test_full_versions_and_floating_selectors(self):
         for version in [
