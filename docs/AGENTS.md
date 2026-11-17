@@ -74,7 +74,7 @@ Each hook runs a wrapper in the tree. The wrapper sets `FLEET_AGENT`, `FLEET_HOO
 Gemini CLI counts hook timeouts in milliseconds. Fleet converts seconds for it.
 A tool class without a confirmed matcher for an agent skips that hook for that agent. The run account says so.
 Codex skips a new or changed hook until the user trusts it in `/hooks`. Next steps lists that step.
-OpenCode and Pi run hooks only through code plugins. Fleet reports their hooks as unsupported.
+OpenCode and Pi run hooks only through code plugins. Fleet reports their hooks as unsupported. The [bridge plugin spike](BRIDGE-SPIKE.md) proposes a later fix for owner review.
 
 OpenCode merges `opencode.jsonc` after `opencode.json`. A same-name server there overrides Fleet's entry.
 Fleet then skips that server for OpenCode and reports the override. The run continues.
