@@ -2,6 +2,28 @@
 
 This file follows Keep a Changelog. Versions use SemVer: major.minor.patch.
 
+## [0.6.0] - 2026-11-17
+
+### Added
+
+- print agents-table entries from an agent's existing settings (#47)
+- serve every MCP server through one Fleet gateway entry (#46)
+- update and pin marketplaces and report their results (#45)
+- install agent packages from marketplaces (#44)
+- manage a connected machine's profile choices over SSH (#43)
+- add per-machine agent exceptions and report agent drift (#42)
+- install and remove declared plugins through each agent (#41)
+- deploy agent configuration through one Fleet-owned tree (#40)
+- let unmanaged content files stay invisible to updates (#39)
+- validate the agents table and add detect-only agents (#37)
+- let content declare its domains (#36)
+
+### Changed
+
+- https://claude.ai/code/session_01VHXAyZNQYaE3KaWYVP4sXo
+- Claude Opus 5.5 <noreply@anthropic.com>
+- propose bridge plugins for Pi and OpenCode hooks (#48)
+
 ## [0.5.0] - 2026-11-17
 
 ### Added
