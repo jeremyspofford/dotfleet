@@ -60,16 +60,28 @@ def send_connections(home):
     )
 
 
-def dispatch(action, backup=None, machine=None):
+def send_backups(home):
+    ui_channel.send(
+        {"kind": "backups", "items": [str(path) for path in reversed(command.records(home))]}
+    )
+
+
+def dispatch(action, backup=None, machine=None, selected=None):
     home = Path.home()
+    if action == "backup-delete-selected":
+        import backup_cleanup
+
+        command.profile(home)
+        result = backup_cleanup.delete_selected(home, selected or [])
+        send_backups(home)
+        return result
     if machine:
         return command.main([action, machine])
     if action == "dashboard":
         ui_channel.send({"kind": "dashboard", "rows": dashboard(home)})
         return 0
     if action == "backups":
-        folders = command.records(home)
-        ui_channel.send({"kind": "backups", "items": [str(path) for path in reversed(folders)]})
+        send_backups(home)
     if action in ("machines", "topology"):
         send_connections(home)
     if action == "configure":
@@ -90,6 +102,8 @@ def dispatch(action, backup=None, machine=None):
         send_connections(home)
     if action == "uninstall":
         ui_channel.send({"kind": "uninstalled", "value": not (home / command.PROFILE).exists()})
+    if action == "backup-delete-all":
+        send_backups(home)
     return result
 
 
@@ -102,6 +116,11 @@ def main(argv=None):
     parser.add_argument("legacy_backup", nargs="?", help=argparse.SUPPRESS)
     parser.add_argument("--backup", help="saved folder for rollback; no other action accepts it")
     parser.add_argument(
+        "--selected-backup",
+        action="append",
+        help="one backup name selected for deletion; repeat for more",
+    )
+    parser.add_argument(
         "--machine", help="saved remote machine; only status, check, diff, doctor, update"
     )
     args = parser.parse_args(argv)
@@ -113,9 +132,11 @@ def main(argv=None):
         parser.error("only rollback accepts a backup")
     if args.machine and (args.action not in remote.CAPABLE or args.backup):
         parser.error("remote actions are status, check, diff, doctor, and update")
+    if args.selected_backup and args.action != "backup-delete-selected":
+        parser.error("only selected backup deletion accepts backup selections")
     if not ui_channel.active():
         parser.error("this internal bridge requires the terminal interface channel")
-    return dispatch(args.action, args.backup, args.machine)
+    return dispatch(args.action, args.backup, args.machine, args.selected_backup)
 
 
 if __name__ == "__main__":

@@ -34,6 +34,8 @@ ACTIONS = {
     "machine-export": ("Export this machine's record", ("machines", "export")),
     "machine-remove": ("Remove a stale machine record", ("machines", "remove")),
     "backups": ("List backups", ("backups", "list")),
+    "backup-delete-selected": ("Delete selected backups", ("backups", "delete")),
+    "backup-delete-all": ("Delete all backups", ("backups", "delete", "--all")),
     "backup": ("Create a backup now", ("backups", "create")),
     "rollback": ("Restore a backup", ("rollback",)),
     "version": ("Version — manager and content", ("version",)),
@@ -66,7 +68,7 @@ RELATED = {
     "pins": ("pin-set", "pin-remove"),
     "diff": ("diff-stat",),
     "machines": ("add-connection", "name-connection", "machine-export", "machine-remove"),
-    "backups": ("backup",),
+    "backups": ("backup", "backup-delete-selected", "backup-delete-all"),
 }
 
 CHANGING = {
@@ -80,6 +82,8 @@ CHANGING = {
     "machine-export",
     "machine-remove",
     "backup",
+    "backup-delete-selected",
+    "backup-delete-all",
     "rollback",
     "uninstall",
 }

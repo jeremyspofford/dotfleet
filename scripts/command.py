@@ -57,7 +57,7 @@ DESCRIPTIONS = {
         "No add-ons ship with Fleet."
     ),
     "backups": (
-        "Create or list saved file copies.\n"
+        "Create, list, or delete saved file copies.\n"
         "A backup is a saved copy of managed files and the profile.\n"
         "List shows dates, recorded results, sizes, and locations without changing files."
     ),
@@ -157,9 +157,11 @@ DESCRIPTIONS = {
         "Offer to restore the oldest backup."
     ),
     "update": (
-        "Pull repositories and apply saved choices.\n"
-        "Pull both manager and content.\n"
-        "A repository stores versioned files."
+        "Check updates and drift before applying.\n"
+        "Compare manager and content with their upstreams, the remote branches they track.\n"
+        "Drift means managed files differ.\n"
+        "Current sources without drift stop without a backup, run record, or review.\n"
+        "A failed check stops without applying files."
     ),
     "version": ("Show manager and content versions.\nA commit identifies a saved Git version."),
 }
@@ -456,10 +458,26 @@ def prepare_manager(home, workspace):
 
 
 def update(home):
+    saved_profile = profile(home)
+    if updates.check(home, saved_profile, display=False) == 2:
+        return 2
+    try:
+        drift = status(home)
+    except (OSError, ValueError, RuntimeError) as error:
+        print("Warning: Could not check local drift: " + str(error), file=sys.stderr)
+        return 2
+    checked = load_json(home / updates.CACHE, {})
+    triggers = [source["name"] + " update" for source in checked["sources"] if source["behind"]]
+    if drift:
+        triggers.append("drift repair")
+    if not triggers:
+        print(updates.CURRENT_MESSAGE)
+        return 0
     with tempfile.TemporaryDirectory(prefix="dotfleet-update-") as folder:
         staged = prepare_manager(home, Path(folder))
         environment = dict(os.environ)
         environment.pop("DOTFLEET_LOCAL_CONTENT", None)
+        environment["FLEET_UPDATE_TRIGGERS"] = json.dumps(triggers)
         arguments = ["bash", str(staged / "install.sh")]
         if ui_channel.active() or os.environ.get(remote.CONTEXT) == "1":
             # TUI and SSH runs leave profile decisions to a real terminal on the target.
@@ -824,6 +842,13 @@ def main(argv=None):
         display = command_name(saved_profile)
         if args.command == "check":
             return updates.check(home, saved_profile)
+        if args.command == "backups" and args.action == "delete":
+            import backup_cleanup
+
+            if args.keep is not None and args.keep < 0:
+                argument_parser.error("--keep needs zero or a positive count")
+            names = backup_cleanup.select(home, args.name, args.keep, args.all_backups)
+            return backup_cleanup.delete_selected(home, names)
         if args.command == "machines":
             if args.action == "set-ssh":
                 name, target = args.hostname, args.ssh_target

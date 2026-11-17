@@ -122,7 +122,7 @@ def serialize(data):
     return "\n".join(lines)
 
 
-def refresh(home, manager_version, backup, result, fallback=None):
+def refresh(home, manager_version, backup, result, fallback=None, *, run_record=None):
     """Replace this hostname's record under a lock; preserve all other records."""
     path = home / REGISTRY
     if not path.parent.resolve().is_relative_to(home.resolve()):
@@ -130,8 +130,8 @@ def refresh(home, manager_version, backup, result, fallback=None):
     current = machine(home, manager_version, fallback)
     current.update(
         last_run=datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
-        last_backup=str(backup),
-        last_run_record=str(backup / "RUN.json"),
+        last_backup=str(backup) if backup else "",
+        last_run_record=str(run_record or backup / "RUN.json"),
         result=result,
     )
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)

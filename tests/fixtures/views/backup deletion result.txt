@@ -1,0 +1,27 @@
+1 · Software — no changes.
+
+2 · Manager and content — no changes.
+
+3 · Files — 1 removed.
+  − ~/fleet-backups/20261101-120000
+    2026-11-01 12:00:00 · 34 bytes
+  Total: 1 backup · 34 bytes freed.
+
+4 · Profile changes — no changes.
+
+5 · Locations
+  Content  ~/dotfiles
+  Profile  ~/.config/fleet/profile.toml
+  Source   not set
+  Backup   not created
+
+6 · Next steps
+  Update    dotfleet update
+  Rollback  Deleted backups cannot be restored.
+  Wizard    dotfleet configure
+
+Warnings:
+  Deleted backups cannot be rolled back to.
+
+chezmoi status: unchanged · warnings: 1
+Run record: ~/.local/share/fleet/cleanup-runs/example/RUN.json

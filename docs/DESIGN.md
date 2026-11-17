@@ -82,7 +82,11 @@ They compare both manager and content. Update preserves these upstream settings 
 Both refuse uncommitted edits and diverged histories. Diverged histories contain new local and remote commits that cannot combine by moving forward.
 Local commits stay intact when the remote adds nothing. Adopted content without a remote stays local.
 
-Check quietly fetches each source with a ten-second limit. Update fetches into temporary checkouts before review and backup.
+Check quietly fetches each source with a ten-second limit.
+Update first refreshes that comparison and reads local drift. Current sources without drift stop before backup, review, or run-record creation.
+A failed check stops without applying files. Behind sources or drift proceed through the existing installer path.
+Update records manager update, content update, and drift repair as its triggers. Both review views use those recorded reasons.
+The terminal interface and remote targets call this same update core. Installer enrollment and repair keep their existing behavior.
 Neither substitutes the remote's default branch for the selected upstream. New commits after a check can change the next update's result.
 
 The manager owns `~/.local/share/fleet/check.json`. Content cannot manage this file.
@@ -177,3 +181,16 @@ Enrollment and update move old stores before other work. The [migration rules](.
 Profiles and backup payloads stay intact. Rollback maps their old paths during restoration and repairs chezmoi's source pointer.
 Migration appears under Profile changes in the run record and review. Cancelling later apply does not undo those moves.
 Internal module names, environment variables, and `.local/state/dotfleet` records keep their existing names.
+
+## Backup cleanup
+
+Backups list shows dates, results, and sizes. Delete accepts one selector: --name, --keep, or --all.
+The shared planner records selected paths, dates, file sizes, and directory contents before confirmation.
+The CLI and terminal interface show the same review. Both require typing delete before removing anything.
+The terminal interface uses checkboxes for selected backups and also offers Delete all.
+A changed backup cancels deletion before any folder is removed. Deletion never follows symlinks to their targets.
+
+Cleanup records live at `~/.local/share/fleet/cleanup-runs/<run>/RUN.json` with owner-only permissions.
+They record completed removals and refresh this machine’s registry entry. Other machine records stay intact.
+The cleanup store sits outside fleet-backups, so deleting all backups leaves that store empty.
+Deleted backups cannot be restored. Cancellation creates no cleanup record and removes nothing.

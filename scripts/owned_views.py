@@ -48,11 +48,9 @@ def backup_entities(home, folders):
 
         record_path = folder / "RUN.json"
         record = json.loads(record_path.read_text()) if record_path.is_file() else {}
-        size = sum(
-            path.lstat().st_size
-            for path in folder.rglob("*")
-            if path.is_file() or path.is_symlink()
-        )
+        from backup_cleanup import details
+
+        size = details(folder)["size"]
         date = folder.name[:15]
         if re.fullmatch(r"\d{8}-\d{6}", date):
             date = f"{date[:4]}-{date[4:6]}-{date[6:8]} {date[9:11]}:{date[11:13]}:{date[13:15]}"

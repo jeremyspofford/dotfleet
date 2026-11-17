@@ -61,7 +61,7 @@ class RuntimeTests(unittest.TestCase):
         self.assertEqual(runtime["version"], tui_environment.required_version(helpers.ROOT))
         path = self.home / tui_environment.ENVIRONMENT
         before = (path / "pyvenv.cfg").read_bytes(), (path / "pyvenv.cfg").stat().st_mtime_ns
-        self.cli("update")
+        command("bash", str(self.origin / "install.sh"), "--defaults", env=self.env)
         record, _ = self.record()
         self.assertEqual(
             next(
@@ -156,7 +156,7 @@ class ChannelTests(unittest.IsolatedAsyncioTestCase):
     cli = commands.CommandTests.cli
     record = commands.CommandTests.record
 
-    async def run_core(self, action, answer="cancel", backup=None):
+    async def run_core(self, action, answer="cancel", backup=None, selected=None):
         output, events, reviews = [], [], []
 
         async def confirm(request):
@@ -165,7 +165,7 @@ class ChannelTests(unittest.IsolatedAsyncioTestCase):
 
         with patch.dict(os.environ, self.env, clear=True):
             result = await CoreSession(helpers.ROOT).run(
-                action, output.append, events.append, confirm, backup
+                action, output.append, events.append, confirm, backup, selected=selected
             )
         return result, "\n".join(output), events, reviews
 
@@ -188,6 +188,32 @@ class ChannelTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(record["result"], "SUCCESS")
         self.assertIn("3 · Files", output)
         self.assertIn(str(self.home / ".file"), record["completed_files"])
+
+    async def test_current_update_has_no_review_or_backup_in_the_terminal_interface(self):
+        import updates
+
+        self.enroll()
+        before = sorted((self.home / "fleet-backups").iterdir())
+        result, output, _, reviews = await self.run_core("update", "confirm")
+        self.assertEqual(result, 0, output)
+        self.assertIn(updates.CURRENT_MESSAGE, output)
+        self.assertEqual(reviews, [])
+        self.assertEqual(sorted((self.home / "fleet-backups").iterdir()), before)
+
+    async def test_cleanup_transports_selected_names_to_the_shared_core(self):
+        self.enroll()
+        self.cli("backups", "create")
+        _, latest = self.record()
+        before = sorted((self.home / "fleet-backups").iterdir())
+        result, output, events, reviews = await self.run_core(
+            "backup-delete-selected", "delete", selected=[latest.name]
+        )
+        self.assertEqual(result, 0, output)
+        self.assertEqual(reviews[0]["word"], "delete")
+        self.assertFalse(latest.exists())
+        self.assertEqual(sorted((self.home / "fleet-backups").iterdir()), before[:-1])
+        self.assertTrue(any(event["kind"] == "backups" for event in events))
+        self.assertIn("Deleted backups cannot be rolled back to.", output)
 
     async def test_update_uses_shared_core_and_confirmed_run_record(self):
         self.enroll()

@@ -219,9 +219,12 @@ Command groups require an action. Bare `machines`, `backups`, `secrets`, `pins`,
 | Command | Action |
 | --- | --- |
 | `dotfleet tui` | Open the full-screen terminal interface. Missing environments show plain command alternatives and exit 0. |
-| `dotfleet update` | Fetch the manager and content, then apply saved choices. Refuse dirty or diverged checkouts. |
+| `dotfleet update` | Check upstreams and drift first. Apply only when an update or repair is needed. |
 | `dotfleet profile show` | Show saved choices and the profile location. Edit choices through commands or the wizard. |
 | `dotfleet backups list` | List backup dates, results, and sizes without changing files. |
+| `dotfleet backups delete --name BACKUP` | Review and delete one saved backup. |
+| `dotfleet backups delete --keep N` | Review deletion of all but the newest N backups. |
+| `dotfleet backups delete --all` | Review deletion of every saved backup. |
 | `dotfleet secrets list` | List declared secret names as set or unset. Values stay private. |
 | `dotfleet content show` | Show the content checkout, repository, commit, behind state, and short Git status. |
 | `dotfleet status` | Show choices, installed pins, drift, recent runs and backups, and the last update check. |
@@ -256,7 +259,8 @@ Top-level help lists commands and global options. Each command’s help keeps it
 Use `version` or `--version` for the same version output. Exit codes are 0 for success or cancellation, 1 for failed checks or operations, and 2 for arguments.
 Check uses 0 for current, 1 for available updates, and 2 when a check fails.
 
-Change-making commands write RUN.json and print the standard review. File lists come from the plan and backup inventory.
+An unchanged update refreshes the check cache and stops without a backup, run record, or review.
+Other change-making commands write RUN.json and print the standard review. File lists come from the plan and backup inventory.
 Rollback makes another backup first. It restores only recorded paths, including original symlinks and recorded external targets.
 It refuses directory replacement and changed external targets whose original symlink is missing.
 It verifies saved file fingerprints before writing. A fingerprint records the file's content hash and permissions, or its symlink target.
@@ -264,6 +268,13 @@ A content checkout remains at its current commit after rollback. Use diff to rev
 Uninstall offers to restore the oldest backup. Otherwise, it removes known managed files and the manager's command, checkout, converted source, and terminal interface environment.
 Uninstall keeps installed tools, the content checkout, and all backups. Removal includes local edits, which the new backup preserves.
 Rollback and uninstall require terminal confirmation. A scripted rollback without a folder only lists backups.
+
+Backup deletion accepts exactly one selector: --name, --keep, or --all. A selector chooses which backups to remove.
+Use --keep 0 to remove all backups; negative counts are invalid.
+Review every selected backup’s date and size, plus the total size. Type delete and press Enter to proceed; cancel keeps everything.
+Deleted backups cannot be rolled back to. Content and the current managed files stay intact.
+Deletion writes its review to `~/.local/share/fleet/cleanup-runs/<run>/RUN.json`, outside the backup store.
+This keeps --all from creating a replacement backup. Dates identify backups; sizes count file and link bytes without following links.
 
 ## Terminal interface
 
@@ -280,7 +291,7 @@ Each menu area opens the existing command's view or action:
 | Machine | Status, Check, Update, Diff, Doctor, and Topology. Diff also offers paths only. |
 | Configuration | Profile show; Domain list/set; Groups list/set; Pins list/set/remove; Secrets list; Content show; Configure. |
 | Machines | List, pick an SSH host, set a named target, export, and remove a stale record. |
-| Backups | List backups, create one, and restore one. |
+| Backups | List, create, restore, or delete backups. Checkboxes select backups for deletion. |
 | System | Version, Add-ons list, command help, interface help, and Uninstall. |
 
 Connected machines offer Status, Check, Diff, Doctor, and Update from Machines and Topology.
@@ -339,6 +350,16 @@ Check and update use each checkout's configured upstream, including a branch oth
 Both preserve local commits when the remote has no new commits. Both refuse local edits, missing upstreams, and histories with conflicting new commits.
 Locally adopted content without a remote has no updates to fetch.
 Update fetches again, so commits published after a check can also arrive.
+It also checks local drift before creating any backup. A failed fetch or drift check stops the update without applying files.
+When both sources are current and no drift exists, update prints:
+
+```text
+Fleet is up to date — manager and content match upstream, checked just now. No backup taken.
+```
+
+Otherwise, the review names the trigger: manager update, content update, drift repair, or their combination.
+Existing conflict rules still apply. Local edits require a terminal decision; unattended conflicts stop safely.
+The same gate applies to terminal-interface and remote updates. The one-line installer still handles enrollment and repair.
 
 Successful checks save both results in `~/.local/share/fleet/check.json` with owner-only permissions.
 This cache is saved check data. It contains the check time, full commit identifiers, and source paths.
@@ -447,7 +468,7 @@ Target runs never prompt. Incomplete profiles name the missing choices and stop;
 Configure requires a terminal on the target. Remote rollback and uninstall are refused because they are destructive.
 Run those commands on the target itself.
 
-The target renders results under its machine header. Updates write RUN.json in its own backup folder, using the local run renderer.
+The target renders results under its machine header. Updates that change files write RUN.json in its backup folder, using the local run renderer.
 The caller creates no backup or install run record for remote execution. It saves the contact's outcome and time locally.
 Raw target errors stay out of both interfaces. Private diagnostic records live under `~/.local/share/fleet/remote-runs/<run>/RUN.json`.
 Check refreshes the target's update cache. Exit 0 means success; check and diff retain exit 1 for updates and differences.
