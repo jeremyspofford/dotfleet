@@ -212,6 +212,66 @@ class MarketplaceCommandTests(unittest.TestCase):
         config = tomllib.loads((self.home / ".codex/config.toml").read_text())
         self.assertIn("review-docs", config["mcp_servers"])
 
+    def publish(self, files, tag):
+        for name, text in files.items():
+            path = self.market / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(text)
+        command("git", "-C", str(self.market), "add", ".")
+        command(
+            "git",
+            "-C",
+            str(self.market),
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "-m",
+            "feat: " + tag,
+        )
+        command("git", "-C", str(self.market), "tag", tag)
+
+    def test_a_pin_blocks_updates_but_not_information(self):
+        self.setup_agents()
+        self.cli("marketplaces", "add", "--source", str(self.market), "--pin", "v1.0.0")
+        catalog = CATALOG + (
+            '[packages.review-kit.skills.release-notes]\ndescription = "Notes."\n'
+            'path = "review-kit/skills/release-notes"\n'
+        )
+        self.publish(
+            {
+                "fleet-marketplace.toml": catalog,
+                "review-kit/skills/release-notes/SKILL.md": "---\nname: release-notes\n---\n",
+            },
+            "v1.1.0",
+        )
+        checked = self.cli("check")
+        self.assertIn("Marketplace market: 1 commit behind", checked)
+        self.assertIn("pinned at v1.0.0, so the pin blocks the update", " ".join(checked.split()))
+        self.assertIn("market +1 (pinned)", self.cli("status"))
+        self.assertIn("the pin blocks them", self.cli("marketplaces", "list"))
+        output = self.cli("marketplaces", "update")
+        self.assertIn("pinned at v1.0.0; the pin blocks updates", output)
+        self.assertIn("Marketplaces are current", output)
+        self.assertFalse((self.home / ".agents/skills/release-notes").exists())
+
+        self.cli("marketplaces", "update", "--name", "market", "--unpin")
+        self.assertTrue((self.home / ".agents/skills/release-notes").is_symlink())
+        saved = json.loads((self.home / marketplaces.RECORD).read_text())["marketplaces"]["market"]
+        self.assertEqual((saved["pin"], saved["version"]), ("", "v1.1.0"))
+
+        self.publish({"notes/rules/style.md": "Write shorter notes.\n"}, "v1.2.0")
+        self.assertIn("Marketplace market: 1 commit behind", self.cli("check", expected=1))
+        self.cli("marketplaces", "update")
+        self.assertIn(
+            "Write shorter notes.", (self.home / agent_deploy.TREE / "rules/claude.md").read_text()
+        )
+
+        self.cli("marketplaces", "update", "--name", "market", "--pin", "v1.0.0")
+        self.assertFalse((self.home / ".agents/skills/release-notes").exists())
+        self.assertIn("Marketplaces are current", self.cli("marketplaces", "update"))
+
 
 if __name__ == "__main__":
     unittest.main()

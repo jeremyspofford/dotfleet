@@ -40,6 +40,7 @@ The command audit uses these forms:
 | domain list / set | set requires --name; --machine selects a registered machine |
 | marketplaces add | --source; optional --features, --name, --packages, --pin |
 | marketplaces delete | --name |
+| marketplaces update | Optional --name; with --name, optional --pin or --unpin, and --all, --packages, or --features |
 | marketplaces list | No value parameters |
 | agents list / set | set requires --name and --state; --machine selects a registered machine |
 | groups list / set | set requires --name and --state; --machine selects a registered machine |

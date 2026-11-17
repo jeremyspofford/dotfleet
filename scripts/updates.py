@@ -249,7 +249,29 @@ def require_no_collision(path, current, target, history=None):
         )
 
 
-def check(home, profile, display=True):
+def check_marketplaces(home, display):
+    """Check marketplaces after the manager and content. Return 1 when an unpinned one is behind."""
+    import marketplaces
+
+    if not marketplaces.load_records(home)["marketplaces"]:
+        return 0
+    try:
+        results = marketplaces.check(home)
+    except (OSError, ValueError, RuntimeError, subprocess.TimeoutExpired) as error:
+        print(f"Warning: Could not check marketplaces: {error}.", file=sys.stderr)
+        return 2
+    for name, result in results.items():
+        count = result["behind"]
+        unit = "commit" if count == 1 else "commits"
+        state = f"{count} {unit} behind" if count else "up to date"
+        if result["pin"] and count:
+            state += f"; pinned at {result['pin']}, so the pin blocks the update"
+        if display:
+            print(f"\nMarketplace {name}: {state} @ {result['current'][:8]}")
+    return int(any(result["behind"] and not result["pin"] for result in results.values()))
+
+
+def check(home, profile, display=True, marketplaces=False):
     name = "manager"
     try:
         sources = []
@@ -283,7 +305,11 @@ def check(home, profile, display=True):
             if source["local_only"]:
                 state += " (local content; no remote)"
             print(f"{source['name'].capitalize()}: {state} @ {source['current'][:8]}")
-    return int(any(source["behind"] for source in sources))
+    result = int(any(source["behind"] for source in sources))
+    if marketplaces:
+        # The update gate leaves marketplaces out; marketplaces update advances them.
+        result = max(result, check_marketplaces(home, display))
+    return result
 
 
 def summary(home, profile=None):
