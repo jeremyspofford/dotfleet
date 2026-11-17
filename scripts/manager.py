@@ -28,6 +28,8 @@ import shlex
 import shutil
 import subprocess
 import sys
+import ui_channel
+import tui_environment
 import tempfile
 import textwrap
 
@@ -893,6 +895,9 @@ def apply_confirmed_plan(
     account.applied_checkouts.add("Manager")
     atomic(home / RECORD, json.dumps({"manager_commit": account.checkouts[0]["new"]}) + "\n")
     account.applied_software.add("dotfleet")
+    account.save()
+    if any(item["name"] == tui_environment.NAME for item in account.software):
+        tui_environment.install(home, ROOT, backup_path, account)
     if before_apply:
         before_apply(account)
     account.save()
@@ -1005,7 +1010,7 @@ def parse_arguments(argv):
     return parser.parse_args(argv)
 
 
-def main(argv=None, edit=None, software=None, before_apply=None):
+def main(argv=None, edit=None, software=None, before_apply=None, manage_tui=False):
     import enrollment as wizard
     from run_account import RunAccount
 
@@ -1034,6 +1039,8 @@ def main(argv=None, edit=None, software=None, before_apply=None):
             os.environ["MISE_CACHE_DIR"] = str(workspace / "mise-cache")
             os.environ["MISE_STATE_DIR"] = str(workspace / "mise-state")
             account = RunAccount(home, ROOT)
+            if manage_tui:
+                account.software.append(tui_environment.software(home, ROOT))
             if software:
                 account.software.extend(software)
             profile, carried, checkout, manifest, warnings = select_profile(home, args, workspace)
@@ -1051,6 +1058,9 @@ def main(argv=None, edit=None, software=None, before_apply=None):
                     backup_inventory(home, plan["all_paths"]),
                 )
                 if not args.wizard:
+                    if ui_channel.active() and not ui_channel.review(account.record()):
+                        account.finish("CANCELLED", warnings)
+                        return 0
                     break
                 choice = wizard.review(profile, account, warnings)
                 if choice == "quit":
@@ -1111,4 +1121,4 @@ def main(argv=None, edit=None, software=None, before_apply=None):
 
 
 if __name__ == "__main__":
-    sys.exit(style.run_cli(main, ROOT))
+    sys.exit(style.run_cli(lambda: main(manage_tui=True), ROOT))

@@ -1,0 +1,11 @@
+# The CLI uses only the Python standard library.
+# Pin the interface and its dependencies for repeatable environment updates.
+textual==8.2.8
+rich==15.0.0
+markdown-it-py==4.3.0
+mdit-py-plugins==0.7.0
+linkify-it-py==2.2.0
+mdurl==0.1.2
+platformdirs==4.14.5
+Pygments==2.21.0
+typing_extensions==4.16.0

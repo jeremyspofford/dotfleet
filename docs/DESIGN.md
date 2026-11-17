@@ -103,6 +103,16 @@ The owner reviews and merges release pull requests. See [the release rules](RELE
 Bash provides the installer and thin command entry. Python handles profiles, conversion, run records, and validation.
 Use the existing manager path for changes. One renderer prints plans and completed run records.
 The renderer shows readable paths and commit identifiers; machine records retain full values.
+
+The terminal interface uses Textual in `~/.local/share/fleet/tui-venv`, a manager-owned virtual environment with separate Python packages.
+The installer and update maintain it after review and backup. Pinned requirements define its contents; Software records each change.
+The plain command core uses only the standard library. Missing interface packages never prevent plain commands.
+
+Interface actions run the existing command dispatcher in a separate process. This isolates terminal input, environment variables, and Python output streams.
+A private inherited socket carries reviews and answers. A socket is a local communication channel; it has no listening network address.
+Only the shared core validates confirmation words and applies files. Both views render the same run record.
+Status and dashboard never fetch. Updates uses the shared check and update cores; Machines has no remote operations.
+Configure closes Textual before the original wizard takes the terminal. Unattended conflicts stop without choosing overwrite.
 Keep Git, chezmoi, and Mise as the proven tools. Do not add a custom sync engine or background synchronization daemon.
 
 Add-ons follow the [add-on contract](ADDON-INTERFACE.md). None ship with this version.

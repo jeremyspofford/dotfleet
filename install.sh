@@ -108,6 +108,9 @@ Missing chezmoi and Mise go in ~/.local/bin. Setup never uses sudo or installs c
 Content lives in ~/dotfiles. Backups live in ~/fleet-backups/<timestamp>/.
 The installer adds ~/.local/bin/dotfleet. Use its --help for updates, checks, rollback, and saved choices.
 The manager checkout lives in ~/.local/share/fleet/manager. Software results include the installed command.
+Setup and update maintain ~/.local/share/fleet/tui-venv, a private Python environment for Textual's terminal interface.
+Its packages are separate from system Python. Software results record environment changes; unchanged environments stay untouched.
+The plain commands work without Textual. The tui subcommand shows plain alternatives when its environment is missing.
 Review MANIFEST.json before restoring backup home/ files and recorded external targets.
 Native chezmoi templates and hooks can execute code. Use only trusted content repositories.
 Examples:

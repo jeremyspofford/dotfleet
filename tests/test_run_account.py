@@ -132,6 +132,8 @@ class RunAccountTests(unittest.TestCase):
         files = {
             "install.sh": (ROOT / "install.sh").read_text(),
             "VERSION": (ROOT / "VERSION").read_text(),
+            "requirements-tui.txt": (ROOT / "requirements-tui.txt").read_text(),
+            "scripts/tui.tcss": (ROOT / "scripts/tui.tcss").read_text(),
         }
         files.update(
             {

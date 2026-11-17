@@ -39,6 +39,20 @@ def section(title):
     return "\n".join([RULE, *("  " + line for line in lines), RULE])
 
 
+def line_palette(line, diff=False):
+    if diff and line.startswith(("+", "-")):
+        return "GREEN" if line.startswith("+") else "RED"
+    if re.match(r"^  [+−~](?: |$)", line):
+        return {"+": "GREEN", "−": "RED", "~": "YELLOW"}[line[2]]
+    if re.search(r"\bFAIL\b|^Error:|^ERROR:", line):
+        return "RED"
+    if re.search(r"\bUNCHOSEN\b|^Warning:|^Choose ", line):
+        return "YELLOW"
+    if re.search(r"\bPASS\b|^chezmoi status: clean", line):
+        return "GREEN"
+    return "BLUE"
+
+
 class ArgumentParser(argparse.ArgumentParser):
     def format_help(self):
         return section(self.prog) + "\n" + super().format_help()
@@ -81,16 +95,9 @@ class LoggerStream:
             color, bold = "CYAN", True
         elif self.in_section or re.match(r"^\d+ · ", line):
             color, bold = "CYAN", True
-        elif self.diff and line.startswith(("+", "-")):
-            color = "GREEN" if line.startswith("+") else "RED"
-        elif re.match(r"^  [+−~](?: |$)", line):
-            color = {"+": "GREEN", "−": "RED", "~": "YELLOW"}[line[2]]
-        elif re.search(r"\bFAIL\b|^Error:|^ERROR:", line):
-            color = "RED"
-        elif re.search(r"\bUNCHOSEN\b|^Warning:|^Choose ", line):
-            color = "YELLOW"
-        elif re.search(r"\bPASS\b|^chezmoi status: clean", line):
-            color = "GREEN"
+        else:
+            selected = line_palette(line, self.diff)
+            color = "RED" if self.error and selected == "BLUE" else selected
         prefix = (
             datetime.datetime.now().strftime("[%H:%M:%S] ")
             if os.environ.get("LOG_TIMESTAMP") == "1"
