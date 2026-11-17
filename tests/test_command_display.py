@@ -84,7 +84,7 @@ class CommandDisplayTests(unittest.TestCase):
         self.assertIn(
             "Use fleet domain set, pins set, groups set, or configure.", self.cli("profile", "show")
         )
-        self.assertIn("Run fleet help", self.cli("check", "--help"))
+        self.assertIn("Usage: fleet check", self.cli("check", "--help"))
         self.assertIn("fleet domain set --name NAME", self.cli("domain", "list"))
         self.assertIn("Run fleet configure", self.cli("configure", expected=1))
         alias = command("bash", "-c", 'source "$HOME/.aliases"; alias fleet', env=self.env)
@@ -115,7 +115,7 @@ class CommandDisplayTests(unittest.TestCase):
         self.assert_instructions(self.enroll_helpers(), "dotfleet")
         self.assertIn("Updates: not checked yet — run: dotfleet check", self.cli("status"))
         self.assert_cached_update_hint("dotfleet")
-        self.assertIn("Run dotfleet help", self.cli("check", "--help"))
+        self.assertIn("Usage: dotfleet check", self.cli("check", "--help"))
         self.assertIn(
             "Use dotfleet domain set, pins set, groups set, or configure.",
             self.cli("profile", "show"),
