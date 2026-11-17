@@ -252,7 +252,8 @@ def checkout_state(path):
     sha = commit(path)
     if not sha:
         return f"missing; run {current_command()} update"
-    dirty = bool(run("git", "-C", str(path), "status", "--porcelain").strip())
+    # Unmanaged files, such as untracked notes, never count as content edits.
+    dirty = bool(updates.managed_edits(path))
     ref = subprocess.run(
         ["git", "-C", str(path), "rev-parse", "--abbrev-ref", "@{upstream}"],
         text=True,
@@ -372,9 +373,11 @@ def read_view(args, home, saved_profile):
             ("Manager checkout", home / MANAGER),
             ("Content checkout", home / "dotfiles"),
         ]:
-            clean = (path / ".git").exists() and not run(
-                "git", "-C", str(path), "status", "--porcelain"
-            ).strip()
+            clean = (path / ".git").exists() and not (
+                updates.managed_edits(path)
+                if label == "Content checkout"
+                else run("git", "-C", str(path), "status", "--porcelain").strip()
+            )
             pairs.append(
                 (
                     label,
