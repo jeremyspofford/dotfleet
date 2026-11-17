@@ -1,0 +1,29 @@
+# Imported from claude's user-level settings. Review before adding to fleet.toml.
+# Secret values were withheld. Set each named variable in your environment.
+[agents]
+schema = 1
+
+[agents.mcp.docs-search]
+description = "Imported from the Docs Search server."
+transport = "stdio"
+command = "npx"
+args = ["-y", "@example/docs"]
+env = {"REGION" = "us"}
+pass_env = ["DOCS_SEARCH_API_KEY", "HOME"]
+
+[agents.mcp.issues]
+description = "Imported from the issues server."
+transport = "http"
+url = "https://mcp.example.com/issues"
+headers = {"X-Team" = "core"}
+bearer_token_env = "ISSUES_TOKEN"
+
+[agents.plugins.review-kit]
+description = "Imported plugin review-kit@example."
+
+[agents.plugins.review-kit.sources]
+claude = {"id" = "review-kit@example", "marketplace" = "example/plugins"}
+
+# Notes:
+# - docs-search: the environment value for API_KEY looks secret. It was withheld; set DOCS_SEARCH_API_KEY in your environment.
+# - claude: hook PreToolUse runs 'guard.sh'. Put it in a tracked script and declare event = "before-tool".
