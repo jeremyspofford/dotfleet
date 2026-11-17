@@ -878,7 +878,7 @@ def changes_state(args):
     action = getattr(args, "action", None)
     if args.command == "machines" and action == "export":
         return bool(args.output)
-    return action in ("set", "remove", "set-ssh", "create", "restore", "delete")
+    return action in ("set", "remove", "set-ssh", "create", "restore", "delete", "uninstall")
 
 
 def dispatch(args, argument_parser, home):

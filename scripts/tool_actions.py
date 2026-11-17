@@ -9,6 +9,8 @@ from pathlib import Path
 import sys
 import tempfile
 
+import run_index
+
 from common import atomic, read_toml, run
 from command_display import current_command
 from render_run import render
@@ -49,6 +51,7 @@ def uninstall(home, saved, tool, version):
     item = next((item for item in installed if item["version"] == version), None)
     if item is None:
         raise ValueError(f"{tool} {version} is not installed; run {display} tools list.")
+    run_index.stage("review")
     account = RunAccount(home, command.ROOT)
     account.checkouts = []
     account.software = [
@@ -93,6 +96,7 @@ def uninstall(home, saved, tool, version):
             raise ValueError(
                 "Saved choices or files changed during review. Nothing uninstalled; run again."
             )
+        run_index.stage("backup")
         manager.backup(home, paths, folder)
         account.bind_backup(folder)
         try:

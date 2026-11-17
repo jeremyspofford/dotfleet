@@ -69,6 +69,10 @@ else: sys.exit(1)
         self.assertTrue((self.home / ".local/share/mise/installs/node/26.13.1").is_dir())
         self.assertFalse((self.home / ".local/share/mise/installs/node/26.3.1").exists())
         self.assertEqual(self.profile.read_bytes(), before)
+        import run_index
+
+        entry = run_index.entries(self.home)[0]
+        self.assertEqual((entry["command"], entry["result"]), ("tools uninstall", "SUCCESS"))
         self.assertIn("1 · Software — 1 removed.", output)
         record, folder = self.record()
         self.assertEqual(record["completed_software"], ["node"])
