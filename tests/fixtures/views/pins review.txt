@@ -1,0 +1,27 @@
+1 · Software — 1 installed.
+  node  24.14.1 · ~/.local/share/mise/installs/node/24.14.1
+  Already present: chezmoi 0.1.0, Mise 0.1.0, Fleet 0.1.0
+
+2 · Manager and content — no changes.
+
+3 · Files — 3 changed.
+  ~ ~/.config/chezmoi/chezmoi.toml
+  ~ ~/.config/fleet/profile.toml
+  ~ ~/.config/mise/config.toml
+
+4 · Profile changes — 1 changed.
+  Pin node  not set → 24.14.1
+
+5 · Locations
+  Content  ~/dotfiles
+  Profile  ~/.config/fleet/profile.toml
+  Source   ~/.local/share/fleet/chezmoi-source
+  Backup   ~/fleet-backups/20261117-120000
+
+6 · Next steps
+  Update    dotfleet update
+  Rollback  ~/fleet-backups/20261117-120000/MANIFEST.json
+  Wizard    dotfleet configure
+
+chezmoi status: clean · warnings: none
+Run record: ~/fleet-backups/20261117-120000/RUN.json

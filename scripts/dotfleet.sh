@@ -2,7 +2,7 @@
 # Purpose: Run Fleet commands after enrollment.
 # Usage: dotfleet COMMAND [ARGS]
 # Parameters: COMMAND selects an action. Run dotfleet COMMAND --help for its arguments.
-# Examples: dotfleet status; dotfleet update; dotfleet domain --name personal
+# Examples: dotfleet status; dotfleet update; dotfleet domain set --name personal
 # Exit codes: 0 success/help/cancel; 1 failed operation or updates available; 2 invalid arguments/check failure.
 # Author: Jeremy Spofford / Aria Labs; Version: read from the manager VERSION file.
 set -euo pipefail
@@ -17,6 +17,7 @@ source "$manager/scripts/logger.sh"
 usage() { python3 -B "$manager/scripts/command.py" --help; }
 case ${1:---help} in
 -h | --help) usage ;;
+help) python3 -B "$manager/scripts/command.py" "$@" ;;
 --version) python3 -B "$manager/scripts/command.py" "$@" ;;
 *)
 	for argument in "$@"; do

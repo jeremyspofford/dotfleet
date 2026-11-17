@@ -192,9 +192,15 @@ def failure(home, name, target, error):
             "SSH host key verification failed",
             "verify the target's host key with its owner before connecting with SSH.",
         )
-    return message.rstrip(
-        "."
-    ) or "SSH connection failed", "check that the target is awake and reachable; then retry."
+    for marker, reason in (
+        ("connection refused", "SSH connection refused"),
+        ("timed out", "SSH connection timed out"),
+        ("no route to host", "SSH target is unreachable"),
+        ("network is unreachable", "SSH target is unreachable"),
+    ):
+        if marker in lowered:
+            return reason, "check that the target is awake and reachable; then retry."
+    return "SSH connection failed", "check the target's SSH access; then retry."
 
 
 def report_failure(home, name, target, error):

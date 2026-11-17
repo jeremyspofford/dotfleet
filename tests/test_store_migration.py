@@ -177,8 +177,8 @@ class StoreMigrationTests(unittest.TestCase):
             "feat: new manifest name",
         )
         self.cli("update")
-        self.assertIn("Preferred group", self.cli("groups"))
-        self.assertIn("Preferred base", self.cli("domain"))
+        self.assertIn("Preferred group", self.cli("groups", "list"))
+        self.assertIn("Preferred base", self.cli("domain", "list"))
         self.assert_quiet_status()
 
     def test_migration_only_translates_this_machines_registry_paths(self):

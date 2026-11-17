@@ -1,0 +1,54 @@
+1 · Software — no changes.
+
+2 · Manager and content — no changes.
+
+3 · Files — 1 changed, 18 removed.
+  ~ ~/.file
+  − ~/.aliases
+  − ~/.bashrc
+  − ~/.config/chezmoi/chezmoi.toml
+  − ~/.config/dotfiles/aliases/core.zsh
+  − ~/.config/dotfiles/aliases/personal.zsh
+  − ~/.config/dotfiles/domain
+  − ~/.config/fleet/profile.toml
+  − ~/.config/git/local.gitconfig
+  − ~/.config/mise/config.toml
+  − ~/.extra
+  − ~/.local/bin/dotfleet
+  − ~/.local/state/dotfleet/last-run.json
+  − ~/.local/state/dotfleet/outputs.json
+  − ~/.secrets
+  − ~/.zshrc
+  − ~/.local/share/fleet/manager
+  − ~/.local/share/fleet/chezmoi-source
+  − ~/.local/share/fleet/tui-venv
+
+4 · Profile changes — 14 changed.
+  Domain            core → not set
+  Domain confirmed  on → not set
+  Git name          Command Example → not set
+  Git email         command@example.invalid → not set
+  Content repo      https://example.invalid/dotfiles → not set
+  Content format    plain → not set
+  Group extra       on → not set
+  Agent claude      off → not set
+  Agent codex       off → not set
+  Agent gemini      off → not set
+  Agent grok        off → not set
+  Agent ollama      off → not set
+  Agent opencode    off → not set
+  Agent pi          off → not set
+
+5 · Locations
+  Content  ~/dotfiles
+  Profile  ~/.config/fleet/profile.toml
+  Source   ~/.local/share/fleet/chezmoi-source
+  Backup   ~/fleet-backups/20261117-120000
+
+6 · Next steps
+  Update    dotfleet update
+  Rollback  ~/fleet-backups/20261117-120000/MANIFEST.json
+  Wizard    dotfleet configure
+
+chezmoi status: clean · warnings: none
+Run record: ~/fleet-backups/20261117-120000/RUN.json

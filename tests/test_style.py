@@ -20,6 +20,9 @@ from unittest.mock import patch
 
 import command
 import registry
+import owned_views
+import updates
+import datetime
 import style
 from common import toml
 
@@ -45,8 +48,32 @@ def command_goldens():
             "git_name": "Example Person",
             "git_email": "example@example.invalid",
             "pins": {"node": "24.14.1"},
-            "groups": {"helpers": True},
+            "groups": {"helpers": True, "docker": False},
+            "agents": {"codex": False},
+            "content_repo": "https://example.invalid/dotfiles",
         }
+        root = home / "manager-fixture"
+        root.mkdir()
+        (root / "VERSION").write_text("0.4.0\n")
+        (home / "dotfiles/fleet.toml").write_text(
+            'format = "plain"\n[domains]\ncore = "Base files only."\npersonal = "Personal shortcuts."\n'
+            '[groups.helpers]\ndescription = "Fleet command shortcut."\n'
+            '[groups.docker]\ndescription = "Container shortcuts."\n'
+            "[secrets]\nEXAMPLE_API_TOKEN = {}\nUNSET_TOKEN = {}\n"
+        )
+        (home / ".config/fleet").mkdir(parents=True)
+        (home / ".config/fleet/profile.toml").write_text(toml(profile))
+        cache = home / updates.CACHE
+        cache.parent.mkdir(parents=True, exist_ok=True)
+        cache.write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "checked_at": datetime.datetime(2026, 11, 17, 9, 2).astimezone().isoformat(),
+                    "sources": [{"name": "manager", "behind": 0}, {"name": "content", "behind": 0}],
+                }
+            )
+        )
         backup = home / "fleet-backups/20261116-120000"
         backup.mkdir(parents=True)
         (backup / "RUN.json").write_text('{"result":"SUCCESS"}')
@@ -65,9 +92,15 @@ def command_goldens():
             result="SUCCESS",
             enrolled=True,
         )
+        empty = {key: False if kind is bool else "" for key, kind in registry.FIELDS.items()}
+        empty.update(hostname="mini-pc", ssh_target="mini-pc", result="not recorded")
         outputs = {}
         with (
             patch("command_display.shutil.which", return_value=None),
+            patch.dict(os.environ, {"HOME": str(home), "EXAMPLE_API_TOKEN": "private-value"}),
+            patch.object(command, "ROOT", root),
+            patch.object(command, "commit", return_value=machine["content_commit"]),
+            patch.object(owned_views, "run", return_value=""),
             patch.object(command, "run", return_value=""),
             patch.object(command, "records", return_value=[backup]),
             patch.object(
@@ -81,16 +114,58 @@ def command_goldens():
             patch.object(
                 registry,
                 "load",
-                return_value={"schema_version": 1, "machines": {"example-hub": machine}},
+                return_value={
+                    "schema_version": 1,
+                    "machines": {"example-hub": machine, "mini-pc": empty},
+                },
             ),
             patch.object(socket, "gethostname", return_value="example-hub"),
         ):
-            for name in ["status", "doctor", "machines"]:
+            for name in [
+                "status",
+                "doctor",
+                "machines",
+                "profile",
+                "backups",
+                "secrets",
+                "content",
+                "domain",
+                "groups",
+                "pins",
+                "addons",
+                "version",
+            ]:
                 output = io.StringIO()
                 with contextlib.redirect_stdout(output):
                     result = command.read_view(argparse.Namespace(command=name), home, profile)
                 assert result == 0, output.getvalue()
                 outputs[name] = output.getvalue()
+            with contextlib.redirect_stdout(io.StringIO()) as output:
+                command.main(["machines", "export"])
+            outputs["machine export"] = output.getvalue()
+            outputs["help"] = command.parser().format_help()
+            with (
+                patch.object(updates, "validate_content"),
+                patch.object(
+                    updates,
+                    "compare",
+                    side_effect=[
+                        {"behind": 3, "local_only": False, "current": "1234567890abcdef"},
+                        {"behind": 0, "local_only": False, "current": "abcdef0123456789"},
+                    ],
+                ),
+                contextlib.redirect_stdout(io.StringIO()) as output,
+            ):
+                assert command.main(["check"]) == 1
+            outputs["check"] = output.getvalue()
+            import tui_environment
+
+            with (
+                patch.object(tui_environment, "installed_version", return_value=None),
+                contextlib.redirect_stdout(io.StringIO()) as output,
+            ):
+                assert tui_environment.launch(home, root) == 0
+            outputs["tui missing"] = output.getvalue()
         return outputs
 
 
@@ -101,6 +176,12 @@ class StyleTests(unittest.TestCase):
             for line in output.splitlines():
                 self.assertLessEqual(len(line), 100)
             self.assertNotIn("[machines.", output)
+            self.assertNotIn("private-value", output)
+        machines = command_goldens()["machines"]
+        self.assertNotIn("RUN.json", machines)
+        self.assertNotIn("Scope", machines)
+        self.assertNotIn("mini-pc → mini-pc", machines)
+        self.assertEqual(machines.count("No local data recorded for this machine."), 1)
 
     def test_python_and_shell_palette_and_section_rule_match(self):
         env = dict(os.environ, TERM="xterm-256color")

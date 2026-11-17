@@ -5,10 +5,11 @@
   Identity          Example Person <example@example.invalid>
   Pin node          24.14.1 · installed: 24.14.1
   Group helpers     on
+  Group docker      off
   Content           12345678 · 0 behind last fetched upstream · clean
   Drift             none
   Last run          ~/fleet-backups/20261116-120000 · SUCCESS
   Last backup       ~/fleet-backups/20261116-120000
   Manager config    ~/.config/chezmoi/chezmoi.toml
   Converted source  ~/.local/share/fleet/chezmoi-source
-Updates: not checked — run: fleet check
+Updates: none (checked 09:02)

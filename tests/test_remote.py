@@ -56,6 +56,14 @@ if os.environ.get("FAKE_SSH_OFFLINE"):
     print("ssh: connect to host mini-pc port 22: Connection refused", file=sys.stderr)
     print("Connection closed", file=sys.stderr)
     sys.exit(255)
+if os.environ.get("FAKE_SSH_NO_FLEET"):
+    print("zsh:1: no such file or directory: /home/private/.local/bin/dotfleet", file=sys.stderr)
+    sys.exit(1 if sys.argv[-1].startswith("test -x") else 127)
+if os.environ.get("FAKE_SSH_EXIT_127"):
+    if sys.argv[-1].startswith("test -x"):
+        sys.exit(0)
+    print("zsh:1: no such file or directory: /home/private/.local/bin/dotfleet", file=sys.stderr)
+    sys.exit(127)
 environment = json.loads(Path(os.environ["FAKE_TARGET_ENV"]).read_text())
 result = subprocess.run(["/bin/sh", "-c", sys.argv[-1]], env=environment,
                         input=payload, text=True, start_new_session=True)
@@ -91,7 +99,9 @@ sys.exit(result.returncode)
         return {
             str(path.relative_to(self.controller)): path.read_bytes()
             for path in self.controller.rglob("*")
-            if path.is_file() and path.name not in ("contacts.json", ".contacts.lock")
+            if path.is_file()
+            and path.name not in ("contacts.json", ".contacts.lock")
+            and "remote-runs" not in path.parts
         }
 
     def change_content(self):
@@ -120,7 +130,7 @@ sys.exit(result.returncode)
         self.assertNotIn("Caller only", output)
         self.assertIn("beelink: status succeeded", output)
         self.call("check", "beelink")
-        self.call("status", "--check", "beelink")
+        self.call("status", "--check", "beelink", expected=2)
         self.assertIn("No differences.", self.call("diff", "beelink"))
         self.assertIn("PASS", self.call("doctor", "beelink"))
         self.change_content()
@@ -135,6 +145,9 @@ sys.exit(result.returncode)
         self.assertEqual(self.caller_files(), before)
         self.assertEqual(sorted((self.home / "fleet-backups").iterdir()), backups)
         for item in map(json.loads, self.ssh_log.read_text().splitlines()):
+            if item["args"][-1] == remote.PROBE_COMMAND:
+                self.assertEqual(item["request"], "")
+                continue
             self.assertEqual(item["args"][-3:], ["--", "mini-pc", remote.REMOTE_COMMAND])
             for option in ("BatchMode=yes", "ConnectTimeout=10", "ConnectionAttempts=1"):
                 self.assertIn(option, item["args"])
@@ -160,14 +173,14 @@ sys.exit(result.returncode)
         self.assertEqual(self.caller_files(), before)
         self.assert_quiet_status()
 
-    def test_unreachable_has_next_step_one_attempt_and_only_contact_cache_writes(self):
+    def test_unreachable_has_next_step_one_attempt_and_private_diagnostics(self):
         self.connect()
         before = self.caller_files()
         self.controller_env["FAKE_SSH_OFFLINE"] = "1"
         output = self.call("status", "beelink", expected=2)
         self.assertEqual(len(output.splitlines()), 2)
-        self.assertIn("beelink: ssh: connect", output)
-        self.assertIn("Connection refused", output)
+        self.assertIn("beelink: SSH connection refused", output)
+        self.assertNotIn("Connection closed", output)
         self.assertEqual(len(self.ssh_log.read_text().splitlines()), 1)
         self.assertIn("beelink", topology.load(self.controller)["machines"])
         self.assertEqual(self.caller_files(), before)
@@ -199,10 +212,36 @@ sys.exit(result.returncode)
         (self.home / ".file").write_text("keep target edit\n")
         self.change_content()
         output = self.call("update", "beelink", expected=1)
-        self.assertIn("Apply stopped", output)
+        self.assertNotIn("Apply stopped", output)
+        raw = list(self.controller.glob(".local/share/fleet/remote-runs/*/RUN.json"))
+        self.assertTrue(any("Apply stopped" in path.read_text() for path in raw))
         self.assertIn("beelink: update failed", output)
         self.assertEqual((self.home / ".file").read_text(), "keep target edit\n")
         self.assertEqual(self.record()[0]["result"], "FAILED")
+
+    def test_missing_command_probe_and_exit_127_have_the_same_safe_guidance(self):
+        self.connect()
+        for variable, attempts in (("FAKE_SSH_NO_FLEET", 1), ("FAKE_SSH_EXIT_127", 2)):
+            with self.subTest(variable=variable):
+                self.controller_env.pop("FAKE_SSH_NO_FLEET", None)
+                self.controller_env[variable] = "1"
+                self.ssh_log.unlink(missing_ok=True)
+                output = self.call("status", "beelink", expected=2)
+                self.assertEqual(
+                    output,
+                    "Error: beelink: Fleet is not installed on this machine (or predates the fleet command).\nNext: Run the Fleet one-liner on that machine once, then retry.\n",
+                )
+                self.assertNotIn("zsh:", output)
+                self.assertNotIn("/home/private", output)
+                self.assertEqual(len(self.ssh_log.read_text().splitlines()), attempts)
+                saved = list(self.controller.glob(".local/share/fleet/remote-runs/*/RUN.json"))
+                self.assertTrue(saved)
+                self.assertTrue(
+                    any("zsh:1:" in json.loads(path.read_text())["stderr"] for path in saved)
+                )
+                for path in saved:
+                    self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+                    self.assertEqual(path.parent.stat().st_mode & 0o777, 0o700)
 
     def test_forbidden_commands_and_unsafe_targets_never_start_ssh(self):
         self.connect()
@@ -230,7 +269,7 @@ sys.exit(result.returncode)
         from test_connections import fake_ssh
 
         fake_ssh(self.home, self.env)
-        self.assertIn("no connection", self.cli("machines"))
+        self.assertIn("no connection", self.cli("machines", "list"))
         output = self.cli("machines", "set-ssh", "beelink", "mini-pc")
         self.assertIn("~ ~/.local/share/fleet/registry.toml", output)
         self.assertEqual(registry.load(self.home)["machines"]["beelink"]["ssh_target"], "mini-pc")
@@ -241,7 +280,7 @@ sys.exit(result.returncode)
         self.assertEqual(after["content_commit"], before["content_commit"])
         self.cli("update")
         self.assertEqual(registry.load(self.home)["machines"][local]["ssh_target"], "example@host")
-        self.assertIn("mini-pc", self.cli("machines"))
+        self.assertIn("mini-pc", self.cli("machines", "list"))
         self.assertEqual((self.home / registry.REGISTRY).stat().st_mode & 0o777, 0o600)
 
 

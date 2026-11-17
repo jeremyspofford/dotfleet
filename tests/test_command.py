@@ -147,6 +147,34 @@ class CommandTests(unittest.TestCase):
         self.assertEqual(sent, len(answers), text)
         return text
 
+    def assert_review_golden(self, name, output):
+        from render_run import render
+
+        record, _ = self.record()
+        self.assertTrue(output.rstrip().endswith(render(record).rstrip()), output)
+        # Compare stable example values; releases and host tool versions must not break snapshots.
+        data = json.dumps(record).replace(str(self.content), "https://example.invalid/dotfiles")
+        data = data.replace(str(self.home), "/home/example")
+        data = re.sub(
+            r"/fleet-backups/\d{8}-\d{6}(?:-\d+)?", "/fleet-backups/20261117-120000", data
+        )
+        record = json.loads(data)
+        for tool in record["software"]:
+            if tool["name"] in ("chezmoi", "Mise", "dotfleet", "Fleet", "Fleet TUI (Textual)"):
+                tool["version"] = "0.1.0"
+                if tool.get("old"):
+                    tool["old"] = "0.0.1"
+        for checkout in record["checkouts"]:
+            unchanged = checkout["old"] == checkout["new"]
+            if checkout["old"]:
+                checkout["old"] = "1" * 40
+            if checkout["new"]:
+                checkout["new"] = "1" * 40 if unchanged else "2" * 40
+        self.assert_golden(name, render(record))
+
+    def assert_golden(self, name, text):
+        self.assertEqual(text, (ROOT / f"tests/fixtures/views/{name} review.txt").read_text())
+
     def test_all_help_and_invalid_arguments(self):
         from command import DESCRIPTIONS
 
@@ -157,8 +185,8 @@ class CommandTests(unittest.TestCase):
             self.assertNotIn("Usage: Usage:", output)
             for line in output.splitlines():
                 self.assertLessEqual(len(line), 100)
-            self.assertIn("exit codes" if name else "Exit codes", output)
-            if name:
+            self.assertIn("exit codes" if name and name != "help" else "Exit codes", output)
+            if name and name != "help":
                 self.assertIn(DESCRIPTIONS[name].split(".")[0].split()[0], output)
         result = subprocess.run(
             ["bash", str(ROOT / "scripts/dotfleet.sh"), "--unknown"],
@@ -193,6 +221,7 @@ class CommandTests(unittest.TestCase):
         self.assertEqual((self.home / ".file").read_bytes(), before)
         output = self.cli("update")
         self.assertIn("2 · Manager and content — 1 updated.", output)
+        self.assert_review_golden("update", output)
         self.assertTrue(self.record()[0]["completed_checkouts"])
         self.assert_quiet_status()
         status = self.cli("status")
@@ -203,19 +232,41 @@ class CommandTests(unittest.TestCase):
         self.assertIn("needs a terminal", self.cli("configure", expected=1))
         self.assertIn("no changes.", self.cli("update"))
 
+    def test_configure_keeps_the_terminal_wizard_and_standard_review(self):
+        self.enroll()
+        output = self.terminal(
+            ["configure"],
+            [
+                (b"Content door [repo]:", b"\n"),
+                (b"Content repository [", b"\n"),
+                (b"Domain [core]:", b"\n"),
+                (b"Git author name [", b"\n"),
+                (b"Git author email [", b"\n"),
+                (b"Pins [accept]:", b"\n"),
+                (b"extra [on]:", b"\n"),
+                (b"Review [quit]:", b"confirm\n"),
+            ],
+        )
+        self.assertIn("1. Welcome", output)
+        self.assertIn("9. Review", output)
+        self.assert_review_golden("configure", output)
+        self.assert_quiet_status()
+
     def test_domain_and_groups_use_saved_profile(self):
         self.enroll()
-        self.assertIn("Personal shortcut", self.cli("domain"))
-        self.cli("domain", "personal")
+        self.assertIn("Personal shortcut", self.cli("domain", "list"))
+        self.assert_review_golden("domain", self.cli("domain", "set", "--name", "personal"))
         p = tomllib.loads((self.home / ".config/fleet/profile.toml").read_text())
         self.assertEqual(p["domain"], "personal")
         self.assertTrue(p["domain_chosen"])
         output = command("zsh", "-ic", "chosen", env=self.env, cwd=self.home)
         self.assertIn("personal", output)
-        self.cli("groups", "extra", "off")
+        self.assert_review_golden(
+            "groups", self.cli("groups", "set", "--name", "extra", "--state", "off")
+        )
         self.assertFalse((self.home / ".extra").exists())
         self.assertIn("− ~/.extra", self.record_text())
-        self.cli("groups", "extra", "on")
+        self.cli("groups", "set", "--name", "extra", "--state", "on")
         self.assertEqual((self.home / ".extra").read_text(), "group\n")
         self.assert_quiet_status()
 
@@ -226,7 +277,7 @@ class CommandTests(unittest.TestCase):
 
     def test_backup_rollback_and_confirmation(self):
         self.enroll()
-        self.cli("backup")
+        self.assert_review_golden("backup", self.cli("backup"))
         _, saved = self.record()
         original_profile = (self.home / ".config/fleet/profile.toml").read_bytes()
         (self.home / ".file").write_text("local edit\n")
@@ -235,6 +286,7 @@ class CommandTests(unittest.TestCase):
         self.assertEqual((self.home / ".file").read_text(), "local edit\n")
         output = self.terminal(["rollback", saved.name], [(b"Confirm [cancel]:", b"restore\n")])
         self.assertIn("~ ~/.file", output)
+        self.assert_review_golden("rollback", output)
         self.assertEqual((self.home / ".file").read_text(), "original\n")
         self.assertEqual((self.home / ".config/fleet/profile.toml").read_bytes(), original_profile)
         self.assert_quiet_status()
@@ -275,14 +327,14 @@ class CommandTests(unittest.TestCase):
         output = self.cli("doctor", expected=1)
         self.assertIn("FAIL · UNCHOSEN", output)
         self.assertIn("never explicitly chosen", output)
-        self.assertIn("dotfleet domain --name NAME", output)
+        self.assertIn("dotfleet domain set --name NAME", " ".join(output.split()))
         self.assertNotIn("Supply --domain", output)
-        choices = self.cli("domain")
+        choices = self.cli("domain", "list")
         self.assertIn("UNCHOSEN", choices)
         self.assertIn("Personal shortcut", choices)
-        self.assertIn("dotfleet domain --name NAME", choices)
+        self.assertIn("dotfleet domain set --name NAME", choices)
         self.assertEqual(path.read_bytes(), before)
-        self.cli("domain", "core")
+        self.cli("domain", "set", "--name", "core")
         self.assertTrue(tomllib.loads(path.read_text())["domain_chosen"])
         self.assertIn("core · chosen", self.cli("status"))
         self.assertNotIn("FAIL", self.cli("doctor"))
@@ -313,12 +365,13 @@ else: sys.exit(1)
         mise.chmod(0o700)
         output = self.cli("pins", "set", "--tool", "node", "--version", "24.14.1")
         self.assertIn("24.14.1", output)
+        self.assert_review_golden("pins", output)
         record, _ = self.record()
         self.assertIn("node", record["completed_software"])
         p = tomllib.loads((self.home / ".config/fleet/profile.toml").read_text())
         self.assertEqual(p["pins"]["node"], "24.14.1")
-        self.assertIn("installed: 24.14.1", self.cli("pins"))
-        self.cli("pins", "remove", "node")
+        self.assertIn("Installed  24.14.1", self.cli("pins", "list"))
+        self.cli("pins", "remove", "--tool", "node")
         p = tomllib.loads((self.home / ".config/fleet/profile.toml").read_text())
         self.assertNotIn("node", p["pins"])
         self.assertIn("node", p["unpinned_tools"])
@@ -326,7 +379,7 @@ else: sys.exit(1)
             "node", tomllib.loads((self.home / ".config/mise/config.toml").read_text())["tools"]
         )
         self.assertTrue((self.home / ".local/share/mise/installs/node/24.14.1").exists())
-        self.cli("pins", "set", "node@latest", expected=2)
+        self.cli("pins", "set", "--tool", "node", "--version", "latest", expected=2)
         self.assert_quiet_status()
 
     def test_external_restore_backs_up_the_current_target(self):
@@ -375,6 +428,7 @@ else: sys.exit(1)
             [(b"Oldest backup [keep]:", b"restore\n"), (b"Confirm [cancel]:", b"uninstall\n")],
         )
         self.assertIn("− ~/.local/bin/dotfleet", output)
+        self.assert_review_golden("uninstall", output)
         self.assertFalse(self.exe.exists())
         self.assertFalse((self.home / ".local/share/fleet/manager").exists())
         self.assertTrue((self.home / "dotfiles/.git").exists())

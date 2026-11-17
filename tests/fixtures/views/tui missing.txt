@@ -1,0 +1,10 @@
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Fleet terminal interface
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Environment        missing; the plain commands still work
+  Inspect            fleet status · fleet diff · fleet doctor
+  Updates            fleet check · fleet update
+  Backups            fleet backups list · fleet rollback
+  Machines           fleet machines list
+  Setup              fleet configure
+  Restore interface  Run fleet update or the README one-line installer.

@@ -1,0 +1,11 @@
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Groups
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+helpers
+  State  on
+  Adds   Fleet command shortcut.
+
+docker
+  State  off
+  Adds   Container shortcuts.

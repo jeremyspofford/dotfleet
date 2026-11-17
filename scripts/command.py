@@ -25,6 +25,7 @@ import remote
 import connections
 import topology
 import command_arguments
+import command_views
 import owned_views
 import style
 import updates
@@ -48,6 +49,7 @@ CONTROLS = {
     COMMAND,
 }
 DESCRIPTIONS = {
+    "help": "Show commands and actions. Use help COMMAND ACTION for a specific action.",
     "topology": (
         "Show this machine’s recorded view as a tree. Topology means connection layout. "
         "Each observation has its time. Nothing is checked live; other machines may have different views."
@@ -59,6 +61,7 @@ DESCRIPTIONS = {
         "print plain command alternatives and exit 0."
     ),
     "check": (
+        "Check fetches new update results; status only reads the saved results. "
         "Fetch the manager and content upstreams quietly, with a 10-second limit per fetch. "
         "An upstream is the remote branch tracked by a checkout. Cache both results only "
         "when both checks succeed. Exit codes: 0 current; 1 updates available; 2 could not check."
@@ -95,9 +98,10 @@ DESCRIPTIONS = {
         "repository stores versioned files."
     ),
     "status": (
+        "Status reads saved update results without fetching; check fetches new results. "
         "Show this machine’s profile, saved choices, installed pins, groups, checkout "
         "state, drift, recent backups, and the last update check. "
-        "Drift means managed files differ. No fetch runs unless --check is given."
+        "Drift means managed files differ. Local status makes no network requests."
     ),
     "diff": (
         "Show pending file paths and unified patches from chezmoi. A patch shows removed "
@@ -143,6 +147,14 @@ DESCRIPTIONS = {
 
 
 class HelpFormatter(argparse.HelpFormatter):
+    def add_argument(self, action):
+        super().add_argument(action)
+        # Older Python releases omit nested indentation when sizing command columns.
+        if action.help is not argparse.SUPPRESS:
+            for nested in self._iter_indented_subactions(action):
+                width = len(self._format_action_invocation(nested)) + self._current_indent
+                self._action_max_length = max(self._action_max_length, width)
+
     def _format_usage(self, usage, actions, groups, prefix):
         return super()._format_usage(usage, actions, groups, prefix or "Usage: ")
 
@@ -166,7 +178,7 @@ def parser():
         prog=display,
         description="Manage enrolled machines. A profile saves each machine’s choices.",
         epilog="Exit codes: 0 success, help, or cancellation; 1 failed operation or check; 2 invalid arguments or check failure; 130 interrupted. Check uses 1 for available updates.\n"
-        f"Examples: {display} update; {display} status; {display} domain --name personal.\n"
+        f"Examples: {display} update; {display} status; {display} domain set --name personal.\n"
         "First install or manager recovery: use the README one-line installer.\n" + TERMS,
         formatter_class=HelpFormatter,
     )
@@ -184,19 +196,26 @@ def parser():
             )
         elif name in remote.REASONS:
             detail += " Remote use is refused: " + remote.REASONS[name] + "."
+        epilog = (
+            f"Example: {display} "
+            + command_arguments.EXAMPLES.get(name, name).replace("; ", f"; {display} ")
+            + "\n"
+            + TERMS
+            + f"\nRun {display} help for exit codes. Help, -h, and --help show help."
+            + " All prompts require Enter and use the terminal."
+        )
         command_parser = subcommands.add_parser(
             name,
             prog=display + " " + name,
             help=detail.split(". ")[0] + ".",
             description=detail,
             formatter_class=HelpFormatter,
-            epilog=f"Example: {display} "
-            + command_arguments.EXAMPLES.get(name, name).replace("; ", f"; {display} ")
-            + "\n"
-            + TERMS
-            + f"\nRun {display} --help for exit codes. All prompts require Enter and use the terminal.",
+            epilog=epilog,
         )
-        command_arguments.add_parameters(command_parser, name)
+        if name in command_arguments.GROUPS:
+            command_arguments.add_groups(command_parser, name, HelpFormatter, epilog)
+        else:
+            command_arguments.add_parameters(command_parser, name)
     return argument_parser
 
 
@@ -287,7 +306,7 @@ def command_profile_gaps(saved_profile):
         if gap.startswith("Domain "):
             gap = gap.replace(
                 "Supply --domain.",
-                f"Run {display} domain to list choices, then {display} domain --name NAME.",
+                f"Run {display} domain list, then {display} domain set --name NAME.",
             )
         elif gap.startswith(("Git name ", "Git email ")):
             gap = gap.split(". Supply ", 1)[0] + f". Run {display} configure."
@@ -307,47 +326,26 @@ def read_view(args, home, saved_profile):
     manifest = content_manifest(home / "dotfiles")
     if name == "profile":
         pairs = owned_views.profile_rows(home, saved_profile)
-    elif name == "backups":
-        pairs = owned_views.backup_rows(home, records(home))
-    elif name == "secrets":
-        pairs = owned_views.secret_rows(home, manifest)
     elif name == "content":
         pairs = owned_views.content_rows(home, saved_profile, checkout_state)
-    elif name == "machines":
-        pairs = registry.rows(home, (ROOT / "VERSION").read_text().strip())
-    elif name == "addons":
-        from addons import installed_addons
-
-        items = installed_addons(home, (ROOT / "VERSION").read_text().strip())
-        pairs = [(item["id"], item["version"] + " · " + item["description"]) for item in items]
-        if not pairs:
-            pairs = [("Installed add-ons", "none; no add-ons ship with Fleet.")]
+    elif name in ("backups", "secrets", "machines", "addons", "domain", "groups", "pins"):
+        entities = command_views.collection(name, home, saved_profile, manifest)
+        empty = {
+            "backups": f"No backups yet. Run {display} backup.",
+            "secrets": "No secret variables declared.",
+            "pins": "No tool pins recorded.",
+            "groups": "No content groups declared.",
+            "addons": "No installed add-ons. None ship with Fleet.",
+        }.get(name, "None recorded.")
+        command_views.directory(name.capitalize(), entities, home, empty)
+        if name == "domain":
+            print(f"\nChoose: {display} domain set --name NAME · use a name listed above")
+        return 0
     elif name == "version":
         pairs = [
             ("Manager", (ROOT / "VERSION").read_text().strip()),
             ("Content commit", commit(home / "dotfiles")),
         ]
-    elif name == "domain":
-        pairs = [
-            ("Current", saved_profile.get("domain", "core")),
-            ("Choice", "chosen" if saved_profile.get("domain_chosen", False) else "UNCHOSEN"),
-        ]
-        pairs += list(domain_choices(home).items())
-        pairs.append(
-            ("Choose", f"{display} domain --name NAME · replace NAME with a listed choice")
-        )
-    elif name == "groups":
-        pairs = [
-            (
-                group,
-                ("on" if saved_profile.get("groups", {}).get(group, True) else "off")
-                + " · "
-                + spec["description"],
-            )
-            for group, spec in manifest.get("groups", {}).items()
-        ]
-    elif name == "pins":
-        pairs = pin_rows(saved_profile, home)
     elif name == "doctor":
         gaps = command_profile_gaps(saved_profile)
         drift = status(home)
@@ -357,10 +355,10 @@ def read_view(args, home, saved_profile):
                 "Domain choice",
                 "PASS · chosen"
                 if saved_profile.get("domain_chosen", False)
-                else f"FAIL · UNCHOSEN; run {display} domain",
+                else f"FAIL · UNCHOSEN; run {display} domain list",
             )
         )
-        pairs += [("Gap", gap) for gap in gaps]
+        pairs += [(f"Gap {number}", gap) for number, gap in enumerate(gaps, 1)]
         pairs += [
             (
                 "Managed files",
@@ -416,7 +414,7 @@ def status_rows(home, saved_profile):
             + (
                 " · chosen"
                 if saved_profile.get("domain_chosen", False)
-                else f" · UNCHOSEN; run {display} domain"
+                else f" · UNCHOSEN; run {display} domain list"
             ),
         ),
         (
@@ -743,23 +741,29 @@ def transaction(home, operations, label, selected=None, require_word=None, tree_
 
 def restore_command(args, home):
     backups = records(home)
-    info(
-        "Backups",
-        [
-            (path.name, load_json(path / "RUN.json", {}).get("result", "snapshot"))
-            for path in backups
-        ],
-        home,
+    command_views.directory(
+        "Backups", owned_views.backup_entities(home, backups), home, "No backups yet."
     )
     if not args.backup:
-        if not backups or not manager.has_terminal():
+        if not backups:
             return 0
-        chosen = manager.ask(
-            "Backup",
-            "cancel",
-            detail="Enter a listed backup folder to restore, or cancel to stop. Press Enter.",
-        )
-        if chosen == "cancel":
+        if ui_channel.active():
+            from tui_actions import choose
+
+            chosen = choose(
+                "Restore a backup",
+                "Backup folder",
+                [(path.name, str(path)) for path in reversed(backups)],
+            )
+        elif manager.has_terminal():
+            chosen = manager.ask(
+                "Backup",
+                "cancel",
+                detail="Enter a listed backup folder to restore, or cancel to stop. Press Enter.",
+            )
+        else:
+            return 0
+        if chosen in (None, "cancel"):
             return 0
     else:
         chosen = args.backup
@@ -779,7 +783,18 @@ def main(argv=None):
             print("Preview failed: " + str(error), file=sys.stderr)
             return 2
     argument_parser = parser()
+    try:
+        argv = command_arguments.help_arguments(
+            sys.argv[1:] if argv is None else argv, DESCRIPTIONS
+        )
+    except ValueError as error:
+        argument_parser.error(str(error))
     args = command_arguments.normalize(argument_parser.parse_args(argv), argument_parser)
+    if args.command in command_arguments.GROUPS and args.action is None:
+        args.help_parser.print_help()
+        return 0
+    if args.command == "version":
+        return read_view(args, home, {})
     if getattr(args, "machine", None):
         return remote.execute(
             home,
@@ -806,14 +821,8 @@ def main(argv=None):
         display = command_name(saved_profile)
         if args.command == "check":
             return updates.check(home, saved_profile)
-        if args.command == "status" and args.check:
-            result = updates.check(home, saved_profile, display=False)
-            read_view(args, home, saved_profile)
-            return result
         if args.command == "machines":
             if args.action == "set-ssh":
-                if args.output:
-                    parser().error("machines set-ssh does not accept --output")
                 name, target = args.hostname, args.ssh_target
                 if name is None and target is None:
                     target = connections.pick(home)
@@ -821,14 +830,8 @@ def main(argv=None):
                         print("Cancelled. No connection saved.")
                         return 0
                 return set_machine_ssh(home, name or target, target or name)
-            if args.ssh_target:
-                parser().error("only machines set-ssh accepts an SSH target")
             if args.action == "remove":
-                if not args.hostname or args.output:
-                    parser().error("machines remove needs --name; --output is not accepted")
                 return remove_machine(home, args.hostname)
-            if args.hostname or args.output and args.action != "export":
-                parser().error("use machines export --output FILE or machines remove --name NAME")
             if args.action == "export":
                 info(
                     "Machine export",
@@ -838,23 +841,9 @@ def main(argv=None):
                     home,
                 )
                 return 0
-        if (
-            args.command
-            in (
-                "profile",
-                "backups",
-                "secrets",
-                "content",
-                "status",
-                "doctor",
-                "version",
-                "machines",
-                "addons",
-            )
-            or args.command in ("domain", "groups")
-            and not args.name
-            or args.command == "pins"
-            and not args.action
+        if args.command in ("status", "doctor") or getattr(args, "action", None) in (
+            "list",
+            "show",
         ):
             return read_view(args, home, saved_profile)
         if args.command == "update":
@@ -882,13 +871,28 @@ def main(argv=None):
             # Snapshot only: transaction has no replacement operations or profile changes.
             return snapshot(home, operations)
         if args.command == "uninstall":
-            if not manager.has_terminal():
+            if not manager.has_terminal() and not ui_channel.active():
                 raise ValueError("Uninstall needs a terminal and typed confirmation.")
             backups = records(home)
             selected, restored = None, []
-            if (
-                backups
-                and manager.ask(
+            restore = "keep"
+            if backups and ui_channel.active():
+                from tui_actions import choose
+
+                restore = choose(
+                    "After removing Fleet",
+                    "Oldest backup",
+                    [
+                        ("keep — remove managed files; keep the backups", "keep"),
+                        ("restore — restore the oldest saved files", "restore"),
+                    ],
+                    "keep",
+                )
+                if restore is None:
+                    print("Cancelled. Nothing removed.")
+                    return 0
+            elif backups:
+                restore = manager.ask(
                     "Oldest backup",
                     "keep",
                     ["restore", "keep"],
@@ -897,8 +901,7 @@ def main(argv=None):
                         "remove managed files only. Content and backups stay. Press Enter."
                     ),
                 )
-                == "restore"
-            ):
+            if restore == "restore":
                 selected, restored = validate_backup(home, str(backups[0]))
             operations = dict.fromkeys(managed_paths(home))
             operations.update(dict(restored))
@@ -917,11 +920,9 @@ def main(argv=None):
         os.environ["DOTFLEET_LOCAL_CONTENT"] = "1"
         if args.command == "domain":
             if args.name not in domain_choices(home):
-                raise ValueError(f"Unknown domain. Run {display} domain to list choices.")
+                raise ValueError(f"Unknown domain. Run {display} domain list to see choices.")
             return manager.main(["--defaults", "--domain", args.name])
         if args.command == "groups":
-            if not args.state:
-                parser().error("groups --name needs --state on or off")
             return manager.main(["--defaults", "--group", args.name + "=" + args.state])
         if args.command == "pins":
             if not args.pin:
@@ -980,7 +981,7 @@ def main(argv=None):
                 before_apply=install,
             )
     except (OSError, ValueError, RuntimeError) as error:
-        if args.command == "check" or args.command == "status" and args.check:
+        if args.command == "check":
             print("Warning: Could not check updates: " + str(error), file=sys.stderr)
             return 2
         style.record_failure()
@@ -1073,6 +1074,8 @@ def change_registry(home, edit):
                     )
                 ),
             )
+            if ui_channel.active() and not ui_channel.review(account.record()):
+                return account.finish("CANCELLED")
             manager.backup(home, [registry.REGISTRY], folder)
             account.bind_backup(folder)
             atomic(path, after)

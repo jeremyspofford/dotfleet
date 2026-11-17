@@ -146,53 +146,53 @@ def refresh(home, manager_version, backup, result, fallback=None):
     return current
 
 
-def rows(home, manager_version):
-    """Render stored records; add a local unrecorded view for older enrollments."""
-    from render_run import human
-    from command_display import current_command
-
+def entities(home, manager_version):
+    """List known facts, with one compact block per machine."""
     data = load(home)
     local = socket.gethostname()
     if local not in data["machines"]:
         data["machines"][local] = machine(home, manager_version)
-    output = [
-        ("Scope", "Recorded data only; no live queries to other machines."),
-        ("Registry", str(home / REGISTRY)),
-    ]
+    output = []
     for key, record in sorted(
         data["machines"].items(), key=lambda item: (item[0] != local, item[0])
     ):
-        output += [
-            ("Machine", key + (" · this machine" if key == local else " · recorded only")),
+        known = any(
+            record.get(field)
+            for field in ("home", "os", "domain", "content_repo", "manager_version", "last_run")
+        )
+        target = record.get("ssh_target")
+        fields = [
+            ("Connection", "SSH uses this name" if target == key else target or "no connection"),
             (
-                "Connection",
-                "SSH uses this name"
-                if record.get("ssh_target") == key
-                else record.get("ssh_target") or "no connection",
+                "Enrollment",
+                "enrolled" if record["enrolled"] else "not enrolled" if known else "not recorded",
             ),
-            ("OS", record["os"]),
+            ("OS", record.get("os")),
             (
                 "Domain",
-                (record["domain"] or "not set")
-                + (" · chosen" if record["domain_chosen"] else " · UNCHOSEN"),
+                (record["domain"] + (" · chosen" if record["domain_chosen"] else " · UNCHOSEN"))
+                if record["domain"]
+                else None,
             ),
-            ("Content repo", record["content_repo"] or "not set"),
-            ("Content commit", record["content_commit"] or "not recorded"),
-            ("Manager version", record["manager_version"]),
-            ("Last run", record["last_run"] or f"not recorded; run {current_command(home)} update"),
-            ("Last result", record["result"]),
-            (
-                "Last backup",
-                human(record["last_backup"], record["home"]) if record["last_backup"] else "none",
-            ),
-            (
-                "Run record",
-                human(record["last_run_record"], record["home"])
-                if record["last_run_record"]
-                else "none",
-            ),
-            ("Enrolled", record["enrolled"]),
+            ("Content", record.get("content_repo")),
+            ("Commit", record.get("content_commit")),
+            ("Fleet", record.get("manager_version")),
         ]
+        if record["result"] and record["result"] != "not recorded":
+            fields.append(
+                (
+                    "Last result",
+                    record["result"]
+                    + (" · recorded " + record["last_run"] if record["last_run"] else ""),
+                )
+            )
+        output.append(
+            {
+                "name": key + (" · this machine" if key == local else " · recorded only"),
+                "fields": fields,
+                "notes": [] if known else ["No local data recorded for this machine."],
+            }
+        )
     return output
 
 

@@ -79,11 +79,13 @@ class CommandDisplayTests(unittest.TestCase):
 
     def test_helpers_use_alias_in_review_hints_and_help(self):
         self.assert_instructions(self.enroll_helpers(), "fleet")
-        self.assertIn("Updates: not checked — run: fleet check", self.cli("status"))
+        self.assertIn("Updates: not checked yet — run: fleet check", self.cli("status"))
         self.assert_cached_update_hint("fleet")
-        self.assertIn("Use fleet domain, pins, groups, or configure.", self.cli("profile"))
-        self.assertIn("Run fleet --help", self.cli("check", "--help"))
-        self.assertIn("fleet domain --name NAME", self.cli("domain"))
+        self.assertIn(
+            "Use fleet domain set, pins set, groups set, or configure.", self.cli("profile", "show")
+        )
+        self.assertIn("Run fleet help", self.cli("check", "--help"))
+        self.assertIn("fleet domain set --name NAME", self.cli("domain", "list"))
         self.assertIn("Run fleet configure", self.cli("configure", expected=1))
         alias = command("bash", "-c", 'source "$HOME/.aliases"; alias fleet', env=self.env)
         self.assertEqual(alias, "alias fleet='dotfleet'\n")
@@ -95,12 +97,15 @@ class CommandDisplayTests(unittest.TestCase):
         (other / "fleet").chmod(0o755)
         with patch.dict(os.environ, {"PATH": str(other)}):
             self.assertIn("Update    fleet update", render(recorded))
-        disabled = self.cli("groups", "helpers", "off")
+        disabled = self.cli("groups", "set", "--name", "helpers", "--state", "off")
         self.assertIn("Update    dotfleet update", disabled)
         self.assertIn("Wizard    dotfleet configure", disabled)
-        self.assertIn("Updates: not checked — run: dotfleet check", self.cli("status"))
+        self.assertIn("Updates: not checked yet — run: dotfleet check", self.cli("status"))
         self.assert_cached_update_hint("dotfleet")
-        self.assertIn("Use dotfleet domain, pins, groups, or configure.", self.cli("profile"))
+        self.assertIn(
+            "Use dotfleet domain set, pins set, groups set, or configure.",
+            self.cli("profile", "show"),
+        )
         self.assert_quiet_status()
 
     def test_real_fleet_binary_keeps_dotfleet_instructions(self):
@@ -108,10 +113,13 @@ class CommandDisplayTests(unittest.TestCase):
         executable.write_text('#!/bin/sh\nprintf "%s\\n" "Rancher fixture"\n')
         executable.chmod(0o755)
         self.assert_instructions(self.enroll_helpers(), "dotfleet")
-        self.assertIn("Updates: not checked — run: dotfleet check", self.cli("status"))
+        self.assertIn("Updates: not checked yet — run: dotfleet check", self.cli("status"))
         self.assert_cached_update_hint("dotfleet")
-        self.assertIn("Run dotfleet --help", self.cli("check", "--help"))
-        self.assertIn("Use dotfleet domain, pins, groups, or configure.", self.cli("profile"))
+        self.assertIn("Run dotfleet help", self.cli("check", "--help"))
+        self.assertIn(
+            "Use dotfleet domain set, pins set, groups set, or configure.",
+            self.cli("profile", "show"),
+        )
         selected = command("bash", "-c", 'source "$HOME/.aliases"; command -v fleet', env=self.env)
         self.assertEqual(selected.strip(), str(executable))
 

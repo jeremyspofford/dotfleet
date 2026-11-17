@@ -62,8 +62,9 @@ class RegistryTests(unittest.TestCase):
             self.home / ".config/fleet/profile.toml",
             toml({"domain": "core", "content_repo": "https://example.invalid/content"}),
         )
-        rows = registry.rows(self.home, "0.2.0")
-        self.assertIn(("Domain", "core · UNCHOSEN"), rows)
+        entities = registry.entities(self.home, "0.2.0")
+        self.assertEqual(len(entities), 1)
+        self.assertIn(("Domain", "core · UNCHOSEN"), entities[0]["fields"])
         self.assertFalse((self.home / registry.REGISTRY).exists())
 
     def test_invalid_schema_and_links_fail_without_replacing_data(self):
@@ -111,11 +112,12 @@ class RegistryCommandTests(unittest.TestCase):
         data["machines"]["recorded-machine"] = other
         atomic(path, registry.serialize(data))
         before = path.read_bytes()
-        output = self.cli("machines")
+        output = self.cli("machines", "list")
         self.assertEqual(path.read_bytes(), before)
         self.assertIn("this machine", output)
         self.assertIn("recorded-machine · recorded only", output)
-        self.assertIn("no live queries", output)
+        self.assertNotIn("Scope", output)
+        self.assertNotIn("RUN.json", output)
         self.assertNotIn("{", output)
         for line in output.splitlines():
             self.assertLessEqual(len(line), 100)
@@ -130,7 +132,7 @@ class RegistryCommandTests(unittest.TestCase):
         self.assertEqual(
             json.loads(Path(latest["last_run_record"]).read_text())["result"], latest["result"]
         )
-        self.assertEqual(self.cli("addons").count("none; no add-ons ship"), 1)
+        self.assertEqual(self.cli("addons", "list").count("No installed add-ons"), 1)
 
     def test_content_cannot_replace_private_registry_or_profile(self):
         self.enroll()

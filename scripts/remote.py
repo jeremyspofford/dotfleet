@@ -16,6 +16,7 @@ import sys
 import registry
 import connections
 import topology
+import remote_history
 import style
 from render_run import render_view
 
@@ -28,6 +29,7 @@ REASONS = {
 }
 # This literal is the entire remote command. User input only enters the JSON request.
 REMOTE_COMMAND = 'export PATH="$HOME/.local/bin:$PATH"; exec "$HOME/.local/bin/dotfleet" _remote'
+PROBE_COMMAND = 'test -x "$HOME/.local/bin/dotfleet"'
 
 
 def validate_target(target):
@@ -49,6 +51,8 @@ def validate_request(request):
     for option, allowed in (("check", "status"), ("stat", "diff")):
         if type(request[option]) is not bool or request[option] and action != allowed:
             raise ValueError("Invalid remote option for " + action + ".")
+    if request["check"]:
+        raise ValueError("Status never fetches. Run check on that machine instead.")
     return request
 
 
@@ -66,6 +70,7 @@ def test_connection(home, name, target):
                 result.stderr or result.stdout or f"SSH test failed (exit {result.returncode})"
             )
     except (OSError, subprocess.TimeoutExpired) as error:
+        diagnostics(home, name, target, "connection test", "connection", error)
         reason = connections.report_failure(home, name, target, error)
         topology.remember(home, name, target, "connection test", reason, 2)
         print("Saved connection kept. Retry after fixing access or waking the target.")
@@ -73,6 +78,22 @@ def test_connection(home, name, target):
     print(f"PASS: {name}: SSH connection test passed.")
     topology.remember(home, name, target, "connection test", "SSH test passed", 0)
     return 0
+
+
+def diagnostics(home, machine, target, action, phase, result):
+    try:
+        remote_history.save(home, machine, target, action, phase, result)
+    except (OSError, ValueError):
+        # Never expose raw shell output if the private record cannot be written.
+        pass
+
+
+def missing_command(home, machine, target, action):
+    reason = "Fleet is not installed on this machine (or predates the fleet command)"
+    print(f"Error: {machine}: {reason}.")
+    print("Next: Run the Fleet one-liner on that machine once, then retry.")
+    topology.remember(home, machine, target, action, reason, 2)
+    return 2
 
 
 def execute(home, machine, action, *, check=False, stat=False):
@@ -89,11 +110,35 @@ def execute(home, machine, action, *, check=False, stat=False):
     except (OSError, ValueError) as error:
         print(f"Error: {machine}: {connections.one_line(str(error))}.")
         return 2
+    phase = "command probe"
+    result = None
     try:
-        result = connections.invoke(target, REMOTE_COMMAND, json.dumps(request) + "\n")
+        result = connections.invoke(target, PROBE_COMMAND, probe=True)
+        if result.returncode or result.stderr:
+            diagnostics(home, machine, target, action, "command probe", result)
+        if result.returncode in (1, 126, 127):
+            return missing_command(home, machine, target, action)
         if result.returncode == 255:
-            raise ConnectionError(result.stderr or "SSH connection failed")
-    except OSError as error:
+            reason = connections.report_failure(
+                home, machine, target, ConnectionError(result.stderr)
+            )
+            topology.remember(home, machine, target, action, reason, 2)
+            return 2
+        phase = "remote command"
+        result = connections.invoke(target, REMOTE_COMMAND, json.dumps(request) + "\n")
+        expected = (0, 1) if action in ("check", "diff") else (0,)
+        if result.returncode not in expected or result.stderr:
+            diagnostics(home, machine, target, action, "remote command", result)
+        if result.returncode == 127:
+            return missing_command(home, machine, target, action)
+        if result.returncode == 255:
+            reason = connections.report_failure(
+                home, machine, target, ConnectionError(result.stderr)
+            )
+            topology.remember(home, machine, target, action, reason, 2)
+            return 2
+    except (OSError, subprocess.TimeoutExpired) as error:
+        diagnostics(home, machine, target, action, phase, error)
         reason = connections.report_failure(home, machine, target, error)
         topology.remember(home, machine, target, action, reason, 2)
         return 2
@@ -101,9 +146,8 @@ def execute(home, machine, action, *, check=False, stat=False):
     if isinstance(sys.stdout, style.LoggerStream) and action == "diff":
         sys.stdout.diff = True
     # The target uses the shared renderer, with its own home and its own run record.
-    for output in (result.stdout, result.stderr):
-        if output:
-            print(output, end="" if output.endswith("\n") else "\n")
+    if result.stdout:
+        print(result.stdout, end="" if result.stdout.endswith("\n") else "\n")
     if result.returncode == 0:
         state = action + " succeeded"
         print(f"{machine}: {state} (exit 0).")
@@ -144,8 +188,6 @@ def receive():
             print("Complete these choices on the target, then retry.")
             return 2
         args = [request["action"]]
-        if request["check"]:
-            args.append("--check")
         if request["stat"]:
             args.append("--stat")
         return command.main(args)

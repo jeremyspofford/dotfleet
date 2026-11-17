@@ -26,10 +26,10 @@ Requires Python 3.11+.
 
 Options:
   --dry-run     Validate and report proposed paths without writing.
+  -h, --help    Print full help and exit 0.
   --home PATH   Full target home path; default: the current user's home.
   --os OS       Select linux (Linux), darwin (macOS), windows (Windows),
                 or wsl (Windows Subsystem for Linux); default: detected system.
-  -h, --help    Print full help and exit 0.
 
 Examples:
   bash scripts/generate-agent-configs.sh --dry-run

@@ -73,7 +73,7 @@ class UpdateTests(unittest.TestCase):
         behind_check = self.cli("check", expected=1)
         self.assertEqual(
             behind_check,
-            f"Manager: 3 commits behind @ {before[0][:8]}\n"
+            f"Manager: 3 commits behind @ {before[0][:8]}\n\n"
             f"Content: 1 commit behind @ {before[1][:8]}\n",
         )
         self.assertEqual(untouched, self.snapshot())
@@ -103,9 +103,9 @@ class UpdateTests(unittest.TestCase):
         current_check = self.cli("check")
         self.assertEqual(
             current_check,
-            f"Manager: up to date @ {targets[0][:8]}\nContent: up to date @ {targets[1][:8]}\n",
+            f"Manager: up to date @ {targets[0][:8]}\n\nContent: up to date @ {targets[1][:8]}\n",
         )
-        current_status = self.cli("status", "--check")
+        current_status = self.cli("status")
         self.assertIn(f"Updates: none (checked {self.checked_time()})", current_status)
         # Optional proof output never enters the enrolled home or repository.
         if directory := os.environ.get("DOTFLEET_CHECK_EVIDENCE"):
@@ -119,7 +119,7 @@ class UpdateTests(unittest.TestCase):
             ]:
                 (folder / f"{name}.txt").write_text(output)
 
-    def test_status_without_cache_never_fetches_and_check_flag_does(self):
+    def test_status_never_fetches_and_check_stays_a_separate_command(self):
         self.enroll()
         advance(self.origin, 3)
         before = self.snapshot()
@@ -134,7 +134,7 @@ class UpdateTests(unittest.TestCase):
             for path in self.paths()
         ]
         output = self.cli("status")
-        self.assertIn("Updates: not checked — run: dotfleet check", output)
+        self.assertIn("Updates: not checked yet — run: dotfleet check", output)
         self.assertFalse((self.home / updates.CACHE).exists())
         self.assertEqual(before, self.snapshot())
         for path, refs, fetched in git_state:
@@ -145,7 +145,11 @@ class UpdateTests(unittest.TestCase):
                 else None,
                 fetched,
             )
-        output = self.cli("status", "--check", expected=1)
+        rejected = self.cli("status", "--check", expected=2)
+        self.assertIn("unrecognized arguments", rejected)
+        self.assertFalse((self.home / updates.CACHE).exists())
+        self.cli("check", expected=1)
+        output = self.cli("status")
         self.assertIn(
             f"Updates: manager +3 (checked {self.checked_time()}) — run: dotfleet update", output
         )
@@ -167,8 +171,7 @@ class UpdateTests(unittest.TestCase):
         self.assertEqual((cache.read_bytes(), cache.stat().st_mtime_ns, self.snapshot()), before)
         self.assertIn(f"Updates: none (checked {self.checked_time()})", self.cli("status"))
         flagged = self.cli("status", "--check", expected=2)
-        self.assertIn("Warning: Could not check content", flagged)
-        self.assertIn("Updates: none", flagged)
+        self.assertIn("unrecognized arguments", flagged)
         self.assertEqual((cache.read_bytes(), cache.stat().st_mtime_ns, self.snapshot()), before)
         cache.unlink()
         self.cli("check", expected=2)

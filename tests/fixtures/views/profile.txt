@@ -7,6 +7,7 @@
   Git name       Example Person
   Git email      example@example.invalid
   Pin node       24.14.1
+  Group docker   off
   Group helpers  on
   Agent codex    off
-  Edit choices   Use fleet domain, pins, groups, or configure. Do not edit profile.toml.
+  Edit choices   Use fleet domain set, pins set, groups set, or configure. Do not edit profile.toml.

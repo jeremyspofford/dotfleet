@@ -12,29 +12,21 @@ import sys
 from rich.text import Text
 from textual import on, work
 from textual.app import App, ComposeResult
-from textual.containers import Vertical
+from textual.containers import Vertical, VerticalScroll
 from textual.screen import ModalScreen, Screen
 from textual.theme import BUILTIN_THEMES, Theme
 from textual.worker import WorkerCancelled, get_current_worker
-from textual.widgets import Button, Input, OptionList, RichLog, Static
+from textual.widgets import Button, Input, OptionList, RichLog, Select, Static
 from textual.widgets.option_list import Option
 
 from render_run import human, render
 import remote
 import style
 from tui_session import CoreSession
+from tui_navigation import ACTIONS, AREAS, CHANGING, RELATED
 
 ROOT = Path(__file__).resolve().parents[1]
-MENU = [
-    ("status", "Status — saved choices and drift"),
-    ("check", "Updates — check, then update"),
-    ("diff", "Diff — pending file changes"),
-    ("backups", "Backups — list and restore"),
-    ("machines", "Machines — records and SSH actions"),
-    ("doctor", "Doctor — check this machine"),
-    ("topology", "Topology — connections from this machine"),
-    ("configure", "Configure — open the wizard"),
-]
+MENU = tuple(AREAS)
 
 
 def plain_theme():
@@ -149,6 +141,76 @@ class ConnectionPicker(ModalScreen[str | None]):
         self.dismiss(None)
 
 
+class CommandForm(ModalScreen[dict | None]):
+    BINDINGS = [("escape", "cancel", "Cancel")]
+
+    def __init__(self, request):
+        super().__init__()
+        self.request = request
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="form-box"):
+            yield Static(self.request["title"], classes="heading")
+            yield Static(self.request["detail"], classes="form-detail")
+            with VerticalScroll(id="form-fields"):
+                for field in self.request["fields"]:
+                    yield Static(field["label"], classes="form-label")
+                    if field["choices"]:
+                        yield Select(
+                            field["choices"],
+                            value=field["default"],
+                            allow_blank=False,
+                            id="field-" + field["name"],
+                        )
+                    else:
+                        yield Input(value=field["default"], id="field-" + field["name"])
+            yield Static("Tab moves. Enter selects or submits. Esc cancels.", classes="keys")
+            yield Static("", id="form-error")
+            yield Button("Continue", id="submit-form")
+            yield Button("Cancel", id="cancel-form")
+
+    def on_mount(self):
+        self.query_one("#field-" + self.request["fields"][0]["name"]).focus()
+
+    @on(Input.Submitted)
+    @on(Button.Pressed, "#submit-form")
+    def submit(self):
+        answer = {}
+        for field in self.request["fields"]:
+            value = self.query_one("#field-" + field["name"]).value
+            if not isinstance(value, str) or field["required"] and not value.strip():
+                self.query_one("#form-error", Static).update(field["label"] + " needs a value.")
+                return
+            answer[field["name"]] = value.strip()
+        self.dismiss(answer)
+
+    @on(Button.Pressed, "#cancel-form")
+    def action_cancel(self):
+        self.dismiss(None)
+
+
+class AreaScreen(Screen):
+    def __init__(self, area):
+        super().__init__()
+        self.area = area
+
+    def compose(self) -> ComposeResult:
+        yield Static("Fleet · " + self.area, classes="heading")
+        yield OptionList(
+            *(Option(ACTIONS[action][0], id=action) for action in AREAS[self.area]),
+            Option("Back", id="back"),
+            id="area-actions",
+        )
+        yield Static("↑↓ / Tab move · Enter selects · Esc back · q quits", classes="keys")
+
+    @on(OptionList.OptionSelected, "#area-actions")
+    async def selected(self, event):
+        if event.option.id == "back":
+            await self.app.action_back()
+        else:
+            self.app.open_command(event.option.id)
+
+
 class MachineActions(Screen):
     def __init__(self, machine):
         super().__init__()
@@ -178,9 +240,10 @@ class ActionScreen(Screen):
         self.machine = machine
         self.backups = []
         self.connections = []
+        self.uninstalled = False
 
     def compose(self) -> ComposeResult:
-        title = "Updates" if self.action == "check" else self.action.capitalize()
+        title = ACTIONS[self.action][0]
         if self.machine:
             title += " · " + self.machine
         yield Static("Fleet · " + title, classes="heading")
@@ -195,6 +258,11 @@ class ActionScreen(Screen):
     def options(self, result, action):
         options = self.query_one("#actions", OptionList)
         options.clear_options()
+        if self.uninstalled:
+            options.add_option(Option("Close Fleet", id="close"))
+            options.disabled = False
+            options.focus()
+            return
         if self.action == "check":
             options.add_option(Option("Check again", id="check"))
             options.add_option(
@@ -213,10 +281,11 @@ class ActionScreen(Screen):
                     options.add_option(
                         Option(action.capitalize() + " · " + machine, id=f"remote-{index}-{action}")
                     )
-            options.add_option(Option("Add SSH connection", id="add-connection"))
         elif self.action == "topology":
             for index, machine in enumerate(self.connections):
                 options.add_option(Option(machine, id=f"machine-{index}"))
+        for action in RELATED.get(self.action, ()):
+            options.add_option(Option(ACTIONS[action][0], id=action))
         options.add_option(Option("Back", id="back"))
         options.disabled = False
         options.highlighted = 0
@@ -225,7 +294,9 @@ class ActionScreen(Screen):
     @on(OptionList.OptionSelected, "#actions")
     async def selected(self, event):
         choice = event.option.id
-        if choice == "back":
+        if choice == "close":
+            self.app.exit()
+        elif choice == "back":
             await self.app.action_back()
         elif choice.startswith("restore-"):
             self.app.perform_action(
@@ -238,8 +309,10 @@ class ActionScreen(Screen):
             self.app.push_screen(
                 MachineActions(self.connections[int(choice.removeprefix("machine-"))])
             )
-        else:
+        elif choice in ("check", "update") and self.action == "check":
             self.app.perform_action(self, choice)
+        else:
+            self.app.open_command(choice)
 
 
 class FleetApp(App[str]):
@@ -256,6 +329,7 @@ class FleetApp(App[str]):
         self.busy = False
         self.changing = False
         self.exit_requested = False
+        self.uninstalled = False
         self.worker = None
         self.operation_worker = None
         colors = {key: "ansi_white" if self.plain else palette(key) for key in style.COLORS}
@@ -284,7 +358,7 @@ class FleetApp(App[str]):
     def compose(self) -> ComposeResult:
         yield Static("Fleet · this machine", classes="heading")
         yield Static("Loading local state…", id="facts")
-        yield OptionList(*(Option(label, id=action) for action, label in MENU), id="menu")
+        yield OptionList(*(Option(area, id=area) for area in MENU), id="menu")
         yield Static("↑↓ / Tab move · Enter selects · Esc back · q quits", classes="keys")
 
     def on_mount(self):
@@ -323,14 +397,19 @@ class FleetApp(App[str]):
     async def confirm(self, request):
         if request.get("kind") == "choose":
             return await self.push_screen_wait(ConnectionPicker(request))
+        if request.get("kind") == "form":
+            return await self.push_screen_wait(CommandForm(request))
         return await self.push_screen_wait(Review(request))
 
     @on(OptionList.OptionSelected, "#menu")
     def open_action(self, event):
-        if event.option.id == "configure":
+        self.push_screen(AreaScreen(event.option.id))
+
+    def open_command(self, action):
+        if action == "configure":
             self.exit("configure")
         else:
-            self.push_screen(ActionScreen(event.option.id))
+            self.push_screen(ActionScreen(action))
 
     @work
     async def perform_action(self, screen, action, backup=None):
@@ -338,7 +417,7 @@ class FleetApp(App[str]):
             return
         self.busy = True
         self.operation_worker = get_current_worker()
-        self.changing = action in ("update", "rollback", "add-connection")
+        self.changing = action in CHANGING
         output = screen.query_one("#output", RichLog)
         output.clear()
         screen.query_one("#actions", OptionList).disabled = True
@@ -358,6 +437,8 @@ class FleetApp(App[str]):
                 screen.backups = message["items"]
             elif message["kind"] == "connections":
                 screen.connections = message["items"]
+            elif message["kind"] == "uninstalled":
+                self.uninstalled = screen.uninstalled = message["value"]
 
         try:
             result = await self.session.run(
@@ -398,7 +479,10 @@ class FleetApp(App[str]):
                 pass
 
     async def action_back(self):
-        if isinstance(self.screen, (Review, ConnectionPicker)):
+        if self.uninstalled:
+            self.exit()
+            return
+        if isinstance(self.screen, (Review, ConnectionPicker, CommandForm)):
             self.screen.action_cancel()
             return
         if self.busy and self.changing:
@@ -408,15 +492,18 @@ class FleetApp(App[str]):
             return
         await self.stop_read()
         if len(self.screen_stack) > 1:
-            self.pop_screen()
-            self.worker = self.load_dashboard()
+            await self.pop_screen()
+            if isinstance(self.screen, ActionScreen):
+                self.perform_action(self.screen, self.screen.action)
+            elif len(self.screen_stack) == 1:
+                self.worker = self.load_dashboard()
         else:
             self.exit()
 
     async def action_quit(self):
         if self.busy and self.changing:
             self.exit_requested = True
-            if isinstance(self.screen, (Review, ConnectionPicker)):
+            if isinstance(self.screen, (Review, ConnectionPicker, CommandForm)):
                 self.screen.action_cancel()
             else:
                 self.screen.query_one("#progress", Static).update(

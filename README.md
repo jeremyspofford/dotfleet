@@ -169,9 +169,9 @@ bash install.sh --domain personal --git-name "Example Person" --git-email person
 Repeat `--pin TOOL=VERSION` for each full version. A floating value in a flag still fails unattended validation.
 Complete profiles need no flags on later runs. New group defaults are printed during scripted setup.
 
-`domain_chosen` records a human choice in this wizard, through `--domain`, or through `dotfleet domain --name NAME`.
+`domain_chosen` records a human choice in this wizard, through `--domain`, or through `dotfleet domain set --name NAME`.
 A missing field means UNCHOSEN, including profiles saved before the wizard existed. Carried and defaulted domains remain unchosen until confirmed.
-Status and doctor show that gap. Run `dotfleet domain` to read the choices, then `dotfleet domain --name NAME` to confirm one.
+Status and doctor show that gap. Run `dotfleet domain list` to read the choices, then `dotfleet domain set --name NAME` to confirm one.
 `unpinned_tools` records skipped tools, so content defaults cannot select them later. Remove a tool there to allow its defaults again.
 Content defaults fill gaps only when the requested versions are installed. The summary lists other defaults as available, without installing them.
 The manager creates Git identity, domain, Mise settings, and a private secrets file. Keep secret references in the content manifest, never values. Imported profile references remain valid.
@@ -214,41 +214,45 @@ Use `dotfleet` for daily commands. The installer places it in `~/.local/bin` on 
 It keeps the manager checkout at `~/.local/share/fleet/manager`. The command uses that copy and its VERSION file.
 Keep `~/.local/bin` on PATH, the list of folders your shell searches for commands.
 The one-line installer remains the first-install and recovery path.
+Command groups require an action. Bare `machines`, `backups`, `secrets`, `pins`, `groups`, `domain`, `content`, `profile`, and `addons` print their action lists.
 
 | Command | Action |
 | --- | --- |
 | `dotfleet tui` | Open the full-screen terminal interface. Missing environments show plain command alternatives and exit 0. |
 | `dotfleet update` | Fetch the manager and content, then apply saved choices. Refuse dirty or diverged checkouts. |
-| `dotfleet profile` | Show saved choices and the profile location. Edit choices through commands or the wizard. |
-| `dotfleet backups` | List backup dates, results, and sizes without changing files. |
-| `dotfleet secrets` | List declared secret names as set or unset. Values stay private. |
-| `dotfleet content` | Show the content checkout, repository, commit, behind state, and short Git status. |
+| `dotfleet profile show` | Show saved choices and the profile location. Edit choices through commands or the wizard. |
+| `dotfleet backups list` | List backup dates, results, and sizes without changing files. |
+| `dotfleet secrets list` | List declared secret names as set or unset. Values stay private. |
+| `dotfleet content show` | Show the content checkout, repository, commit, behind state, and short Git status. |
 | `dotfleet status` | Show choices, installed pins, drift, recent runs and backups, and the last update check. |
 | `dotfleet topology` | Show this machine’s recorded connection tree. Use --json for structured output. |
 | `dotfleet check` | Fetch both upstreams and save their update counts. An upstream is the remote branch tracked by a checkout. |
-| `dotfleet status --check` | Run check first, then show status. Return the check exit code. |
 | `dotfleet diff` | Show pending patches. Use `--stat` for paths only. Exit 0 means clean; exit 1 means differences. |
 | `dotfleet rollback` | List backups and choose one in a terminal. Include the saved profile when restoring. |
 | `dotfleet rollback --backup BACKUP` | Review one backup folder, then type restore to confirm. |
-| `dotfleet domain` | Show the current domain, its confirmation state, and each domain's description. |
-| `dotfleet domain --name personal` | Record the personal domain as chosen and apply it. |
-| `dotfleet groups` | List content groups, their states, and descriptions. |
-| `dotfleet groups --name docker --state off` | Exclude Docker content. Use on to restore it. |
-| `dotfleet pins` | List saved exact versions and installed versions. |
+| `dotfleet domain list` | Show the current domain, its confirmation state, and each domain's description. |
+| `dotfleet domain set --name personal` | Record the personal domain as chosen and apply it. |
+| `dotfleet groups list` | List content groups, their states, and descriptions. |
+| `dotfleet groups set --name docker --state off` | Exclude Docker content. Use on to restore it. |
+| `dotfleet pins list` | List saved exact versions and installed versions. |
 | `dotfleet pins set --tool node --version 24.14.1` | Explicitly install and record that exact version. Content defaults still never install software. |
 | `dotfleet pins remove --tool node` | Remove the pin and prevent content defaults from filling it again. Keep installed software. |
 | `dotfleet configure` | Reopen the enrollment wizard. |
 | `dotfleet doctor` | Check profile completeness, drift, checkout edits, and backups. Print a fix for each failed check. |
+| `dotfleet machines list` | List saved machines with known facts and connections. Make no network requests. |
+| `dotfleet addons list` | List installed add-on records. No add-ons ship with Fleet. |
 | `dotfleet backup` | Snapshot managed files and the profile without applying content. |
 | `dotfleet version` | Print the manager version and content commit. |
 | `dotfleet uninstall` | Review removal, then type uninstall. Keep the content checkout and all backups. |
 
 A checkout is a local Git copy. Plain status reports saved update results and never fetches.
-Its content behind count compares the last fetched remote state.
+Its Updates line includes the check time, or says not checked yet.
+Its content behind count compares the last fetched remote state. Check prints only update results.
 Drift means that managed files differ from the selected content. Groups select optional files or alias blocks.
 The profile stores machine choices. Pins select exact tool versions.
-Every command supports `--help`. Exit codes are 0 for success or cancellation, 1 for failed checks or operations, and 2 for arguments.
-Check and `status --check` use 0 for current, 1 for available updates, and 2 when a check fails.
+Use `help`, `-h`, or `--help` at any command or action. `fleet help machines` lists machine actions.
+Use `version` or `--version` for the same version output. Exit codes are 0 for success or cancellation, 1 for failed checks or operations, and 2 for arguments.
+Check uses 0 for current, 1 for available updates, and 2 when a check fails.
 
 Change-making commands write RUN.json and print the standard review. File lists come from the plan and backup inventory.
 Rollback makes another backup first. It restores only recorded paths, including original symlinks and recorded external targets.
@@ -266,23 +270,30 @@ A terminal user interface (TUI) fills the terminal with navigable screens.
 The dashboard fits 80 columns and 24 rows. Narrow terminals keep one column; long dashboard values shorten with an ellipsis.
 Status shows the full values. Scroll the other screens to read long results.
 
-| Screen | Action |
+The dashboard shows this machine, domain choice, content source and commit, manager version, cached updates, last backup, and drift.
+Each menu area opens the existing command's view or action:
+
+| Area | Commands and actions |
 | --- | --- |
-| Dashboard | Show this machine, domain choice, content source and commit, manager version, cached updates, last backup, and drift. |
-| Status | Show the same local status as the plain command. |
-| Updates | Check both sources live. Offer update when the check finds new commits. |
-| Diff | Show pending file patches, or one clean-state line. |
-| Backups | List saved backups. Select one, review its changes, then type `restore` to confirm. |
-| Machines | Show saved records. Connected machines offer Status, Check, Diff, Doctor, and Update. |
-| Doctor | Run the existing local checks and show each result. |
-| Configure | Close the interface and run the existing terminal wizard. |
+| Machine | Status, Check, Update, Diff, Doctor, and Topology. Diff also offers paths only. |
+| Configuration | Profile show; Domain list/set; Groups list/set; Pins list/set/remove; Secrets list; Content show; Configure. |
+| Machines | List, pick an SSH host, set a named target, export, and remove a stale record. |
+| Backups | List backups, create one, and restore one. |
+| System | Version, Add-ons list, command help, interface help, and Uninstall. |
+
+Connected machines offer Status, Check, Diff, Doctor, and Update from Machines and Topology.
+Unconnected machines remain display-only. Help includes every command and action; interface help describes the already-open TUI.
+Configure closes the interface and runs the original terminal wizard. No commands are excluded from the interface.
+CI checks every command and group action against reachable menu entries.
 
 Arrows and Tab move between choices. Enter selects. Esc goes back or cancels review. Press q to quit.
 During a change, q waits for that operation to finish. Review can still be cancelled before applying.
 Mouse selection also works. Set `NO_COLOR`, even empty, or `TERM=dumb` for the plain theme.
 
-The interface calls the existing command cores. Updates and rollback show the standard review and write the same RUN.json records.
-Type `confirm` for an update. Type `restore` for rollback. Empty or incorrect answers never approve changes.
+The interface calls the existing command cores. Changes show the same review and write the same RUN.json records.
+Forms collect named choices; the command core validates them. Cancel leaves those choices unapplied.
+Type `confirm` for an update, `restore` for rollback, or `uninstall` for removal. Empty or incorrect answers never approve changes.
+Uninstall offers to restore the oldest backup, as the plain command does. After removal, close the interface.
 Remote Update runs unattended on the selected machine. It shows that machine's completed review; it never asks for target input.
 Incomplete profiles stop updates; choose Configure to finish them. Local file conflicts also stop unattended apply.
 Use the plain update command in a terminal to resolve those conflicts. No interface action guesses an overwrite choice.
@@ -318,7 +329,7 @@ If both old and new stores exist, migration stops before moving folders. Resolve
 3. Run `fleet update` to fetch and apply changes. Run check again to refresh the saved result.
 
 The `fleet` alias runs `dotfleet`. Use `dotfleet` directly if your content does not provide that alias.
-Use `dotfleet status --check` to check and display status together.
+Status never fetches. Run check first when you need fresh update counts.
 Each fetch stops after ten seconds. Network or repository failures print a warning and return exit code 2.
 A failed check preserves the previous result and its time.
 
@@ -330,13 +341,14 @@ Update fetches again, so commits published after a check can also arrive.
 Successful checks save both results in `~/.local/share/fleet/check.json` with owner-only permissions.
 This cache is saved check data. It contains the check time, full commit identifiers, and source paths.
 Check creates no backup or run record and never writes the profile or managed files.
-Status shows “not checked” until a valid result exists. Plain status keeps working offline.
+Status shows “not checked yet” until a valid result exists. Plain status keeps working offline.
 
 ## Recorded machines
 
 The fleet registry records machines in `~/.local/share/fleet/registry.toml`, inside the manager store. It is not content and never enters your dotfiles checkout.
-Run `dotfleet machines` to read this machine's record and any other records in that file.
-These are saved facts, not live results. Named remote commands query one machine on demand. Automatic registry transfer remains deferred.
+Run `dotfleet machines list` to read this machine's record and any other records in that file.
+Each machine has its own block. The list hides empty fields and keeps run-record and backup paths in their dedicated commands.
+A connection-only record says no local data is recorded. These are saved facts, not live results. Named remote commands query one machine on demand. Automatic registry transfer remains deferred.
 
 Each completed apply, update, restore, or backup refreshes this hostname's record. Other machine records stay intact.
 The record contains hostname, operating system, domain, domain confirmation, content repository and commit, manager version, last run, and last backup.
@@ -353,7 +365,7 @@ Content cannot manage the registry or profile file. These belong to the manager.
 
 ## Add-on records
 
-An add-on is an optional manager extension. Run `dotfleet addons` to list validated installed records. No add-ons ship with Fleet.
+An add-on is an optional manager extension. Run `dotfleet addons list` to list validated installed records. No add-ons ship with Fleet.
 The [add-on contract](docs/ADDON-INTERFACE.md) defines installation declarations, allowed data access, output ownership, and safe teardown.
 A test fixture validates the contract. It is not installed or offered as a product add-on.
 
@@ -390,13 +402,12 @@ A passed test exits 0. A failed test exits 2, explains the next step, and keeps 
 A saved target may be asleep. Passing this test proves SSH command access, not Fleet enrollment or profile completeness.
 
 1. Register a target with one of the commands above.
-2. Run `fleet machines` to inspect it. Equal names appear once; records without a target show `no connection`.
+2. Run `fleet machines list` to inspect it. Equal names appear once; records without a target show `no connection`.
 3. Confirm the target has an enrolled Fleet manager with a complete profile.
 4. Run one command below. The registered machine name is the final argument.
 
 ```sh
 fleet status mini-pc
-fleet status --check mini-pc
 fleet check mini-pc
 fleet diff mini-pc
 fleet diff --stat mini-pc
@@ -425,8 +436,9 @@ Tailscale is one option for making machines reachable; it is not required.
 Fleet never installs or configures a VPN, Tailscale, or a relay. A VPN is a private network connection.
 Fleet reads SSH configuration but never edits it. It uses the SSH client, keys, and network access you already have.
 
-A missing client, unresolved target, or failed authentication prints an error and one next step.
-Remote commands use one SSH connection attempt with a ten-second connection timeout. Dead connections stop through SSH keepalive checks.
+A missing client, unresolved target, failed authentication, or missing Fleet command prints an error and one next step.
+Remote commands probe for the installed command before dispatch. Each SSH call uses one attempt and a ten-second connection timeout.
+Dead connections stop through SSH keepalive checks. An absent command or exit 127 asks you to run the installer on that target.
 SSH keeps your host checks and never forwards your authentication agent or extra network channels.
 
 Target runs never prompt. Incomplete profiles name the missing choices and stop; file conflicts stop without choosing overwrite.
@@ -435,6 +447,7 @@ Run those commands on the target itself.
 
 The target renders results under its machine header. Updates write RUN.json in its own backup folder, using the local run renderer.
 The caller creates no backup or install run record for remote execution. It saves the contact's outcome and time locally.
+Raw target errors stay out of both interfaces. Private diagnostic records live under `~/.local/share/fleet/remote-runs/<run>/RUN.json`.
 Check refreshes the target's update cache. Exit 0 means success; check and diff retain exit 1 for updates and differences.
 Other failures return nonzero. A lost connection cannot prove whether an update finished; inspect the target before retrying.
 

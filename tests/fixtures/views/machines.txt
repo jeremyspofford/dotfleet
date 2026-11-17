@@ -1,17 +1,18 @@
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   Machines
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  Scope            Recorded data only; no live queries to other machines.
-  Registry         ~/.local/share/fleet/registry.toml
-  Machine          example-hub · this machine
-  Connection       no connection
-  OS               Linux
-  Domain           personal · chosen
-  Content repo     https://example.invalid/dotfiles
-  Content commit   12345678
-  Manager version  0.1.0
-  Last run         2026-11-16T12:00:00+00:00
-  Last result      SUCCESS
-  Last backup      ~/fleet-backups/20261116-120000
-  Run record       ~/fleet-backups/20261116-120000/RUN.json
-  Enrolled         on
+
+example-hub · this machine
+  Connection   no connection
+  Enrollment   enrolled
+  OS           Linux
+  Domain       personal · chosen
+  Content      https://example.invalid/dotfiles
+  Commit       12345678
+  Fleet        0.1.0
+  Last result  SUCCESS · recorded 2026-11-16T12:00:00+00:00
+
+mini-pc · recorded only
+  Connection  SSH uses this name
+  Enrollment  not recorded
+  No local data recorded for this machine.

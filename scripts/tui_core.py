@@ -1,8 +1,7 @@
 """Expose existing command cores to the terminal interface. No Textual dependency.
 
 Usage: python3 scripts/tui_core.py ACTION [--backup PATH] [--machine NAME].
-Actions include dashboard, status, check, update, diff, backups, rollback, machines,
-topology, add-connection, and doctor.
+Actions cover every CLI command. Each area and action is listed in tui_navigation.py.
 The private channel carries screen data and confirmations. stdout carries human output.
 """
 
@@ -18,22 +17,11 @@ import remote
 import style
 import ui_channel
 import updates
+from tui_navigation import ACTIONS as COMMAND_ACTIONS
 from run_account import commit
 
 ROOT = Path(__file__).resolve().parents[1]
-ACTIONS = (
-    "dashboard",
-    "status",
-    "check",
-    "update",
-    "diff",
-    "backups",
-    "rollback",
-    "machines",
-    "doctor",
-    "topology",
-    "add-connection",
-)
+ACTIONS = ("dashboard", *COMMAND_ACTIONS)
 
 
 def dashboard(home):
@@ -84,13 +72,25 @@ def dispatch(action, backup=None, machine=None):
         ui_channel.send({"kind": "backups", "items": [str(path) for path in reversed(folders)]})
     if action in ("machines", "topology"):
         send_connections(home)
-    if action == "add-connection":
-        result = command.main(["machines", "set-ssh"])
+    if action == "configure":
+        raise ValueError("Configure returns to the terminal wizard. Close the interface first.")
+    from tui_actions import arguments
+
+    args = arguments(action, home)
+    if args is None:
+        print("Cancelled. Nothing changed.")
+        return 0
+    if backup:
+        args.extend(["--backup", backup])
+    try:
+        result = command.main(args)
+    except SystemExit as error:
+        result = error.code
+    if action in ("add-connection", "name-connection", "machine-remove"):
         send_connections(home)
-        return result
-    if action == "rollback" and not backup:
-        raise ValueError("Select a backup before restoring.")
-    return command.main([action, *(["--backup", backup] if backup else [])])
+    if action == "uninstall":
+        ui_channel.send({"kind": "uninstalled", "value": not (home / command.PROFILE).exists()})
+    return result
 
 
 def main(argv=None):

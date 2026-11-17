@@ -1,0 +1,100 @@
+"""Declare the terminal interface's areas and their command actions.
+
+Usage: import AREAS, ACTIONS, and RELATED. CI compares these routes with the CLI.
+Help: python3 scripts/tui_navigation.py --help.
+"""
+
+import argparse
+from pathlib import Path
+import sys
+
+# Keep this list explicit: the parity test must catch a new CLI command with no screen.
+ACTIONS = {
+    "status": ("Status — local state", ("status",)),
+    "check": ("Check — fetch update results", ("check",)),
+    "update": ("Update — pull and apply", ("update",)),
+    "diff": ("Diff — pending changes", ("diff",)),
+    "diff-stat": ("Changed paths only", ("diff", "--stat")),
+    "doctor": ("Doctor — check this machine", ("doctor",)),
+    "topology": ("Topology — recorded connections", ("topology",)),
+    "profile": ("Profile — saved choices", ("profile", "show")),
+    "domain": ("Domains — choices and current domain", ("domain", "list")),
+    "domain-set": ("Choose a domain", ("domain", "set")),
+    "groups": ("Groups — content switches", ("groups", "list")),
+    "group-set": ("Turn a group on or off", ("groups", "set")),
+    "pins": ("Pins — exact tool versions", ("pins", "list")),
+    "pin-set": ("Install and pin an exact version", ("pins", "set")),
+    "pin-remove": ("Remove a pin", ("pins", "remove")),
+    "secrets": ("Secrets — names and set/unset", ("secrets", "list")),
+    "content": ("Content — checkout and Git state", ("content", "show")),
+    "configure": ("Configure — reopen the terminal wizard", ("configure",)),
+    "machines": ("List saved machines", ("machines", "list")),
+    "add-connection": ("Pick an SSH host", ("machines", "set-ssh")),
+    "name-connection": ("Set a name and SSH target", ("machines", "set-ssh")),
+    "machine-export": ("Export this machine's record", ("machines", "export")),
+    "machine-remove": ("Remove a stale machine record", ("machines", "remove")),
+    "backups": ("List backups", ("backups", "list")),
+    "backup": ("Create a backup now", ("backup",)),
+    "rollback": ("Restore a backup", ("rollback",)),
+    "version": ("Version — manager and content", ("version",)),
+    "addons": ("Add-ons — installed records", ("addons", "list")),
+    "help": ("Help — all commands", ("help",)),
+    "command-help": ("Help for one command or action", ("help",)),
+    "tui": ("Interface help — keys and layout", ("tui", "--help")),
+    "uninstall": ("Uninstall — review before removal", ("uninstall",)),
+}
+
+AREAS = {
+    "Machine": ("status", "check", "update", "diff", "doctor", "topology"),
+    "Configuration": ("profile", "domain", "groups", "pins", "secrets", "content", "configure"),
+    "Machines": (
+        "machines",
+        "add-connection",
+        "name-connection",
+        "machine-export",
+        "machine-remove",
+    ),
+    "Backups": ("backups", "backup", "rollback"),
+    "System": ("version", "addons", "help", "tui", "uninstall"),
+}
+
+RELATED = {
+    "help": ("command-help",),
+    "profile": ("configure",),
+    "domain": ("domain-set",),
+    "groups": ("group-set",),
+    "pins": ("pin-set", "pin-remove"),
+    "diff": ("diff-stat",),
+    "machines": ("add-connection", "name-connection", "machine-export", "machine-remove"),
+    "backups": ("backup",),
+}
+
+CHANGING = {
+    "update",
+    "domain-set",
+    "group-set",
+    "pin-set",
+    "pin-remove",
+    "add-connection",
+    "name-connection",
+    "machine-export",
+    "machine-remove",
+    "backup",
+    "rollback",
+    "uninstall",
+}
+
+
+def usage():
+    from style import ArgumentParser
+
+    ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    ).parse_args()
+
+
+if __name__ == "__main__":
+    if any(argument in ("--help", "-h") for argument in sys.argv[1:]):
+        from style import run_cli
+
+        sys.exit(run_cli(usage, Path(__file__).resolve().parents[1]))

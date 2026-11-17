@@ -63,7 +63,7 @@ Inspect current records before any manual recovery. An older registry can contai
 
 Backed-up apply, update, restore, and backup runs refresh this machine's record, including failures.
 Read-only commands and cancellations do not update timestamps. Cancelling before confirmation leaves managed files unchanged. Earlier store migration moves remain.
-`dotfleet machines` prints saved records already present in the file. It does not contact other machines or prove that their records are current.
+`dotfleet machines list` prints saved records already present in the file. It does not contact other machines or prove that their records are current.
 Keep profile data and the registry out of the content repository. Machine synchronization and a live fleet view remain deferred.
 
 ## 3. Keep status local in v1
@@ -71,7 +71,7 @@ Keep profile data and the registry out of the content repository. Machine synchr
 Without a machine name, `dotfleet status` reports this machine only. It shows profile choices, checkout state, drift, and recent runs and backups.
 A checkout is a local Git copy. Drift means managed files differ from the selected content.
 The behind count compares content with the last fetched remote state. Plain status never fetches.
-It adds one line from the saved update check. `dotfleet status --check` runs a check first.
+It adds one line from the saved update check, with its time. Run check separately to refresh it.
 `dotfleet doctor` checks local readiness and names fixes. Missing domain provenance counts as unchosen until a user selects a domain.
 Provenance records how a choice was made. Passing a domain explicitly records a human choice.
 
@@ -90,8 +90,8 @@ Schema 1 stores `checked_at` and `sources`. Each source records its name, path, 
 The time includes its time zone. The cache keeps full paths and commit identifiers; command output shortens commits.
 Check replaces the private cache atomically only after both sources succeed. A failed check leaves the previous cache unchanged.
 It creates no backup or run record and writes no profile or managed files.
-Exit codes are 0 for current, 1 for updates, and 2 for an unavailable check. `status --check` returns the same codes.
-Plain status reads only the cache. Without a valid cache, it says “not checked.”
+Exit codes are 0 for current, 1 for updates, and 2 for an unavailable check.
+Plain status reads only the cache. Without a valid cache, it says “not checked yet.”
 
 ## 4. Let Fleet own releases
 
@@ -117,6 +117,9 @@ The plain command core uses only the standard library. Missing interface package
 Interface actions run the existing command dispatcher in a separate process. This isolates terminal input, environment variables, and Python output streams.
 A private inherited socket carries reviews and answers. A socket is a local communication channel; it has no listening network address.
 Only the shared core validates confirmation words and applies files. Both views render the same run record.
+Menus cover every command and group action. Forms send named choices to the shared dispatcher; they do not implement changes.
+Parity tests compare reachable menus with the parser. Golden files check each primary output shape.
+A golden file stores expected output. Machine lists use separate blocks, omit empty fields, and exclude run-record paths.
 Status and dashboard never fetch. Updates uses the shared check and update cores.
 Machines offers the same remote command core only for records with an SSH target.
 Configure closes Textual before the original wizard takes the terminal. Unattended conflicts stop without choosing overwrite.
@@ -131,15 +134,18 @@ SSH runs the target's installed command. The target owns execution, profile vali
 The local manager validates status, check, diff, doctor, or update before starting SSH. Both ends validate the request.
 A fixed remote shell command starts the receiver. User arguments never enter that command.
 A versioned JSON request travels through standard input. JSON is a structured transfer format; it is never printed to the terminal.
-Requests contain one action and boolean options for status checks or diff paths. They cannot name a profile, path, executable, or another target.
+Requests contain one action and a boolean option for diff paths. The old status-check field must remain false. They cannot name a profile, path, executable, or another target.
 
-SSH uses batch mode, no terminal, one connection attempt, and a ten-second connection timeout.
+Before dispatch, a fixed probe checks for the installed command. Missing commands and remote exit 127 receive the same installation guidance.
+Each SSH call uses batch mode, no terminal, one connection attempt, and a ten-second connection timeout.
 Keepalive checks stop a dead connection. Live updates have no artificial time limit.
 The target disables terminal decisions and Git password prompts. Update passes --defaults to the existing installer.
 Incomplete profiles fail before action dispatch. Unattended file conflicts fail without overwriting local edits.
 Configure, rollback, and uninstall remain local-only. There is no persistent network listener, remote file editing, or cross-machine profile transfer.
 
 The target's shared renderer supplies human output. The caller adds the machine name and result, without recording a local install run.
+Target shell errors never reach the terminal interface or CLI. CLI means the plain command interface.
+Private diagnostic RUN.json files under ~/.local/share/fleet/remote-runs preserve raw output and failures.
 Check and diff preserve their meaningful exit 1 results. SSH failures return nonzero with one diagnostic line and one next step.
 An interrupted connection leaves the update outcome unknown; the owner must inspect the target's last run.
 

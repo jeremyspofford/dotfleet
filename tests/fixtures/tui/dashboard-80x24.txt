@@ -4,18 +4,18 @@
  Content      https://github.com/example/dotfiles
  Commit       abcdef01
  Fleet        0.2.0
- Updates      not checked — run: fleet check
+ Updates      not checked yet — run: fleet check
  Last backup  2026-11-16 14:00:00
  Drift        none
 
  ╭────────────────────────────────────────────────────────────────────────────╮
- │Status — saved choices and drift                                            │
- │Updates — check, then update                                                │
- │Diff — pending file changes                                                 │
- │Backups — list and restore                                                  │
- │Machines — records and SSH actions                                          │
- │Doctor — check this machine                                                 │
- │Topology — connections from this machine                                    │
- │Configure — open the wizard                                                 │
+ │Machine                                                                     │
+ │Configuration                                                               │
+ │Machines                                                                    │
+ │Backups                                                                     │
+ │System                                                                      │
+ │                                                                            │
+ │                                                                            │
+ │                                                                            │
  ╰────────────────────────────────────────────────────────────────────────────╯
  ↑↓ / Tab move · Enter selects · Esc back · q quits

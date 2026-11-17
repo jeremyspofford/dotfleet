@@ -5,7 +5,7 @@ A profile saves machine choices. A domain selects personal, employer, client, or
 This document defines manifest schema 1. A manifest is a file that declares an add-on's requirements and owned outputs.
 
 No add-on ships with Fleet. The repository contains a test fixture only.
-`dotfleet addons` lists recorded local installations. It does not install, execute, enable, or remove add-ons.
+`dotfleet addons list` lists recorded local installations. It does not install, execute, enable, or remove add-ons.
 The executable lifecycle remains deferred. This contract defines its required behavior before that interface is built.
 
 ## Store and versions

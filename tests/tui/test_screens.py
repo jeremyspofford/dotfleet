@@ -25,9 +25,20 @@ import ui_channel
 import updates
 import connections
 import topology
+import owned_views
 from render_run import render
-from tui import ActionScreen, ConnectionPicker, FleetApp, MachineActions, Review, styled
-from textual.widgets import Input, OptionList, RichLog, Static
+from tui import (
+    ActionScreen,
+    AreaScreen,
+    CommandForm,
+    ConnectionPicker,
+    FleetApp,
+    MachineActions,
+    Review,
+    styled,
+)
+from tui_navigation import ACTIONS, AREAS, RELATED
+from textual.widgets import Input, OptionList, RichLog, Select, Static
 
 
 class FixtureSession:
@@ -36,11 +47,15 @@ class FixtureSession:
     async def run(self, action, output, event, confirm, backup=None, machine=None):
         loop = asyncio.get_running_loop()
 
+        async def deliver(callback, value):
+            callback(value)
+
         def send(message, reply=False):
             if reply:
                 answer = asyncio.run_coroutine_threadsafe(confirm(message), loop).result(10)
                 return answer
-            loop.call_soon_threadsafe(event, message)
+            # Match CoreSession: finish reading its events before completing the action.
+            asyncio.run_coroutine_threadsafe(deliver(event, message), loop).result(10)
 
         def execute():
             captured = io.StringIO()
@@ -50,7 +65,7 @@ class FixtureSession:
             ):
                 result = tui_core.dispatch(action, backup, machine)
             for line in captured.getvalue().splitlines():
-                loop.call_soon_threadsafe(output, line)
+                asyncio.run_coroutine_threadsafe(deliver(output, line), loop).result(10)
             return result
 
         return await asyncio.to_thread(execute)
@@ -89,6 +104,9 @@ class ScreenTests(unittest.IsolatedAsyncioTestCase):
             patch.object(command, "status", return_value=""),
             patch.object(command, "pin_rows", return_value=[]),
             patch.object(
+                command.enrollment, "installed", return_value={"node": [{"version": "24.14.1"}]}
+            ),
+            patch.object(
                 command,
                 "checkout_state",
                 return_value="abcdef01 · 0 behind last fetched upstream · clean",
@@ -99,6 +117,21 @@ class ScreenTests(unittest.IsolatedAsyncioTestCase):
 
     async def settle(self, pilot, app):
         await app.workers.wait_for_complete()
+        await pilot.pause()
+
+    async def open_command(self, pilot, app, action):
+        while len(app.screen_stack) > 1:
+            await pilot.press("escape")
+            await self.settle(pilot, app)
+        area = next(name for name, actions in AREAS.items() if action in actions)
+        menu = app.query_one("#menu", OptionList)
+        menu.highlighted = menu.get_option_index(area)
+        menu.focus()
+        await pilot.press("enter")
+        options = app.screen.query_one("#area-actions", OptionList)
+        options.highlighted = options.get_option_index(action)
+        options.focus()
+        await pilot.press("enter")
         await pilot.pause()
 
     async def test_dashboard_from_store_at_80_columns(self):
@@ -143,7 +176,7 @@ class ScreenTests(unittest.IsolatedAsyncioTestCase):
         ):
             async with app.run_test(size=(80, 24)) as pilot:
                 await self.settle(pilot, app)
-                await pilot.press("down", "enter")
+                await self.open_command(pilot, app, "check")
                 await self.settle(pilot, app)
                 self.assertEqual(checked.call_count, 1)
                 self.assertIsInstance(app.screen, ActionScreen)
@@ -159,6 +192,128 @@ class ScreenTests(unittest.IsolatedAsyncioTestCase):
                 text = "\n".join(line.text for line in app.screen.query_one(RichLog).lines)
                 self.assertIn("6 · Next steps", text)
                 self.assertIn("fleet update", text)
+
+    async def test_configuration_and_system_views_use_the_cli_actions(self):
+        app = FleetApp(FixtureSession())
+        with (
+            patch.object(owned_views, "run", return_value=""),
+            patch.object(command, "main", wraps=command.main) as called,
+        ):
+            async with app.run_test(size=(80, 24)) as pilot:
+                await self.settle(pilot, app)
+                for action in (
+                    "profile",
+                    "domain",
+                    "groups",
+                    "pins",
+                    "secrets",
+                    "content",
+                    "version",
+                    "addons",
+                    "help",
+                    "tui",
+                ):
+                    await self.open_command(pilot, app, action)
+                    await self.settle(pilot, app)
+                    called.assert_called_with(list(ACTIONS[action][1]))
+                    self.assertTrue(app.screen.query_one(RichLog).lines)
+
+    async def test_domain_form_calls_the_apply_core_after_review(self):
+        applied = []
+
+        def apply(arguments, **kwargs):
+            if ui_channel.review(self.record):
+                applied.append(arguments)
+                print(render(self.record), end="")
+            return 0
+
+        app = FleetApp(FixtureSession())
+        with patch.object(command.manager, "main", side_effect=apply):
+            async with app.run_test(size=(32, 24)) as pilot:
+                await self.settle(pilot, app)
+                await self.open_command(pilot, app, "domain")
+                await self.settle(pilot, app)
+                await pilot.press("enter")
+                await pilot.pause()
+                self.assertIsInstance(app.screen, CommandForm)
+                app.screen.query_one(Select).value = "work"
+                app.screen.query_one("#submit-form").focus()
+                await pilot.press("enter")
+                await pilot.pause()
+                self.assertIsInstance(app.screen, Review)
+                self.assertEqual(applied, [])
+                await pilot.press(*"confirm", "enter")
+                await self.settle(pilot, app)
+                self.assertEqual(applied, [["--defaults", "--domain", "work"]])
+                self.assertIn(
+                    "6 · Next steps",
+                    "\n".join(line.text for line in app.screen.query_one(RichLog).lines),
+                )
+
+    async def test_uninstall_requires_its_word_and_cancel_keeps_the_profile(self):
+        removed = []
+
+        def transaction(home, operations, label, selected, word, trees):
+            if command.confirm(word, label, self.record):
+                removed.append(word)
+                print(render(self.record), end="")
+            return 0
+
+        app = FleetApp(FixtureSession())
+        with (
+            patch.object(ui_channel, "active", return_value=True),
+            patch.object(command, "managed_paths", return_value={command.PROFILE}),
+            patch.object(command, "transaction", side_effect=transaction),
+        ):
+            async with app.run_test(size=(32, 24)) as pilot:
+                await self.settle(pilot, app)
+                await self.open_command(pilot, app, "uninstall")
+                self.assertIsInstance(app.screen, CommandForm)
+                app.screen.query_one("#submit-form").focus()
+                await pilot.press("enter")
+                await pilot.pause()
+                self.assertIsInstance(app.screen, Review)
+                self.assertEqual(app.screen.request["word"], "uninstall")
+                await pilot.press("u", "enter")
+                self.assertEqual(removed, [])
+                await pilot.press("escape")
+                await self.settle(pilot, app)
+                self.assertEqual(removed, [])
+                self.assertTrue((self.home / command.PROFILE).is_file())
+                await self.open_command(pilot, app, "uninstall")
+                app.screen.query_one("#submit-form").focus()
+                await pilot.press("enter")
+                await pilot.pause()
+                await pilot.press(*"uninstall", "enter")
+                await self.settle(pilot, app)
+                self.assertEqual(removed, ["uninstall"])
+
+    async def test_remote_missing_command_is_classified_on_screen(self):
+        from types import SimpleNamespace
+
+        record = registry.machine(self.home, "0.2.0")
+        record.update(hostname="mini-pc", ssh_target="mini-pc")
+        path = self.home / registry.REGISTRY
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(registry.serialize({"schema_version": 1, "machines": {"mini-pc": record}}))
+        app = FleetApp(FixtureSession())
+        with patch.object(
+            connections,
+            "invoke",
+            return_value=SimpleNamespace(
+                returncode=1, stdout="", stderr="zsh: private shell detail"
+            ),
+        ):
+            async with app.run_test() as pilot:
+                await self.settle(pilot, app)
+                await self.open_command(pilot, app, "machines")
+                await self.settle(pilot, app)
+                await pilot.press("enter")
+                await self.settle(pilot, app)
+                output = "\n".join(line.text for line in app.screen.query_one(RichLog).lines)
+                self.assertIn("Fleet is not installed", output)
+                self.assertNotIn("private shell detail", output)
+                self.assertNotIn("zsh:", output)
 
     async def test_machines_offer_remote_actions_only_for_connections(self):
         data = {"schema_version": 1, "machines": {}}
@@ -182,10 +337,12 @@ class ScreenTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(remote, "execute", side_effect=execute) as called:
             async with app.run_test(size=(80, 24)) as pilot:
                 await self.settle(pilot, app)
-                await pilot.press("down", "down", "down", "down", "enter")
+                await self.open_command(pilot, app, "machines")
                 await self.settle(pilot, app)
                 options = app.screen.query_one("#actions", OptionList)
-                self.assertEqual(options.option_count, len(remote.CAPABLE) + 2)
+                self.assertEqual(
+                    options.option_count, len(remote.CAPABLE) + len(RELATED["machines"]) + 1
+                )
                 text = "\n".join(line.text for line in app.screen.query_one(RichLog).lines)
                 self.assertIn("offline-record", text)
                 self.assertIn("no connection", text)
@@ -220,7 +377,7 @@ class ScreenTests(unittest.IsolatedAsyncioTestCase):
         ):
             async with app.run_test() as pilot:
                 await self.settle(pilot, app)
-                await pilot.press("down", "down", "down", "enter")
+                await self.open_command(pilot, app, "backups")
                 await self.settle(pilot, app)
                 await pilot.press("enter")
                 await pilot.pause()
@@ -247,10 +404,10 @@ class ScreenTests(unittest.IsolatedAsyncioTestCase):
                     self.assertEqual(styled("  + ~/.new", app.plain).spans, [])
                     for widget in app.screen.query("Static, OptionList"):
                         self.assertLessEqual(widget.region.right, 32)
-                    await pilot.press("enter")
+                    await self.open_command(pilot, app, "status")
                     await self.settle(pilot, app)
                     self.assertIsInstance(app.screen, ActionScreen)
-                    await pilot.press("tab", "escape")
+                    await pilot.press("tab", "escape", "escape")
                     await self.settle(pilot, app)
                     self.assertEqual(len(app.screen_stack), 1)
                     await pilot.press("q")
@@ -259,8 +416,7 @@ class ScreenTests(unittest.IsolatedAsyncioTestCase):
         app = FleetApp(FixtureSession())
         async with app.run_test() as pilot:
             await self.settle(pilot, app)
-            app.query_one("#menu", OptionList).highlighted = 7
-            await pilot.press("enter")
+            await self.open_command(pilot, app, "configure")
         self.assertEqual(app.return_value, "configure")
 
     async def test_topology_uses_shared_tree_and_only_connected_actions(self):
@@ -276,8 +432,7 @@ class ScreenTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(remote, "execute", return_value=0) as execute:
             async with app.run_test(size=(80, 24)) as pilot:
                 await self.settle(pilot, app)
-                app.query_one("#menu", OptionList).highlighted = 6
-                await pilot.press("enter")
+                await self.open_command(pilot, app, "topology")
                 await self.settle(pilot, app)
                 self.assertEqual(app.screen.action, "topology")
                 text = "\n".join(line.text for line in app.screen.query_one(RichLog).lines)
@@ -285,7 +440,7 @@ class ScreenTests(unittest.IsolatedAsyncioTestCase):
                 self.assertIn("offline-record", text)
                 self.assertIn("never contacted", text)
                 options = app.screen.query_one("#actions", OptionList)
-                self.assertEqual(options.option_count, 2)
+                self.assertEqual(options.option_count, 2, text)
                 self.assertEqual(str(options.get_option("machine-0").prompt), "mini-pc")
                 await pilot.press("enter")
                 await pilot.pause()
@@ -321,11 +476,7 @@ class ScreenTests(unittest.IsolatedAsyncioTestCase):
         ):
             async with app.run_test(size=(32, 24)) as pilot:
                 await self.settle(pilot, app)
-                app.query_one("#menu", OptionList).highlighted = 4
-                await pilot.press("enter")
-                await self.settle(pilot, app)
-                await pilot.press("enter")
-                await pilot.pause()
+                await self.open_command(pilot, app, "add-connection")
                 self.assertIsInstance(app.screen, ConnectionPicker)
                 self.assertEqual(app.screen.query_one(OptionList).option_count, 2)
                 self.assertEqual(app.screen.query_one(Input).region.right <= 32, True)
@@ -352,19 +503,14 @@ class ScreenTests(unittest.IsolatedAsyncioTestCase):
         ):
             async with app.run_test(size=(80, 24)) as pilot:
                 await self.settle(pilot, app)
-                app.query_one("#menu", OptionList).highlighted = 4
-                await pilot.press("enter")
-                await self.settle(pilot, app)
-                await pilot.press("enter")
-                await pilot.pause()
+                await self.open_command(pilot, app, "add-connection")
                 self.assertIsInstance(app.screen, ConnectionPicker)
                 self.assertIn("No SSH config", app.screen.request["notice"])
                 await pilot.press("escape")
                 await self.settle(pilot, app)
                 self.assertEqual(saved, [])
                 self.assertFalse((self.home / registry.REGISTRY).exists())
-                await pilot.press("enter")
-                await pilot.pause()
+                await self.open_command(pilot, app, "add-connection")
                 app.screen.query_one(Input).value = "user@host"
                 await pilot.press("enter")
                 await self.settle(pilot, app)
@@ -382,16 +528,14 @@ class ScreenTests(unittest.IsolatedAsyncioTestCase):
             async with app.run_test() as pilot:
                 await self.settle(pilot, app)
                 # Mouse and keyboard activate the same menu options.
-                menu = app.query_one("#menu", OptionList)
-                menu.highlighted = 2
-                await pilot.press("enter")
+                await self.open_command(pilot, app, "diff")
                 await self.settle(pilot, app)
                 self.assertEqual(preview.call_count, 1)
                 lines = [line.text for line in app.screen.query_one(RichLog).lines]
                 self.assertEqual(lines, ["No differences. Your files match fixture @ abcdef01."])
                 await pilot.press("escape")
                 await self.settle(pilot, app)
-                await pilot.click("#menu", offset=(3, 1))
+                await pilot.click("#area-actions", offset=(3, 1))
                 await self.settle(pilot, app)
                 self.assertIsInstance(app.screen, ActionScreen)
                 self.assertEqual(app.screen.action, "status")
@@ -404,7 +548,7 @@ class ScreenTests(unittest.IsolatedAsyncioTestCase):
         ):
             async with app.run_test() as pilot:
                 await self.settle(pilot, app)
-                await pilot.press("down", "enter")
+                await self.open_command(pilot, app, "check")
                 await self.settle(pilot, app)
                 self.assertTrue(
                     app.screen.query_one("#actions", OptionList).get_option("update").disabled
@@ -447,13 +591,13 @@ class ScreenTests(unittest.IsolatedAsyncioTestCase):
         app = FleetApp(SlowCheck())
         async with app.run_test() as pilot:
             await self.settle(pilot, app)
-            await pilot.press("down", "enter")
+            await self.open_command(pilot, app, "check")
             await pilot.pause()
             self.assertTrue(app.busy)
             await pilot.press("escape")
             await self.settle(pilot, app)
             self.assertTrue(cancelled.is_set())
-            self.assertEqual(len(app.screen_stack), 1)
+            self.assertEqual(len(app.screen_stack), 2)
             cancelled.clear()
             await pilot.press("enter")
             await pilot.pause()
