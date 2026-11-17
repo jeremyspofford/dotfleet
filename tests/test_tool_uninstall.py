@@ -44,6 +44,7 @@ items = json.loads(store.read_text())
 if sys.argv[1] == '--version': print('2026.8.5')
 elif sys.argv[1] == 'ls': print(json.dumps(items))
 elif sys.argv[1] == 'uninstall':
+    assert '--yes' in sys.argv and '--cd' in sys.argv
     tool, version = sys.argv[2].rsplit('@', 1)
     selected = next(item for item in items[tool] if item['version'] == version)
     shutil.rmtree(selected['install_path'])

@@ -96,7 +96,7 @@ def uninstall(home, saved, tool, version):
         manager.backup(home, paths, folder)
         account.bind_backup(folder)
         try:
-            run("mise", "uninstall", tool + "@" + version)
+            run("mise", "uninstall", tool + "@" + version, "--yes", "--cd", str(home))
             if any(item["version"] == version for item in enrollment.installed(home).get(tool, [])):
                 raise ValueError(
                     "Mise still lists the selected version. Inspect tools list before retrying."
