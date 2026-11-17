@@ -26,7 +26,6 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
-import agent_configs
 from manager import domain_details, exact_version, installed_defaults, validate_profile
 from common import toml
 from convert import manifest_path, convert, detect
@@ -1079,26 +1078,6 @@ class ConverterTests(unittest.TestCase):
             )
         self.assertEqual(pins, {"node": "22", "python": "3.13.0"})
         self.assertEqual(available, {"uv": "0.12"})
-
-    def test_agent_generation_keeps_conflict_checks(self):
-        with tempfile.TemporaryDirectory() as temp:
-            home = Path(temp)
-            skill = home / "dotfiles/agents/skills/review-change/SKILL.md"
-            skill.parent.mkdir(parents=True)
-            skill.write_text("Review changes")
-            with patch.object(
-                shutil, "which", side_effect=lambda name: "/bin/fake" if name == "claude" else None
-            ):
-                agent_configs.generate(home, "linux", True)
-                self.assertFalse((home / ".claude").exists())
-                agent_configs.generate(home, "linux", False)
-                self.assertEqual((home / ".claude/skills/review-change").resolve(), skill.parent)
-                agent_configs.generate(home, "linux", False)
-                config = home / ".claude/settings.json"
-                config.write_text('{"local": true}\n')
-                with self.assertRaisesRegex(ValueError, "modified config"):
-                    agent_configs.generate(home, "linux", False)
-                self.assertEqual(json.loads(config.read_text()), {"local": True})
 
     def test_native_manifest_all_platforms(self):
         manifest = tomllib.loads((ROOT / "agents/manifest.toml").read_text())

@@ -286,6 +286,8 @@ def render(record, future=False):
                     else "not needed; nothing applied",
                 ),
                 ("Wizard", command + " configure"),
+                # Agent steps are actions only a person or the agent can complete.
+                *[("Agent", step) for step in record.get("agent_steps", [])],
             ],
             home,
         )

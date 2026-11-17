@@ -558,8 +558,11 @@ def preview_current(home, saved_profile, stat=False):
 
 
 def managed_paths(home):
+    import agent_deploy
+
     paths = set(load_json(home / ".local/state/dotfleet/outputs.json", {})) | CONTROLS
-    paths |= set(load_json(home / ".local/state/dotfleet/agents.json", {}))
+    # Agent shared files are not managed paths. Only Fleet's entries inside them belong to Fleet.
+    paths |= set(agent_deploy.load_inventory(home).get("paths", {}))
     if (home / ".config/chezmoi/chezmoi.toml").exists():
         paths |= set(
             filter(
@@ -657,7 +660,40 @@ def validate_backup(home, selected):
                         + str(target)
                     )
                 operations.append((str(target), external))
-    return folder, operations
+    return folder, restore_shared_entries(home, folder, operations)
+
+
+def scratch_folder():
+    """Hold temporary rewritten files until this command exits."""
+    import atexit
+
+    folder = Path(tempfile.mkdtemp(prefix="dotfleet-shared-"))
+    atexit.register(shutil.rmtree, folder, True)
+    return folder
+
+
+def restore_shared_entries(home, folder, operations):
+    """Restore only Fleet's entries in agent shared files; keep values written after the backup."""
+    import agent_deploy
+
+    current = agent_deploy.load_inventory(home)
+    saved_state = folder / "home" / agent_deploy.INVENTORY
+    entries = list(current.get("entries", []))
+    if saved_state.is_file():
+        saved = json.loads(saved_state.read_text())
+        if saved.get("schema_version") == agent_deploy.SCHEMA:
+            entries += saved.get("entries", [])
+    shared = {item["file"] for item in entries}
+    if not shared:
+        return operations
+    inventory = {"entries": entries}
+    workspace = scratch_folder()
+    return [
+        (name, agent_deploy.restore_shared(home, name, source, workspace, inventory))
+        if name in shared
+        else (name, source)
+        for name, source in operations
+    ]
 
 
 def transaction(home, operations, label, selected=None, require_word=None, tree_removals=()):
@@ -944,12 +980,14 @@ def dispatch(args, argument_parser, home):
                 return remote.refusal(args.backup, "rollback")
             return restore_command(args, home)
         if args.command == "backups" and args.action == "create":
+            import agent_deploy
+
             operations = [
                 (
                     name,
                     home / name if (home / name).exists() or (home / name).is_symlink() else None,
                 )
-                for name in sorted(managed_paths(home))
+                for name in sorted(managed_paths(home) | agent_deploy.shared_files(home))
             ]
             # Snapshot only: transaction has no replacement operations or profile changes.
             return snapshot(home, operations)
@@ -986,7 +1024,12 @@ def dispatch(args, argument_parser, home):
                 )
             if restore == "restore":
                 selected, restored = validate_backup(home, str(backups[0]))
+            import agent_deploy
+
             operations = dict.fromkeys(managed_paths(home))
+            # Remove Fleet's entries from agent shared files; never delete those files.
+            _, shared = agent_deploy.removal_operations(home, scratch_folder())
+            operations.update(shared)
             operations.update(dict(restored))
             return transaction(
                 home,
@@ -998,6 +1041,7 @@ def dispatch(args, argument_parser, home):
                     home / MANAGER,
                     home / ".local/share/fleet/chezmoi-source",
                     home / ".local/share/fleet/tui-venv",
+                    home / ".local/share/fleet/agents",
                 ],
             )
         os.environ["DOTFLEET_LOCAL_CONTENT"] = "1"

@@ -15,6 +15,7 @@ Messages use logger.sh. Prompts use /dev/tty.
 
 import argparse
 import agent_table
+import convert as convert_module
 from convert import content_domains, content_manifest, require_domain
 import style
 import run_index
@@ -669,7 +670,7 @@ def generated_files(home, profile, manifest, defaults):
 
 def prepare(home, checkout, profile, manifest, folder):
     import enrollment as wizard
-    import agent_configs
+    import agent_deploy
 
     folder.mkdir()
     # Content defines the domains. A removed domain stops before any plan or write.
@@ -678,6 +679,11 @@ def prepare(home, checkout, profile, manifest, folder):
     agents_table = agent_table.load(checkout, manifest, wizard.agent_manifest())
     for warning in agents_table.warnings:
         print("Warning: " + warning)
+    if profile.get("format") == "chezmoi" and convert_module.excluded_skills(manifest, profile):
+        # Fleet never rewrites a native source, so it cannot omit skill folders there.
+        print(
+            "Warning: Native chezmoi content installs every skill; limit skills in .chezmoiignore."
+        )
     defaults = wizard.content_defaults(checkout)
     generated, pins, available = generated_files(home, profile, manifest, defaults)
     source, items, _ = convert(checkout, folder / "source", profile, profile["format"])
@@ -797,19 +803,12 @@ def prepare(home, checkout, profile, manifest, folder):
             or path.stat().st_mode & 0o777 != 0o600
         ):
             changed.add(name)
-    agents = (
-        agent_configs.generate(
-            home, agent_configs.native_os(), True, profile=profile, content_root=checkout
-        )
-        if any(profile.get("agents", {}).values())
-        else {}
+    # Agent outputs live outside content. Content cannot also manage any of them.
+    agents = agent_deploy.plan(
+        home, checkout, profile, agents_table, wizard.agent_manifest(), names | set(generated)
     )
-    changed |= {
-        name
-        for name, item in agents.items()
-        if not fingerprint(home / name)
-        or any(fingerprint(home / name).get(key) != value for key, value in item.items())
-    }
+    agent_deploy.require_no_conflicts(agents, command_name(profile))
+    changed |= agents.changed_paths(home)
     changed |= {name for name in stale if fingerprint(home / name) is not None}
     controls = {
         ".local/share/fleet/registry.toml",
@@ -833,7 +832,7 @@ def prepare(home, checkout, profile, manifest, folder):
         if not matches or path.is_symlink() or path.stat().st_mode & 0o777 != 0o600:
             changed.add(name)
     # Output inventories are bookkeeping, not rendered home settings.
-    all_paths = names | set(generated) | stale | controls | set(agents) | changed | removed
+    all_paths = names | set(generated) | stale | controls | agents.all_paths() | changed | removed
     for tool in ["chezmoi", "mise"]:
         if os.environ.get("DOTFLEET_STAGED_" + tool.upper()):
             all_paths.add(".local/bin/" + tool)
@@ -848,9 +847,9 @@ def prepare(home, checkout, profile, manifest, folder):
         or target.stat().st_mode & 0o777 != 0o700
     ):
         changed.add(COMMAND)
-    if agents:
-        all_paths.add(".local/state/dotfleet/agents.json")
-        changed.add(".local/state/dotfleet/agents.json")
+    if agents.all_paths() or (home / agent_deploy.INVENTORY).exists():
+        all_paths.add(agent_deploy.INVENTORY)
+        changed.add(agent_deploy.INVENTORY)
     return dict(
         source=source,
         native=native,
@@ -918,7 +917,7 @@ def publish_checkout(home, checkout, profile, backup_path):
 def apply_confirmed_plan(
     home, checkout, profile, plan, backup_path, account, before_apply, warnings
 ):
-    import agent_configs
+    import agent_deploy
     from run_account import RECORD
 
     publish_checkout(home, checkout, profile, backup_path)
@@ -968,14 +967,15 @@ def apply_confirmed_plan(
         # This deletion was requested by the group selection, not a local edit.
         # Retire only this path's remembered entry; preserve all other conflict state.
         run("chezmoi", "state", "delete", "--bucket=entryState", "--key=" + str(path))
+    # Agent outputs first: earlier skill links must leave before content installs skill folders.
+    agent_deploy.apply(home, plan["agents"])
+    account.confirm_files(fingerprint)
     result = subprocess.run(["bash", str(ROOT / "scripts/apply.sh")])
     account.confirm_files(fingerprint)
     if result.returncode:
         raise RuntimeError(
             f"chezmoi apply failed with exit {result.returncode}; restore from {backup_path}"
         )
-    if any(profile.get("agents", {}).values()):
-        agent_configs.generate(home, agent_configs.native_os(), False)
     account.confirm_files(fingerprint)
     run_index.stage("verify")
     status = run("chezmoi", "status")

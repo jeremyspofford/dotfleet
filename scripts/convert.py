@@ -212,6 +212,22 @@ def selected_paths(checkout, manifest, groups):
     return output
 
 
+def excluded_skills(manifest, profile):
+    """Name skill folders that this machine omits: a domain limit or an exception turns them off."""
+    skills = manifest.get("agents", {}).get("skills", {})
+    domain = (profile or {}).get("domain", "core")
+    exceptions = (profile or {}).get("agent_items", {})
+    names = {
+        name for name, spec in skills.items() if "domains" in spec and domain not in spec["domains"]
+    }
+    names |= {
+        key.removeprefix("skills.")
+        for key, state in exceptions.items()
+        if key.startswith("skills.") and state == "off"
+    }
+    return sorted(names)
+
+
 def filter_blocks(content, name, manifest, groups):
     text = content.decode()
     for group, spec in manifest.get("groups", {}).items():
@@ -241,6 +257,9 @@ def convert(checkout, output, profile=None, explicit=None):
         raise ValueError("Conversion output must be empty; never overwrite a source checkout.")
     output.mkdir(parents=True, exist_ok=True)
     items = selected_paths(checkout, manifest, (profile or {}).get("groups", {}))
+    for skill in excluded_skills(manifest, profile):
+        folder = f".agents/skills/{skill}"
+        items = {k: v for k, v in items.items() if k != folder and not k.startswith(folder + "/")}
     for destination, (name, mode) in items.items():
         # Read Git blobs, never dereference links or include uncommitted content.
         blob = subprocess.check_output(["git", "-C", str(checkout), "show", f":{name}"])

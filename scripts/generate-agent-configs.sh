@@ -1,12 +1,11 @@
 #!/usr/bin/env bash
-# Purpose: Write settings and skill links for installed coding agents.
-# A skill is a folder of agent instructions. The manifest lists settings and paths.
+# Purpose: Show the planned agent outputs for this machine without writing.
+# An agent is a coding assistant. The content's agents table declares its configuration.
 # Usage: bash scripts/generate-agent-configs.sh [OPTIONS]
-# Parameters: --dry-run lists changes without writing; --home PATH selects a full home path.
-# --os selects linux (Linux), darwin (macOS), windows (Windows), or wsl (Windows Subsystem for Linux).
+# Parameters: --home PATH selects a full home path. --dry-run is accepted; the script never writes.
 # -h and --help print full help.
-# Examples: bash scripts/generate-agent-configs.sh --dry-run
-# Exit codes: 0 success/help; 1 runtime failure or conflict; 2 invalid arguments.
+# Examples: bash scripts/generate-agent-configs.sh
+# Exit codes: 0 success/help; 1 invalid content or conflict; 2 invalid arguments.
 # Author: Jeremy Spofford / Aria Labs; Version: read from ../VERSION at runtime.
 set -euo pipefail
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
@@ -14,32 +13,28 @@ SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 source "$SCRIPT_DIR/logger.sh"
 usage() {
 	log_section "Agent configuration help"
-	cat <<EOF
-generate-agent-configs.sh — configure installed coding agents ($DOTFILES_VERSION)
+	cat <<HELP
+generate-agent-configs.sh — show planned agent outputs ($DOTFILES_VERSION)
 Usage: bash scripts/generate-agent-configs.sh [OPTIONS]
 
-An agent is a coding assistant. A skill is a folder of agent instructions.
-The manifest, agents/manifest.toml, lists settings and paths.
-Find agent commands on PATH, the command search path. Write their settings and links to agents/skills.
-Refuse files the generator does not own. Keep this checkout at a stable path.
+An agent is a coding assistant. The content's agents table declares its configuration.
+Read the saved profile and ~/dotfiles. Print each planned output, entry, removal, and conflict.
+Write nothing. Run fleet update to review and apply the plan with a backup.
 Requires Python 3.11+.
 
 Options:
-  --dry-run     Validate and report proposed paths without writing.
+  --dry-run     Accepted for earlier scripts. The script never writes.
   -h, --help    Print full help and exit 0.
   --home PATH   Full target home path; default: the current user's home.
-  --os OS       Select linux (Linux), darwin (macOS), windows (Windows),
-                or wsl (Windows Subsystem for Linux); default: detected system.
 
 Examples:
-  bash scripts/generate-agent-configs.sh --dry-run
-  bash scripts/generate-agent-configs.sh --home /tmp/demo --os linux
+  bash scripts/generate-agent-configs.sh
+  bash scripts/generate-agent-configs.sh --home /tmp/demo
 
-Outputs are recorded in ~/.local/state/dotfleet/agents.json.
-Ollama has no portable settings-file or skill contract. Report it without writing files.
-Exit codes: 0 success/help; 1 runtime failure or conflict; 2 invalid arguments.
+Outputs are recorded in ~/.local/state/dotfleet/agents.json after an update applies them.
+Exit codes: 0 success/help; 1 invalid content or conflict; 2 invalid arguments.
 Author: Jeremy Spofford / Aria Labs; Version: $DOTFILES_VERSION (VERSION).
-EOF
+HELP
 }
 args=()
 while (($#)); do
@@ -49,10 +44,9 @@ while (($#)); do
 		exit 0
 		;;
 	--dry-run)
-		args+=("$1")
 		shift
 		;;
-	--home | --os)
+	--home)
 		if [[ $# -lt 2 || -z $2 || $2 == --* ]]; then
 			log_error "Missing value for $1"
 			usage >&2
@@ -72,4 +66,4 @@ if ! command -v python3 >/dev/null; then
 	log_error "Python 3.11+ required."
 	exit 1
 fi
-python3 "$SCRIPT_DIR/agent_configs.py" "${args[@]}"
+python3 "$SCRIPT_DIR/agent_deploy.py" "${args[@]}"

@@ -131,6 +131,7 @@ class RunAccount:
         self.adoption_excluded = []
         self.scan = {}
         self.debug_details = None
+        self.agent_steps = []
         self.update_triggers = json.loads(os.environ.get("FLEET_UPDATE_TRIGGERS", "[]"))
         if not isinstance(self.update_triggers, list) or any(
             trigger not in ("manager update", "content update", "drift repair")
@@ -190,6 +191,8 @@ class RunAccount:
             )
         self.diff_path = plan["diff_path"]
         self.status = plan["status"]
+        agents = plan.get("agents")
+        self.agent_steps = (agents.kept + agents.notes + agents.steps) if agents else []
         run_index.stage("review")
 
     def bind_backup(self, path):
@@ -230,6 +233,7 @@ class RunAccount:
             "scan": self.scan,
             "debug_details": self.debug_details,
             "update_triggers": self.update_triggers,
+            "agent_steps": self.agent_steps,
         }
 
     def save(self):
