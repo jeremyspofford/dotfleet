@@ -53,16 +53,21 @@ def collection(name, home, profile, manifest):
             for domain, description in command.domain_choices(home).items()
         ]
     if name == "tools":
+        from tool_actions import installed_labels
+
         installed = enrollment.installed(home)
         return [
             {
                 "name": tool,
                 "fields": [
                     ("Version", command.format_pin(version)),
-                    ("Installed", enrollment.versions(installed.get(tool, []))),
+                    ("Installed", installed_labels(installed.get(tool, []), version)),
                 ],
             }
-            for tool, version in profile.get("pins", {}).items()
+            for tool, version in {
+                tool: profile.get("pins", {}).get(tool, "none")
+                for tool in sorted(set(profile.get("pins", {})) | set(installed))
+            }.items()
         ]
     if name == "secrets":
         return [

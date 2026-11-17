@@ -41,6 +41,7 @@ The command audit uses these forms:
 | groups list / set | set requires --name and --state |
 | tools set | TOOL, --version |
 | tools remove | TOOL |
+| tools uninstall | TOOL, --version |
 | backups restore | --backup; no flag lists backups |
 | status, check, diff, doctor, update | One optional machine subject; diff also has --stat |
 | topology | --json selects structured output |
@@ -62,3 +63,5 @@ Record any file that needs a behavior change before it can meet these rules.
 
 Imported helper modules may provide help only. Keep their existing behavior when called without help.
 Sourced shell configuration is not a command. Do not add argument parsing that changes the caller’s shell.
+
+Argument errors use the shared parser handler. Show the failing command’s usage, then name the problem and accepted arguments. Exit 2.

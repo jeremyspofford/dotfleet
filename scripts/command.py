@@ -111,7 +111,8 @@ DESCRIPTIONS = {
         "Show or set exact tool versions.\n"
         "A selection records an exact tool version.\n"
         "Set installs that exact version.\n"
-        "Remove clears the selection without uninstalling the tool."
+        "Remove clears the selection without uninstalling the tool.\n"
+        "Uninstall removes one extra installed version after typed confirmation."
     ),
     "secrets": (
         "List secret names as set or unset.\n"
@@ -962,8 +963,12 @@ def main(argv=None):
         if args.command == "groups":
             return manager.main(["--defaults", "--group", args.name + "=" + args.state])
         if args.command == "tools":
+            if args.action == "uninstall":
+                from tool_actions import uninstall
+
+                return uninstall(home, saved_profile, args.tool, args.version)
             if not args.pin:
-                parser().error("tools set needs TOOL and --version; tools remove needs TOOL")
+                argument_parser.error("tools set needs TOOL and --version; tools remove needs TOOL")
             if args.action == "remove":
 
                 def unpin(value):
@@ -980,7 +985,7 @@ def main(argv=None):
                 or not manager.exact_version(version)
                 or tool.startswith("-")
             ):
-                parser().error(
+                argument_parser.error(
                     "tools set needs TOOL --version VERSION with an exact version, such as 24.14.1"
                 )
             installed = enrollment.installed(home).get(tool, [])

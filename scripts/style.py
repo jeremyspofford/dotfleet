@@ -55,6 +55,65 @@ def line_palette(line, diff=False):
 
 
 class ArgumentParser(argparse.ArgumentParser):
+    def parse_args(self, args=None, namespace=None):
+        arguments = list(sys.argv[1:] if args is None else args)
+        selected = self
+        for word in arguments:
+            children = next(
+                (
+                    action.choices
+                    for action in selected._actions
+                    if isinstance(action, argparse._SubParsersAction)
+                ),
+                {},
+            )
+            if word in children:
+                selected = children[word]
+        self.failure_parser = selected
+        return super().parse_args(arguments, namespace)
+
+    def error(self, message):
+        selected = getattr(self, "failure_parser", self)
+        options = sorted(
+            {
+                name
+                for action in selected._actions
+                for name in action.option_strings
+                if name.startswith("--") and action.help is not argparse.SUPPRESS
+            }
+        )
+        subjects = [
+            action.metavar or action.dest.upper()
+            for action in selected._actions
+            if not action.option_strings and action.help is not argparse.SUPPRESS
+        ]
+        accepted = ", ".join([*subjects, *options]) or "no arguments"
+        if message.startswith("unrecognized arguments: "):
+            problem = "Does not accept " + message.removeprefix("unrecognized arguments: ")
+        elif message.startswith("the following arguments are required: "):
+            problem = "Supply " + message.removeprefix("the following arguments are required: ")
+        elif "invalid choice:" in message:
+            value = message.split("invalid choice:", 1)[1].split(" (choose from", 1)[0].strip()
+            problem = "Unknown choice " + value
+        elif "expected one argument" in message:
+            problem = "Give a value for " + message.removeprefix("argument ").split(":", 1)[0]
+        else:
+            problem = message.removeprefix("argument ").rstrip(".")
+        text = section(selected.prog) + "\n" + selected.format_usage()
+        text += (
+            "\n".join(
+                textwrap.wrap(
+                    f"Error: {problem}; accepts {accepted}.",
+                    100,
+                    break_long_words=False,
+                    break_on_hyphens=False,
+                )
+            )
+            + "\n"
+        )
+        self._print_message(text, sys.stderr)
+        self.exit(2)
+
     @contextmanager
     def sorted_help(self):
         def key(action):
