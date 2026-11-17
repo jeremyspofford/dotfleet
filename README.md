@@ -60,7 +60,7 @@ Only accepted files enter the first local Git commit. Nothing is uploaded.
 
 An unrelated `~/dotfiles` stops setup. Preserve it before choosing another repository or adopting files.
 Native chezmoi templates and hooks can execute code. Use trusted content only.
-Quitting review cancels planned file changes. Earlier [store moves](README.md#store-migration) stay in place.
+Quitting review cancels planned file changes. A small attempt entry records the cancellation. Earlier [store moves](README.md#store-migration) stay in place.
 Preparation uses temporary files outside home; missing tools move into `~/.local/bin` only after confirmation.
 
 ### Flags and updates
@@ -225,6 +225,8 @@ Command groups require an action. Bare `machines`, `backups`, `secrets`, `tools`
 | `dotfleet backups delete --keep N` | Review deletion of all but the newest N backups. |
 | `dotfleet backups delete --all` | Review deletion of every saved backup. |
 | `dotfleet secrets list` | List declared secret names as set or unset. Values stay private. |
+| `dotfleet logs list --limit 10` | Show the newest ten change-making attempts. |
+| `dotfleet logs show` | Read the latest review or failure. Use --name for a timestamp or backup. |
 | `dotfleet content` | Show the content checkout, repository, commit, behind state, and short Git status. |
 | `dotfleet status` | Show choices, installed tools, drift, recent runs and backups, and the last update check. |
 | `dotfleet topology` | Show this machine’s recorded connection tree. Use --json for structured output. |
@@ -273,7 +275,7 @@ Top-level help lists commands and global options. Each command’s help keeps it
 Use `version` or `--version` for the same version output. Exit codes are 0 for success or cancellation, 1 for failed checks or operations, and 2 for arguments.
 Check uses 0 for current, 1 for available updates, and 2 when a check fails.
 
-An unchanged update refreshes the check cache and stops without a backup, run record, or review.
+An unchanged update refreshes the check cache and stops without a backup or review. Its small index entry records NO_CHANGE.
 Other change-making commands write RUN.json and print the standard review. File lists come from the plan and backup inventory.
 Rollback makes another backup first. It restores only recorded paths, including original symlinks and recorded external targets.
 It refuses directory replacement and changed external targets whose original symlink is missing.
@@ -358,6 +360,25 @@ If both old and new stores exist, migration stops before moving folders. Resolve
 Fleet refuses the recorded version. Use `fleet tools remove node` to clear that choice, or select another with `fleet tools set`.
 Tools remove never uninstalls software. Tools uninstall keeps the profile unchanged and saves a run review.
 Its backup copies managed files, not installed software. Reinstall software with tools set when needed.
+
+## Run history
+
+1. Run `fleet logs list --limit 10` to list recent change-making attempts, newest first.
+2. Run `fleet logs show` to read the latest attempt.
+3. Use `fleet logs show --name TIMESTAMP` to select a listed timestamp. A backup folder name also works.
+4. Use `fleet logs show --json` to export the index entry and its saved review for scripts.
+
+An index is a small list of records. Fleet keeps its newest 100 entries in `~/.local/share/fleet/runs/`.
+Each attempt records its time, command, machine, result, stage, error, and backup when present.
+Installation, configuration, updates, and other change-making actions create entries. Target-side remote updates write the target's entry.
+An update with no work records `NO_CHANGE`, without a backup or review. Cancellation records `CANCELLED`, without applying files.
+Read-only commands, including status, diff, check, and logs, create no entries.
+The terminal interface has the same list and details under Logs.
+
+Applied runs show their saved review. Earlier failures show the stage reached and error line.
+Deleting a backup removes its RUN.json. The small index entry remains until it falls outside the newest 100.
+Cleanup and remote diagnostics also keep their newest 100 records. No text log grows or needs rotation.
+See [run record storage](docs/RUNS.md) for all retained data and limits.
 
 ## Check for updates
 
@@ -494,7 +515,7 @@ Run those commands on the target itself.
 
 The target renders results under its machine header. Updates that change files write RUN.json in its backup folder, using the local run renderer.
 The caller creates no backup or install run record for remote execution. It saves the contact's outcome and time locally.
-Raw target errors stay out of both interfaces. Private diagnostic records live under `~/.local/share/fleet/remote-runs/<run>/RUN.json`.
+Raw target errors stay out of both interfaces. The newest 100 private diagnostic records live under `~/.local/share/fleet/remote-runs/<run>/RUN.json`.
 Check refreshes the target's update cache. Exit 0 means success; check and diff retain exit 1 for updates and differences.
 Other failures return nonzero. A lost connection cannot prove whether an update finished; inspect the target before retrying.
 
@@ -536,4 +557,4 @@ The manager’s chezmoi configuration and converted source are internal files. I
 Python commands share the colors and section rule from `scripts/logger.sh`. Shell entry points use that logger directly.
 Colors reinforce labels and change markers. Redirected output, `NO_COLOR`, and `TERM=dumb` disable colors.
 Errors use the diagnostic output stream and return a failure code. Unexpected errors never print a traceback, Python’s technical call history.
-When an apply run has a record, its technical error detail stays in private RUN.json.
+Applied runs keep technical error detail in private RUN.json. Earlier failures keep their stage and error in the run index.

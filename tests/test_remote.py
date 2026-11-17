@@ -20,6 +20,7 @@ from common import atomic, read_toml, toml
 import registry
 import remote
 import topology
+import run_index
 
 
 class RemoteTests(unittest.TestCase):
@@ -122,6 +123,7 @@ sys.exit(result.returncode)
 
     def test_status_check_diff_and_doctor_use_only_the_target(self):
         self.connect()
+        index_before = {path: path.read_bytes() for path in run_index.files(self.home)}
         before = self.caller_files()
         backups = sorted((self.home / "fleet-backups").iterdir())
         output = self.call("status", "beelink")
@@ -144,6 +146,9 @@ sys.exit(result.returncode)
         self.assertEqual((self.home / ".file").read_text(), "original\n")
         self.assertEqual(self.caller_files(), before)
         self.assertEqual(sorted((self.home / "fleet-backups").iterdir()), backups)
+        self.assertEqual(
+            {path: path.read_bytes() for path in run_index.files(self.home)}, index_before
+        )
         for item in map(json.loads, self.ssh_log.read_text().splitlines()):
             if item["args"][-1] == remote.PROBE_COMMAND:
                 self.assertEqual(item["request"], "")
@@ -167,6 +172,10 @@ sys.exit(result.returncode)
             {path: path.read_bytes() for path in self.home.glob("fleet-backups/*/RUN.json")}, before
         )
         self.assertTrue((self.home / updates.CACHE).is_file())
+        entry = run_index.entries(self.home)[0]
+        self.assertTrue(entry["remote"])
+        self.assertEqual(entry["result"], "NO_CHANGE")
+        self.assertEqual(run_index.entries(self.controller), [])
 
     def test_update_returns_review_and_writes_only_target_record(self):
         self.connect()
@@ -216,6 +225,13 @@ sys.exit(result.returncode)
             "node tool version is floating",
         ):
             self.assertIn(gap, output)
+        entry = run_index.entries(self.home)[0]
+        self.assertEqual(
+            (entry["command"], entry["result"], entry["stage"]), ("update", "FAILED", "profile")
+        )
+        self.assertTrue(entry["remote"])
+        self.assertIn("Git email is empty", entry["error"])
+        self.assertIsNone(entry["backup"])
         self.assertIn("Complete these choices on the target", output)
         self.assertNotIn("Confirm", output)
         self.assertEqual(path.read_bytes(), before)

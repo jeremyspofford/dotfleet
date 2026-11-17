@@ -33,6 +33,8 @@ ACTIONS = {
     "name-connection": ("Set a name and SSH target", ("machines", "set-ssh")),
     "machine-export": ("Export this machine's record", ("machines", "export")),
     "machine-remove": ("Remove a stale machine record", ("machines", "remove")),
+    "logs": ("Logs — saved attempts", ("logs", "list")),
+    "log-show": ("Latest attempt", ("logs", "show")),
     "backups": ("List backups", ("backups", "list")),
     "backup-delete-selected": ("Delete selected backups", ("backups", "delete")),
     "backup-delete-all": ("Delete all backups", ("backups", "delete", "--all")),
@@ -57,6 +59,7 @@ AREAS = {
         "machine-remove",
     ),
     "Backups": ("backups", "backup", "rollback"),
+    "Logs": ("logs", "log-show"),
     "System": ("version", "addons", "help", "tui", "uninstall"),
 }
 

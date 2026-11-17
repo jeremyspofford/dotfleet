@@ -47,6 +47,8 @@ The command audit uses these forms:
 | topology | --json selects structured output |
 | content | No value parameters |
 | machines list, backups list, secrets list, tools list, addons list | No value parameters |
+| logs list | --limit |
+| logs show | --json, --name |
 | backups create, tui, configure, version, uninstall | No value parameters |
 | Installer and agent generator | Existing named flags |
 | Converter | --checkout, --output, --profile, --format |

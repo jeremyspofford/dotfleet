@@ -239,6 +239,7 @@ class ActionScreen(Screen):
         self.action = action
         self.machine = machine
         self.backups = []
+        self.entries = []
         self.connections = []
         self.uninstalled = False
 
@@ -280,6 +281,9 @@ class ActionScreen(Screen):
         elif self.action == "backups":
             for index, backup in enumerate(self.backups):
                 options.add_option(Option("Restore " + Path(backup).name, id=f"restore-{index}"))
+        elif self.action == "logs":
+            for index, entry in enumerate(self.entries):
+                options.add_option(Option(entry["label"], id=f"entry-{index}"))
         elif self.action == "machines":
             for index, machine in enumerate(self.connections):
                 for action in remote.CAPABLE:
@@ -325,6 +329,9 @@ class ActionScreen(Screen):
             self.app.perform_action(
                 self, "rollback", self.backups[int(choice.removeprefix("restore-"))]
             )
+        elif choice.startswith("entry-"):
+            entry = self.entries[int(choice.removeprefix("entry-"))]
+            self.app.perform_action(self, "log-show", entry=entry["id"])
         elif choice.startswith("remote-"):
             _, index, action = choice.split("-", 2)
             self.app.push_screen(ActionScreen(action, self.connections[int(index)]))
@@ -435,7 +442,7 @@ class FleetApp(App[str]):
             self.push_screen(ActionScreen(action))
 
     @work
-    async def perform_action(self, screen, action, backup=None, selected=None):
+    async def perform_action(self, screen, action, backup=None, selected=None, entry=None):
         if self.busy:
             return
         self.busy = True
@@ -466,6 +473,8 @@ class FleetApp(App[str]):
                         [(Path(path).name, path, path in selected) for path in screen.backups]
                     )
                     choices.highlighted = 0 if screen.backups else None
+            elif message["kind"] == "logs":
+                screen.entries = message["items"]
             elif message["kind"] == "connections":
                 screen.connections = message["items"]
             elif message["kind"] == "uninstalled":
@@ -480,6 +489,7 @@ class FleetApp(App[str]):
                 backup,
                 **({"machine": screen.machine} if screen.machine else {}),
                 **({"selected": selected} if selected is not None else {}),
+                **({"entry": entry} if entry is not None else {}),
             )
             normal = result == 0 or action in ("check", "diff") and result == 1
             progress.update(

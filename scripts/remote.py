@@ -18,6 +18,7 @@ import connections
 import topology
 import remote_history
 import style
+import run_index
 from render_run import render_view
 
 CAPABLE = ("status", "check", "diff", "doctor", "update")
@@ -180,20 +181,30 @@ def receive():
             }
         )
         home = Path.home()
-        gaps = command.command_profile_gaps(command.profile(home))
-        if gaps:
-            print("Error: Remote operation needs a complete target profile:")
-            for gap in gaps:
-                print("- " + gap)
-            print("Complete these choices on the target, then retry.")
-            return 2
-        args = [request["action"]]
-        if request["stat"]:
-            args.append("--stat")
-        return command.main(args)
+        if request["action"] == "update":
+            return run_index.run(home, "update", lambda: receive_action(home, request))
+        return receive_action(home, request)
     except (OSError, ValueError, RuntimeError) as error:
         print("Error: " + str(error))
         return 2
+
+
+def receive_action(home, request):
+    import command
+
+    run_index.stage("profile")
+    gaps = command.command_profile_gaps(command.profile(home))
+    if gaps:
+        run_index.failure("Remote operation needs a complete target profile: " + "; ".join(gaps))
+        print("Error: Remote operation needs a complete target profile:")
+        for gap in gaps:
+            print("- " + gap)
+        print("Complete these choices on the target, then retry.")
+        return 2
+    args = [request["action"]]
+    if request["stat"]:
+        args.append("--stat")
+    return command.main(args)
 
 
 def usage():

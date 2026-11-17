@@ -11,6 +11,11 @@ import sys
 import remote
 
 GROUPS = {
+    "logs": {
+        "list": "List the newest change-making attempts first.\nLimit the number with --limit.",
+        "show": "Show the latest attempt, or select its saved timestamp or backup with --name.\n"
+        "Use --json for the index entry and its RUN.json, when that record still exists.",
+    },
     "machines": {
         "list": "List saved machines and their connections.\nMake no network requests.",
         "set-ssh": "Save and test an SSH target.\nOmit flags to pick a host in a terminal.",
@@ -47,6 +52,7 @@ GROUPS = {
 }
 
 EXAMPLES = {
+    "logs": "logs list; logs list --limit 10; logs show; logs show --name BACKUP; logs show --json",
     "machines": "machines list; machines set-ssh --target mini-pc; machines set-ssh --name beelink --target mini-pc; machines export --output FILE; machines remove --name NAME",
     "domain": "domain list; domain set --name personal",
     "groups": "groups list; groups set --name docker --state off",
@@ -115,7 +121,19 @@ def add_groups(parser, name, formatter, display):
 
 
 def add_action_parameters(parser, name, action):
-    if name == "backups" and action == "delete":
+    if name == "logs":
+        if action == "list":
+            parser.add_argument(
+                "--limit", type=int, default=100, help="newest N attempts; default 100"
+            )
+        else:
+            parser.add_argument(
+                "--json", action="store_true", help="print both records as JSON for scripts"
+            )
+            parser.add_argument(
+                "--name", help="saved timestamp or backup folder name; default latest"
+            )
+    elif name == "backups" and action == "delete":
         selectors = parser.add_mutually_exclusive_group(required=True)
         selectors.add_argument(
             "--all", dest="all_backups", action="store_true", help="delete every saved backup"

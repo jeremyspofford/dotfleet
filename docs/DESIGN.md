@@ -83,7 +83,7 @@ Both refuse uncommitted edits and diverged histories. Diverged histories contain
 Local commits stay intact when the remote adds nothing. Adopted content without a remote stays local.
 
 Check quietly fetches each source with a ten-second limit.
-Update first refreshes that comparison and reads local drift. Current sources without drift stop before backup, review, or run-record creation.
+Update first refreshes that comparison and reads local drift. Current sources without drift stop before backup or review. A small run-index entry records the attempt.
 A failed check stops without applying files. Behind sources or drift proceed through the existing installer path.
 Update records manager update, content update, and drift repair as its triggers. Both review views use those recorded reasons.
 The terminal interface and remote targets call this same update core. Installer enrollment and repair keep their existing behavior.
@@ -194,3 +194,13 @@ Cleanup records live at `~/.local/share/fleet/cleanup-runs/<run>/RUN.json` with 
 They record completed removals and refresh this machine’s registry entry. Other machine records stay intact.
 The cleanup store sits outside fleet-backups, so deleting all backups leaves that store empty.
 Deleted backups cannot be restored. Cancellation creates no cleanup record and removes nothing.
+
+## Keep bounded run attempts
+
+The run index records each change-making attempt before profile validation or apply. It keeps the newest 100 JSON entries.
+JSON is a structured format that scripts can read. Each entry records progress and links to RUN.json when available.
+The installer and nested update share one entry. Remote updates keep that entry on their target.
+Read-only commands never create entries. Queries can refresh their existing fixed caches.
+Cancellation preserves managed files and keeps a small cancellation entry. Earlier store moves remain recorded separately.
+The Logs screen and commands read the same index. Applied attempts use the existing review renderer.
+See [RUNS.md](RUNS.md) for storage, cleanup, and diagnostic limits.

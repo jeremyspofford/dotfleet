@@ -44,7 +44,9 @@ from textual.widgets import Input, OptionList, RichLog, Select, SelectionList, S
 class FixtureSession:
     """Use the actual dispatcher; mock only external core operations in tests."""
 
-    async def run(self, action, output, event, confirm, backup=None, machine=None, selected=None):
+    async def run(
+        self, action, output, event, confirm, backup=None, machine=None, selected=None, entry=None
+    ):
         loop = asyncio.get_running_loop()
 
         async def deliver(callback, value):
@@ -63,7 +65,7 @@ class FixtureSession:
                 patch.object(ui_channel, "send", side_effect=send),
                 contextlib.redirect_stdout(captured),
             ):
-                result = tui_core.dispatch(action, backup, machine, selected)
+                result = tui_core.dispatch(action, backup, machine, selected, entry)
             for line in captured.getvalue().splitlines():
                 asyncio.run_coroutine_threadsafe(deliver(output, line), loop).result(10)
             return result
@@ -157,6 +159,29 @@ class ScreenTests(unittest.IsolatedAsyncioTestCase):
             text = "\n".join(lines).rstrip() + "\n"
             golden = ROOT / "tests/fixtures/tui/dashboard-80x24.txt"
             self.assertEqual(text, golden.read_text())
+
+    async def test_logs_lists_attempts_and_opens_selected_detail(self):
+        import run_index
+
+        identifier = run_index.begin(self.home, "configure")
+        run_index.update(
+            self.home, identifier, result="FAILED", stage="profile", error="Git email is empty."
+        )
+        app = FleetApp(FixtureSession())
+        async with app.run_test(size=(80, 24)) as pilot:
+            await self.settle(pilot, app)
+            app.open_command("logs")
+            await self.settle(pilot, app)
+            options = app.screen.query_one("#actions", OptionList)
+            self.assertIn("configure", options.get_option("entry-0").prompt)
+            options.highlighted = 0
+            options.focus()
+            await pilot.press("enter")
+            await self.settle(pilot, app)
+            text = "\n".join(line.text for line in app.screen.query_one("#output", RichLog).lines)
+            self.assertIn("Stage reached", text)
+            self.assertIn("Git email is empty.", text)
+            self.assertEqual(len(run_index.entries(self.home)), 1)
 
     async def test_updates_call_check_and_update_cores_with_review(self):
         def check(home, profile, display=True):

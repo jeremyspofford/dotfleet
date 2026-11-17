@@ -54,7 +54,7 @@ class ConsolidationTests(unittest.TestCase):
         names = next(
             item for item in parser._actions if isinstance(item, argparse._SubParsersAction)
         ).choices
-        self.assertEqual(len(names), 18)
+        self.assertEqual(len(names), 19)
         self.assertTrue({"backups", "tools", "status", "content"}.issubset(names))
         self.assertFalse({"backup", "rollback", "pins", "profile"}.intersection(names))
 

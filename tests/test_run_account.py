@@ -179,7 +179,7 @@ class RunAccountTests(unittest.TestCase):
                 os.readlink(path) if path.is_symlink() else path.read_bytes()
             )
             for path in self.home.rglob("*")
-            if path.is_file() or path.is_symlink()
+            if (path.is_file() or path.is_symlink()) and ".local/share/fleet/runs/" not in str(path)
         }
         answers = [
             (b"Content door [", b"repo\n"),
@@ -217,7 +217,7 @@ class RunAccountTests(unittest.TestCase):
                 os.readlink(path) if path.is_symlink() else path.read_bytes()
             )
             for path in self.home.rglob("*")
-            if path.is_file() or path.is_symlink()
+            if (path.is_file() or path.is_symlink()) and ".local/share/fleet/runs/" not in str(path)
         }
         self.assertEqual(set(after), set(snapshot))
         for name in snapshot:

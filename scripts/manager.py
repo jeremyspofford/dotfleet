@@ -16,6 +16,7 @@ Messages use logger.sh. Prompts use /dev/tty.
 import argparse
 from convert import content_manifest
 import style
+import run_index
 from updates import CACHE
 import traceback
 import datetime
@@ -949,6 +950,7 @@ def apply_confirmed_plan(
     if any(profile.get("agents", {}).values()):
         agent_configs.generate(home, agent_configs.native_os(), False)
     account.confirm_files(fingerprint)
+    run_index.stage("verify")
     status = run("chezmoi", "status")
     if status.strip():
         raise ValueError("Managed files still differ:\n" + status)
@@ -1022,10 +1024,19 @@ def parse_arguments(argv):
 
 
 def main(argv=None, edit=None, software=None, before_apply=None, manage_tui=False):
+    args = parse_arguments(argv)
+    label = "configure" if args.configure else "install"
+    return run_index.run(
+        Path.home(),
+        label,
+        lambda: enroll(args, edit, software, before_apply, manage_tui),
+    )
+
+
+def enroll(args, edit=None, software=None, before_apply=None, manage_tui=False):
     import enrollment as wizard
     from run_account import RunAccount
 
-    args = parse_arguments(argv)
     args.edit = edit
     home = Path.home()
     # Git status must not refresh the real checkout's index before confirmation.
@@ -1054,11 +1065,13 @@ def main(argv=None, edit=None, software=None, before_apply=None, manage_tui=Fals
                 account.software.append(tui_environment.software(home, ROOT))
             if software:
                 account.software.extend(software)
+            run_index.stage("profile")
             profile, carried, checkout, manifest, warnings = select_profile(home, args, workspace)
             account.scan = getattr(args, "scan_record", {})
             print("Carried from: " + (", ".join(carried) or "new profile"))
             attempt = 0
             while True:
+                run_index.stage("plan")
                 plan = prepare(home, checkout, profile, manifest, workspace / f"plan-{attempt}")
                 proposed_backup = backup_location(home)
                 account.plan(
@@ -1112,6 +1125,7 @@ def main(argv=None, edit=None, software=None, before_apply=None, manage_tui=Fals
                         " to review those changes."
                     )
                 )
+            run_index.stage("backup")
             backup_path = backup(home, plan["all_paths"], proposed_backup)
             account.bind_backup(backup_path)
             writes_started = True
@@ -1122,6 +1136,7 @@ def main(argv=None, edit=None, software=None, before_apply=None, manage_tui=Fals
                 home, checkout, profile, plan, backup_path, account, before_apply, warnings
             )
     except Exception as error:
+        run_index.failure(f"Error: Setup failed: {error}")
         print(f"Error: Setup failed: {error}", file=sys.stderr)
         if account:
             account.debug_details = traceback.format_exc()

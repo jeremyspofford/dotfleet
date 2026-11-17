@@ -28,6 +28,7 @@ import command_arguments
 import command_views
 import owned_views
 import style
+import run_index
 import updates
 import store_migration
 import ui_channel
@@ -98,6 +99,12 @@ DESCRIPTIONS = {
         "A group selects optional files or alias blocks.\n"
         "Turn a group on to include it, or off to remove its managed content."
     ),
+    "logs": (
+        "Show saved change-making attempts.\n"
+        "The index keeps the newest 100 attempts, including failures before apply.\n"
+        "Read-only commands do not add entries.\n"
+        "Backup deletion removes its detailed run record; the index entry remains until pruned."
+    ),
     "machines": (
         "Manage saved machine connections.\n"
         "The registry, registry.toml, stores machine records.\n"
@@ -148,7 +155,8 @@ DESCRIPTIONS = {
         "Check updates and drift before applying.\n"
         "Compare manager and content with their upstreams, the remote branches they track.\n"
         "Drift means managed files differ.\n"
-        "Current sources without drift stop without a backup, run record, or review.\n"
+        "Current sources without drift stop without a backup or review.\n"
+        "Each attempt keeps a small entry in logs.\n"
         "A failed check stops without applying files."
     ),
     "version": ("Show manager and content versions.\nA commit identifies a saved Git version."),
@@ -463,12 +471,14 @@ def prepare_manager(home, workspace):
 
 
 def update(home):
+    run_index.stage("check")
     saved_profile = profile(home)
     if updates.check(home, saved_profile, display=False) == 2:
         return 2
     try:
         drift = status(home)
     except (OSError, ValueError, RuntimeError) as error:
+        run_index.failure("Warning: Could not check local drift: " + str(error))
         print("Warning: Could not check local drift: " + str(error), file=sys.stderr)
         return 2
     checked = load_json(home / updates.CACHE, {})
@@ -476,9 +486,11 @@ def update(home):
     if drift:
         triggers.append("drift repair")
     if not triggers:
+        run_index.outcome("NO_CHANGE")
         print(updates.CURRENT_MESSAGE)
         return 0
     with tempfile.TemporaryDirectory(prefix="dotfleet-update-") as folder:
+        run_index.stage("manager checkout")
         staged = prepare_manager(home, Path(folder))
         environment = dict(os.environ)
         environment.pop("DOTFLEET_LOCAL_CONTENT", None)
@@ -487,6 +499,7 @@ def update(home):
         if ui_channel.active() or os.environ.get(remote.CONTEXT) == "1":
             # TUI and SSH runs leave profile decisions to a real terminal on the target.
             arguments.append("--defaults")
+        run_index.stage("installer")
         return subprocess.call(arguments, env=environment, pass_fds=ui_channel.descriptors())
 
 
@@ -707,6 +720,7 @@ def transaction(home, operations, label, selected=None, require_word=None, tree_
             target = home / name
             if target.is_dir() and not target.is_symlink():
                 raise ValueError("Refusing to replace a directory: " + str(target))
+        run_index.stage("review")
         if require_word:
             print(render(account.record(), future=True), end="")
             if not confirm(require_word, label, account.record()):
@@ -714,6 +728,7 @@ def transaction(home, operations, label, selected=None, require_word=None, tree_
                 return 0
         if manager.backup_inventory(home, backup_paths) != account.manifest:
             raise ValueError("Files changed during review. Run the command again.")
+        run_index.stage("backup")
         manager.backup(home, backup_paths, folder)
         account.bind_backup(folder)
         source = home / ".local/share/fleet/chezmoi-source"
@@ -847,7 +862,30 @@ def main(argv=None):
         else:
             print(topology.render(view), end="")
         return 0
+    if args.command == "logs":
+        import run_logs
+
+        if args.action == "list" and args.limit < 1:
+            argument_parser.error("--limit needs a positive count")
+        return run_logs.show_command(home, args)
+    if changes_state(args):
+        label = args.command + (" " + args.action if getattr(args, "action", None) else "")
+        return run_index.run(home, label, lambda: dispatch(args, argument_parser, home))
+    return dispatch(args, argument_parser, home)
+
+
+def changes_state(args):
+    if args.command in ("update", "configure", "uninstall"):
+        return True
+    action = getattr(args, "action", None)
+    if args.command == "machines" and action == "export":
+        return bool(args.output)
+    return action in ("set", "remove", "set-ssh", "create", "restore", "delete", "uninstall")
+
+
+def dispatch(args, argument_parser, home):
     try:
+        run_index.stage("profile")
         saved_profile = profile(home)
         display = command_name(saved_profile)
         if args.command == "check":
@@ -1027,6 +1065,7 @@ def main(argv=None):
             print("Warning: Could not check updates: " + str(error), file=sys.stderr)
             return 2
         style.record_failure()
+        run_index.failure("Error: " + str(error))
         print("Error: " + str(error), file=sys.stderr)
         return 2 if args.command == "diff" else 1
     return 0
@@ -1118,6 +1157,7 @@ def change_registry(home, edit):
             )
             if ui_channel.active() and not ui_channel.review(account.record()):
                 return account.finish("CANCELLED")
+            run_index.stage("backup")
             manager.backup(home, [registry.REGISTRY], folder)
             account.bind_backup(folder)
             atomic(path, after)
@@ -1150,6 +1190,7 @@ def snapshot(home, operations):
             run("chezmoi", "--no-pager", "--use-builtin-diff", "--color=false", "diff"),
         )
         account.status = status(home)
+        run_index.stage("backup")
         manager.backup(home, [name for name, _ in operations], folder)
         account.bind_backup(folder)
         source = home / ".local/share/fleet/chezmoi-source"
