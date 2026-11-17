@@ -128,6 +128,11 @@ def add_groups(parser, name, formatter, display):
 
 
 def add_action_parameters(parser, name, action):
+    if name in remote.PROFILE_ACTIONS and action in remote.PROFILE_ACTIONS[name]:
+        parser.add_argument(
+            "--machine",
+            help="registered machine; save there; its next update applies the change",
+        )
     if name == "logs":
         if action == "list":
             parser.add_argument(

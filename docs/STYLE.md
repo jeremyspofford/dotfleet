@@ -37,17 +37,18 @@ The command audit uses these forms:
 | machines remove | --name |
 | backups delete | Exactly one of --all, --keep, or --name |
 | machines export | --output |
-| domain list / set | set requires --name |
-| agents list / set | set requires --name and --state |
-| groups list / set | set requires --name and --state |
-| tools set | TOOL, --version |
-| tools remove | TOOL |
+| domain list / set | set requires --name; --machine selects a registered machine |
+| agents list / set | set requires --name and --state; --machine selects a registered machine |
+| groups list / set | set requires --name and --state; --machine selects a registered machine |
+| tools set | TOOL, --version; --machine selects a registered machine |
+| tools remove | TOOL; --machine selects a registered machine |
 | tools uninstall | TOOL, --version |
 | backups restore | --backup; no flag lists backups |
 | status, check, diff, doctor, update | One optional machine subject; diff also has --stat |
 | topology | --json selects structured output |
 | content | No value parameters |
-| machines list, backups list, secrets list, tools list, addons list | No value parameters |
+| tools list | --machine selects a registered machine |
+| machines list, backups list, secrets list, addons list | No value parameters |
 | logs list | --limit |
 | logs show | --json, --name |
 | backups create, tui, configure, version, uninstall | No value parameters |

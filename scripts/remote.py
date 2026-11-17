@@ -22,6 +22,22 @@ import run_index
 from render_run import render_view
 
 CAPABLE = ("status", "check", "diff", "doctor", "update")
+# Profile commands run on the target. The target's manager is the only writer of its profile.
+PROFILE_ACTIONS = {
+    "agents": {"list": (), "set": ("name", "state")},
+    "domain": {"list": (), "set": ("name",)},
+    "groups": {"list": (), "set": ("name", "state")},
+    "tools": {"list": (), "set": ("tool", "version"), "remove": ("tool",)},
+}
+PATTERNS = {
+    ("agents", "name"): r"(?:skills|rules|mcp|connectors|plugins|hooks)\.[a-z0-9]+(?:-[a-z0-9]+)*",
+    ("agents", "state"): r"on|off|local",
+    ("domain", "name"): r"[a-z][a-z0-9]*(?:-[a-z0-9]+)*",
+    ("groups", "name"): r"[A-Za-z0-9][A-Za-z0-9_.-]*",
+    ("groups", "state"): r"on|off",
+    ("tools", "tool"): r"[A-Za-z0-9][A-Za-z0-9:._@/-]*",
+    ("tools", "version"): r"[A-Za-z0-9][A-Za-z0-9._+-]*",
+}
 CONTEXT = "FLEET_REMOTE_RUN"
 REASONS = {
     "configure": "configure needs a terminal on that machine",
@@ -41,7 +57,29 @@ def validate_target(target):
     return target
 
 
+def validate_profile_request(request):
+    """Accept one profile command with named values. Nothing else crosses the connection."""
+    if set(request) != {"version", "command", "action", "arguments"}:
+        raise ValueError("Invalid remote request. Update Fleet on both machines.")
+    command, action, arguments = request["command"], request["action"], request["arguments"]
+    if command not in PROFILE_ACTIONS or action not in PROFILE_ACTIONS.get(command, {}):
+        raise ValueError("Only domain, groups, agents, and tools choices can change remotely.")
+    expected = PROFILE_ACTIONS[command][action]
+    if not isinstance(arguments, dict) or set(arguments) != set(expected):
+        raise ValueError(f"Invalid values for remote {command} {action}.")
+    for key, value in arguments.items():
+        if not isinstance(value, str) or not re.fullmatch(PATTERNS[(command, key)], value):
+            raise ValueError(f"Invalid {key} for remote {command} {action}.")
+    return request
+
+
 def validate_request(request):
+    if (
+        isinstance(request, dict)
+        and type(request.get("version")) is int
+        and request["version"] == 2
+    ):
+        return validate_profile_request(request)
     if not isinstance(request, dict) or set(request) != {"version", "action", "check", "stat"}:
         raise ValueError("Invalid remote request. Update Fleet on both machines.")
     if type(request["version"]) is not int or request["version"] != 1:
@@ -97,10 +135,17 @@ def missing_command(home, machine, target, action):
     return 2
 
 
-def execute(home, machine, action, *, check=False, stat=False):
-    if action not in CAPABLE:
-        return refusal(machine, action)
-    request = validate_request(dict(version=1, action=action, check=check, stat=stat))
+def profile_request(command, action, arguments):
+    return validate_request(
+        dict(version=2, command=command, action=action, arguments=dict(arguments))
+    )
+
+
+def execute(home, machine, action, *, check=False, stat=False, request=None):
+    if request is None:
+        if action not in CAPABLE:
+            return refusal(machine, action)
+        request = validate_request(dict(version=1, action=action, check=check, stat=stat))
     try:
         record = registry.load(home)["machines"].get(machine)
         if record is None:
@@ -169,6 +214,9 @@ def receive():
 
     try:
         request = validate_request(json.loads(sys.stdin.read(4097)))
+        if request["version"] == 2:
+            prepare_environment()
+            return receive_profile(Path.home(), request)
         os.environ.pop(ui_channel.CHANNEL, None)
         os.environ.update(
             {
@@ -187,6 +235,32 @@ def receive():
     except (OSError, ValueError, RuntimeError) as error:
         print("Error: " + str(error))
         return 2
+
+
+def prepare_environment():
+    import ui_channel
+
+    os.environ.pop(ui_channel.CHANNEL, None)
+    os.environ.update(
+        {
+            CONTEXT: "1",
+            "NO_COLOR": "1",
+            "GIT_TERMINAL_PROMPT": "0",
+            "GCM_INTERACTIVE": "never",
+            "SSH_ASKPASS_REQUIRE": "never",
+            "GIT_SSH_COMMAND": "ssh -oBatchMode=yes",
+        }
+    )
+
+
+def receive_profile(home, request):
+    """List or save one profile choice. The target's next update applies a saved change."""
+    import command
+
+    if request["action"] == "list":
+        return command.main([request["command"], "list"])
+    label = request["command"] + " " + request["action"]
+    return run_index.run(home, label, lambda: command.save_remote_choice(home, request))
 
 
 def receive_action(home, request):
