@@ -20,7 +20,10 @@ Use flags for optional parameters and for values that a reader can confuse with 
 Commands and action words stay positional. A positional argument is a value without a named flag.
 The single trailing machine in status, check, diff, doctor, and update is the subject. Keep that machine name positional.
 Use --name and --target for SSH registration. One flag supplies both values unless the other flag gives a different value.
-Help and examples show flags. Parse supported old forms without documenting them as the main interface.
+Help and examples show flags. Keep promised positional SSH-registration forms readable, but do not document them as the main interface.
+Command groups require explicit action verbs. A bare group prints its action list.
+Support help, -h, and --help at each command and action. Support help COMMAND and both version and --version.
+Status reads saved state without network requests. Check fetches updates. Keep their help and output distinct.
 
 The command audit uses these forms:
 
@@ -29,17 +32,21 @@ The command audit uses these forms:
 | machines set-ssh | --name, --target; no flags opens the terminal picker |
 | machines remove | --name |
 | machines export | --output |
-| domain | --name; no flag lists choices |
-| groups | --name, --state; no flags lists groups |
+| domain list / set | set requires --name |
+| groups list / set | set requires --name and --state |
 | pins set | --tool, --version |
 | pins remove | --tool |
 | rollback | --backup; no flag lists backups |
-| status, check, diff, doctor, update | One optional machine subject; status also has --check and diff has --stat |
+| status, check, diff, doctor, update | One optional machine subject; diff also has --stat |
 | topology | --json selects structured output |
-| tui, profile, backups, secrets, content, addons, configure, backup, version, uninstall | No value parameters |
+| profile show, content show | No value parameters |
+| machines list, backups list, secrets list, pins list, addons list | No value parameters |
+| tui, configure, backup, version, uninstall | No value parameters |
 | Installer and agent generator | Existing named flags |
 | Converter | --checkout, --output, --profile, --format |
 
+Every command and group action needs a reachable terminal-interface entry and a primary-output golden test.
+Use the shared core for actions, reviews, records, and confirmations. List each entity in its own block; omit fields without values.
 Internal bridges also label optional values, such as --backup and --machine. Function arguments are not command-line parameters.
 
 ## Preserve behavior

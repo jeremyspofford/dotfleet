@@ -311,7 +311,26 @@ def render(record, future=False):
 
 def render_view(title, pairs, home=""):
     """Use the same width, path, and column rules for read-only command results."""
+    pairs = [(key, value) for key, value in pairs if value is not None and value != ""]
     return "\n".join([section(title), *block(pairs, home)]) + "\n"
+
+
+def render_entities(title, entities, home="", empty="None recorded."):
+    """Keep each named item in its own block. Missing fields never become blank rows."""
+    lines = [section(title)]
+    for entity in entities:
+        lines += [""] + wrap(human(entity["name"], home))
+        fields = [
+            (key, value)
+            for key, value in entity.get("fields", [])
+            if value is not None and value != ""
+        ]
+        lines += block(fields, home)
+        for note in entity.get("notes", []):
+            lines += wrap(human(note, home), "  ")
+    if not entities:
+        lines += [""] + wrap(empty)
+    return "\n".join(lines) + "\n"
 
 
 def usage():

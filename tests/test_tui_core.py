@@ -161,7 +161,7 @@ class ChannelTests(unittest.IsolatedAsyncioTestCase):
 
         async def confirm(request):
             reviews.append(request)
-            return answer
+            return answer(request) if callable(answer) else answer
 
         with patch.dict(os.environ, self.env, clear=True):
             result = await CoreSession(helpers.ROOT).run(
@@ -238,6 +238,55 @@ class ChannelTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((self.home / ".file").read_text(), "keep my local change\n")
         self.assertEqual(self.record()[0]["result"], "FAILED")
         self.assertIn("Apply stopped.", output)
+
+    async def test_configuration_actions_keep_the_real_apply_and_run_records(self):
+        self.enroll()
+
+        def answer(request):
+            if request["kind"] == "review":
+                return "confirm"
+            field = request["fields"][0]
+            values = [value for label, value in field["choices"]]
+            return {
+                "choice": "personal"
+                if "personal" in values
+                else "extra"
+                if "extra" in values
+                else "off"
+            }
+
+        result, output, _, reviews = await self.run_core("domain-set", answer)
+        self.assertEqual(result, 0, output)
+        self.assertIn("personal", (self.home / ".config/fleet/profile.toml").read_text())
+        self.assertEqual(self.record()[0]["result"], "SUCCESS")
+        result, output, _, reviews = await self.run_core("group-set", answer)
+        self.assertEqual(result, 0, output)
+        self.assertFalse((self.home / ".extra").exists())
+        self.assertTrue(any(item["kind"] == "review" for item in reviews))
+        self.assertIn("6 · Next steps", output)
+
+    async def test_uninstall_uses_the_same_typed_confirmation_and_real_record(self):
+        self.enroll()
+        profile = self.home / ".config/fleet/profile.toml"
+        before = profile.read_bytes()
+        result, output, _, reviews = await self.run_core(
+            "uninstall",
+            lambda request: {"choice": "keep"} if request["kind"] == "form" else "wrong",
+        )
+        self.assertEqual(result, 0, output)
+        self.assertEqual(profile.read_bytes(), before)
+        self.assertEqual(reviews[-1]["word"], "uninstall")
+        result, output, events, reviews = await self.run_core(
+            "uninstall",
+            lambda request: {"choice": "keep"} if request["kind"] == "form" else "uninstall",
+        )
+        self.assertEqual(result, 0, output)
+        self.assertFalse(profile.exists())
+        self.assertFalse((self.home / ".local/bin/dotfleet").exists())
+        self.assertTrue((self.home / "dotfiles").is_dir())
+        self.assertEqual(self.record()[0]["result"], "SUCCESS")
+        self.assertIn("3 · Files", output)
+        self.assertIn({"kind": "uninstalled", "value": True}, events)
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 """Check the same upstream commits that update stages, and cache successful results.
 
-Usage: dotfleet check; dotfleet status --check.
+Usage: dotfleet check; dotfleet status.
 An upstream is the remote branch tracked by a checkout's current branch.
 Fetches stop after 10 seconds. No checkout, profile, or managed file is applied here.
 Help: python3 scripts/updates.py --help.
@@ -196,7 +196,9 @@ def check(home, profile, display=True):
         print(f"Warning: Could not check {name}: {error}.", file=sys.stderr)
         return 2
     if display:
-        for source in sources:
+        for index, source in enumerate(sources):
+            if index:
+                print()
             count = source["behind"]
             unit = "commit" if count == 1 else "commits"
             state = f"{count} {unit} behind" if count else "up to date"
@@ -210,7 +212,7 @@ def summary(home, profile=None):
     from command_display import command_name, current_command
 
     display = current_command(home) if profile is None else command_name(profile)
-    missing = f"Updates: not checked — run: {display} check"
+    missing = f"Updates: not checked yet — run: {display} check"
     try:
         cache = home / CACHE
         if cache.is_symlink() or not cache.parent.resolve().is_relative_to(home.resolve()):

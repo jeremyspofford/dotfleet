@@ -1,8 +1,7 @@
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   Machine export
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  Machine            example-hub
-  Scope              This machine’s saved record only.
+  Machine            example-hub · this machine
   Home               ~
   OS                 Linux
   Domain             personal
@@ -15,4 +14,4 @@
   Run record         ~/fleet-backups/20261116-120000/RUN.json
   Result             SUCCESS
   Enrolled           on
-  Carry this record  Use dotfleet machines export --output FILE to save a private TOML copy.
+  Carry this record  Use fleet machines export --output FILE to save a private TOML copy.

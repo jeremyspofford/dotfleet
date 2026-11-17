@@ -1,0 +1,54 @@
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  fleet
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Usage: fleet [-h] [--version] COMMAND ...
+
+Manage enrolled machines. A profile saves each machine’s choices.
+
+positional arguments:
+  COMMAND
+    help       Show commands and actions.
+    topology   Show this machine’s recorded view as a tree.
+    tui        Open the terminal interface, a full-screen view of Fleet
+               commands.
+    check      Check fetches new update results; status only reads the saved
+               results.
+    profile    Show saved domain, identity, pins, groups, and agents from
+               profile.toml.
+    backups    List backup folders with their dates, recorded results, and
+               sizes.
+    secrets    Show secret variable names declared by the content manifest,
+               the repository’s settings file.
+    content    Show the content checkout, a local Git copy.
+    machines   Show recorded machine facts from registry.toml.
+    addons     List installed add-ons, optional manager extensions.
+    update     Pull the manager and content repositories, then apply your
+               saved choices.
+    status     Status reads saved update results without fetching; check
+               fetches new results.
+    diff       Show pending file paths and unified patches from chezmoi.
+    rollback   List backups or restore one after confirmation.
+    domain     Show domains, or apply a named domain.
+    groups     List optional content groups.
+    pins       List exact tool versions and installed state.
+    configure  Reopen the enrollment wizard.
+    doctor     Check profile completeness, drift, clean checkouts, and
+               backups.
+    backup     Copy managed files and the profile into a new private backup.
+    version    Show the manager version and content commit.
+    uninstall  Remove the manager and its managed files after typed
+               confirmation.
+
+options:
+  -h, --help   show this help message and exit
+  --version    show program's version number and exit
+
+Exit codes: 0 success, help, or cancellation; 1 failed operation or check; 2
+invalid arguments or check failure; 130 interrupted. Check uses 1 for
+available updates.
+Examples: fleet update; fleet status; fleet domain set --name personal.
+First install or manager recovery: use the README one-line installer.
+Profile: saved machine choices. Pins: exact tool versions. Groups: optional
+content.
+Domain: content additions. Drift: differences in managed files.
+Commit: saved Git version. Checkout: a local Git copy.

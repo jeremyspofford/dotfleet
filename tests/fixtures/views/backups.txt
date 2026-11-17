@@ -1,5 +1,10 @@
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   Backups
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  Backups          ~/fleet-backups
-  20261116-120000  2026-11-16 12:00:00 · SUCCESS · 29 bytes
+
+20261116-120000
+  Date        2026-11-16 12:00:00
+  Result      SUCCESS
+  Size        20 bytes
+  Folder      ~/fleet-backups/20261116-120000
+  Run record  ~/fleet-backups/20261116-120000/RUN.json

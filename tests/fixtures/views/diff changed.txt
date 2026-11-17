@@ -1,0 +1,8 @@
+~/.file
+diff --git a/.file b/.file
+index d0124552d7d5fc2918b7084863c0bb64672cd158..4b48deed3a433909bfd6b6ab3d4b91348b6af464 100600
+--- a/.file
++++ b/.file
+@@ -1 +1 @@
+-local change
++original

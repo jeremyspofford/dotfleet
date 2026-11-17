@@ -9,7 +9,7 @@ from pathlib import Path
 import unittest
 
 import test_command as helpers
-from test_manager import command
+from test_manager import command, ROOT
 
 
 class DiffTests(unittest.TestCase):
@@ -33,6 +33,12 @@ class DiffTests(unittest.TestCase):
         clean = self.cli("diff")
         sha = command("git", "-C", str(self.content), "rev-parse", "HEAD").strip()[:8]
         self.assertEqual(clean, f"No differences. Your files match {self.content} @ {sha}.\n")
+        self.assertEqual(
+            clean.replace(str(self.content), "https://example.invalid/dotfiles").replace(
+                sha, "12345678"
+            ),
+            (ROOT / "tests/fixtures/views/diff clean.txt").read_text(),
+        )
         self.assertEqual(self.snapshot(), before)
         Path("/tmp/dotfleet-diff-clean.txt").write_text(clean)
         (self.home / ".file").write_text("local change\n")
@@ -43,6 +49,7 @@ class DiffTests(unittest.TestCase):
         self.assertIn("+original\n", changed)
         self.assertNotIn("Locations", changed)
         self.assertNotIn("Selected choices", changed)
+        self.assertEqual(changed, (ROOT / "tests/fixtures/views/diff changed.txt").read_text())
         self.assertEqual(self.snapshot(), before)
         Path("/tmp/dotfleet-diff-changed.txt").write_text(changed)
         self.assertEqual(self.cli("diff", "--stat", expected=1), "~/.file\n")

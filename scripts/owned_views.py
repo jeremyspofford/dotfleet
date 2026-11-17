@@ -1,6 +1,6 @@
 """Read manager-owned stores as human rows. Never execute a secrets file.
 
-Usage: use dotfleet profile, backups, secrets, content, or machines export.
+Usage: use dotfleet profile show, backups list, secrets list, content show, or machines export.
 """
 
 import os
@@ -21,7 +21,9 @@ def profile_rows(home, profile):
         ("Domain", profile.get("domain", "core")),
         (
             "Domain choice",
-            "chosen" if profile.get("domain_chosen", False) else f"UNCHOSEN; run {display} domain",
+            "chosen"
+            if profile.get("domain_chosen", False)
+            else f"UNCHOSEN; run {display} domain list",
         ),
         ("Git name", profile.get("git_name") or f"missing; run {display} configure"),
         ("Git email", profile.get("git_email") or f"missing; run {display} configure"),
@@ -33,14 +35,14 @@ def profile_rows(home, profile):
     rows.append(
         (
             "Edit choices",
-            f"Use {display} domain, pins, groups, or configure. Do not edit profile.toml.",
+            f"Use {display} domain set, pins set, groups set, or configure. Do not edit profile.toml.",
         )
     )
     return rows
 
 
-def backup_rows(home, folders):
-    rows = [("Backups", str(home / "fleet-backups"))]
+def backup_entities(home, folders):
+    entities = []
     for folder in reversed(folders):
         import json
 
@@ -54,12 +56,20 @@ def backup_rows(home, folders):
         date = folder.name[:15]
         if re.fullmatch(r"\d{8}-\d{6}", date):
             date = f"{date[:4]}-{date[4:6]}-{date[6:8]} {date[9:11]}:{date[11:13]}:{date[13:15]}"
-        rows.append(
-            (folder.name, f"{date} · {record.get('result') or 'not recorded'} · {size:,} bytes")
+        entities.append(
+            {
+                "name": folder.name,
+                "fields": [
+                    ("Date", date),
+                    ("Result", record.get("result")),
+                    ("Size", f"{size:,} bytes"),
+                    ("Folder", str(folder)),
+                    ("Run record", str(record_path) if record_path.is_file() else None),
+                ],
+                "notes": [] if record.get("result") else ["No run result recorded."],
+            }
         )
-    if not folders:
-        rows.append(("Saved backups", f"none; run {current_command(home)} backup"))
-    return rows
+    return entities
 
 
 def secret_rows(home, manifest):
@@ -97,7 +107,7 @@ def export_rows(home, version, output=None):
     name = socket.gethostname()
     data = registry.load(home)
     record = data["machines"].get(name) or registry.machine(home, version)
-    rows = [("Machine", name), ("Scope", "This machine’s saved record only.")]
+    rows = [("Machine", name + " · this machine")]
     labels = {
         "os": "OS",
         "content_repo": "Content repo",

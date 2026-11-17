@@ -52,7 +52,7 @@ class CoreSession:
             async def read_events():
                 while line := await reader.readline():
                     message = json.loads(line)
-                    if message["kind"] in ("review", "choose"):
+                    if message["kind"] in ("review", "choose", "form"):
                         answer = await confirm(message)
                         writer.write((json.dumps({"answer": answer}) + "\n").encode())
                         await writer.drain()

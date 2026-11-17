@@ -94,7 +94,7 @@ class RegistrationTests(unittest.TestCase):
         self.assertIn("Next: use --target user@host or user@IP", output)
         self.assertIn("Saved connection kept", output)
         self.assertEqual(registry.load(self.home)["machines"]["mini-pc"]["ssh_target"], "mini-pc")
-        listing = self.cli("machines")
+        listing = self.cli("machines", "list")
         self.assertEqual(listing.count("mini-pc"), 1)
         self.assertIn("SSH uses this name", listing)
         self.assertEqual(self.record()[0]["result"], "SUCCESS")
@@ -147,11 +147,11 @@ class RegistrationTests(unittest.TestCase):
 
     def test_flagged_command_audit_keeps_the_same_core_actions(self):
         self.prepare()
-        self.cli("domain", "--name", "personal")
+        self.cli("domain", "set", "--name", "personal")
         self.assertEqual(read_toml(self.home / cli.PROFILE)["domain"], "personal")
-        self.cli("groups", "--name", "extra", "--state", "off")
+        self.cli("groups", "set", "--name", "extra", "--state", "off")
         self.assertFalse((self.home / ".extra").exists())
-        self.cli("groups", "--name", "extra", "--state", "on")
+        self.cli("groups", "set", "--name", "extra", "--state", "on")
         self.assertTrue((self.home / ".extra").exists())
         self.cli("machines", "set-ssh", "--target", "lab")
         self.cli("machines", "remove", "--name", "lab")
@@ -197,7 +197,7 @@ class ConnectionUnitTests(unittest.TestCase):
             ),
             (
                 "ssh: connect to host mini-pc port 22: Connection refused",
-                "Connection refused",
+                "SSH connection refused",
                 "awake and reachable",
             ),
         ]:

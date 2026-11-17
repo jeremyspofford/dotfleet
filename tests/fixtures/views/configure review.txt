@@ -1,0 +1,18 @@
+1 · Software — no changes.
+  Already present: chezmoi 0.1.0, Mise 0.1.0, Fleet 0.1.0
+
+2 · Manager and content — no changes.
+
+3 · Files — no changes.
+
+4 · Profile changes — no changes.
+
+5 · Locations — recorded in RUN.json.
+
+6 · Next steps
+  Update    dotfleet update
+  Rollback  ~/fleet-backups/20261117-120000/MANIFEST.json
+  Wizard    dotfleet configure
+
+chezmoi status: clean · warnings: none
+Run record: ~/fleet-backups/20261117-120000/RUN.json
