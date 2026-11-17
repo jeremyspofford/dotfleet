@@ -228,14 +228,16 @@ def stage(path, destination, local_only=False, content=False):
     result = compare(destination, local_only)
     if result["behind"]:
         if content:
-            require_no_collision(path, result["current"], result["target"])
+            # The staged clone holds the target commit; the checkout holds the local files.
+            require_no_collision(path, result["current"], result["target"], destination)
         git(destination, "merge", "--ff-only", "--no-edit", result["target"])
     return destination
 
 
-def require_no_collision(path, current, target):
+def require_no_collision(path, current, target, history=None):
     """Stop before backup when an update would change a local file that Fleet does not manage."""
-    changed = set(git(path, "diff", "--name-only", "-z", current, target, raw=True).split("\0"))
+    history = history or path
+    changed = set(git(history, "diff", "--name-only", "-z", current, target, raw=True).split("\0"))
     local = set(edited_paths(path))
     local |= set(git(path, "ls-files", "--others", "-z", raw=True).split("\0"))
     collisions = sorted((changed & local) - {""})
