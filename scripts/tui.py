@@ -32,6 +32,7 @@ MENU = [
     ("backups", "Backups — list and restore"),
     ("machines", "Machines — records and SSH actions"),
     ("doctor", "Doctor — check this machine"),
+    ("topology", "Topology — connections from this machine"),
     ("configure", "Configure — open the wizard"),
 ]
 
@@ -95,6 +96,81 @@ class Review(ModalScreen[str]):
         self.dismiss("cancel")
 
 
+class ConnectionPicker(ModalScreen[str | None]):
+    BINDINGS = [("escape", "cancel", "Cancel")]
+
+    def __init__(self, request):
+        super().__init__()
+        self.request = request
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="review-box"):
+            yield Static(self.request["title"], classes="heading")
+            yield Static(self.request["notice"] or "Choose an unregistered SSH host.")
+            yield OptionList(
+                *(
+                    Option(f"{number + 1}. {host}", id=str(number))
+                    for number, host in enumerate(self.request["items"])
+                ),
+                id="host-options",
+            )
+            yield Static(
+                "Enter selects a host. Tab moves to a typed target. Esc cancels.", classes="keys"
+            )
+            yield Static("Or enter user@host or user@IP, then press Enter.")
+            yield Input(placeholder="SSH target", id="ssh-target")
+            yield Static("", id="target-error")
+            yield Button("Cancel", id="cancel")
+
+    def on_mount(self):
+        if self.request["items"]:
+            self.query_one(OptionList).focus()
+        else:
+            self.query_one(Input).focus()
+
+    def choose(self, target):
+        try:
+            remote.validate_target(target)
+        except ValueError as error:
+            self.query_one("#target-error", Static).update(str(error))
+            return
+        self.dismiss(target)
+
+    @on(OptionList.OptionSelected, "#host-options")
+    def selected(self, event):
+        self.choose(self.request["items"][int(event.option.id)])
+
+    @on(Input.Submitted, "#ssh-target")
+    def typed(self, event):
+        self.choose(event.value.strip())
+
+    @on(Button.Pressed, "#cancel")
+    def action_cancel(self):
+        self.dismiss(None)
+
+
+class MachineActions(Screen):
+    def __init__(self, machine):
+        super().__init__()
+        self.machine = machine
+
+    def compose(self) -> ComposeResult:
+        yield Static("Fleet · " + self.machine, classes="heading")
+        yield OptionList(
+            *(Option(action.capitalize(), id=action) for action in remote.CAPABLE),
+            Option("Back", id="back"),
+            id="machine-actions",
+        )
+        yield Static("↑↓ / Tab move · Enter selects · Esc back · q quits", classes="keys")
+
+    @on(OptionList.OptionSelected, "#machine-actions")
+    async def selected(self, event):
+        if event.option.id == "back":
+            await self.app.action_back()
+        else:
+            self.app.push_screen(ActionScreen(event.option.id, self.machine))
+
+
 class ActionScreen(Screen):
     def __init__(self, action, machine=None):
         super().__init__()
@@ -137,6 +213,10 @@ class ActionScreen(Screen):
                     options.add_option(
                         Option(action.capitalize() + " · " + machine, id=f"remote-{index}-{action}")
                     )
+            options.add_option(Option("Add SSH connection", id="add-connection"))
+        elif self.action == "topology":
+            for index, machine in enumerate(self.connections):
+                options.add_option(Option(machine, id=f"machine-{index}"))
         options.add_option(Option("Back", id="back"))
         options.disabled = False
         options.highlighted = 0
@@ -154,6 +234,10 @@ class ActionScreen(Screen):
         elif choice.startswith("remote-"):
             _, index, action = choice.split("-", 2)
             self.app.push_screen(ActionScreen(action, self.connections[int(index)]))
+        elif choice.startswith("machine-"):
+            self.app.push_screen(
+                MachineActions(self.connections[int(choice.removeprefix("machine-"))])
+            )
         else:
             self.app.perform_action(self, choice)
 
@@ -237,6 +321,8 @@ class FleetApp(App[str]):
             self.screen_stack[0].query_one("#facts", Static).update(Text("Error: " + str(error)))
 
     async def confirm(self, request):
+        if request.get("kind") == "choose":
+            return await self.push_screen_wait(ConnectionPicker(request))
         return await self.push_screen_wait(Review(request))
 
     @on(OptionList.OptionSelected, "#menu")
@@ -252,13 +338,15 @@ class FleetApp(App[str]):
             return
         self.busy = True
         self.operation_worker = get_current_worker()
-        self.changing = action in ("update", "rollback")
+        self.changing = action in ("update", "rollback", "add-connection")
         output = screen.query_one("#output", RichLog)
         output.clear()
         screen.query_one("#actions", OptionList).disabled = True
         progress = screen.query_one("#progress", Static)
         progress.update(
-            "Working on " + screen.machine + ". The target runs without prompts."
+            "Choose a target; saving is followed by one SSH test."
+            if action == "add-connection"
+            else "Working on " + screen.machine + ". The target runs without prompts."
             if screen.machine
             else "Working… Changes require review."
             if self.changing
@@ -310,7 +398,7 @@ class FleetApp(App[str]):
                 pass
 
     async def action_back(self):
-        if isinstance(self.screen, Review):
+        if isinstance(self.screen, (Review, ConnectionPicker)):
             self.screen.action_cancel()
             return
         if self.busy and self.changing:
@@ -328,7 +416,7 @@ class FleetApp(App[str]):
     async def action_quit(self):
         if self.busy and self.changing:
             self.exit_requested = True
-            if isinstance(self.screen, Review):
+            if isinstance(self.screen, (Review, ConnectionPicker)):
                 self.screen.action_cancel()
             else:
                 self.screen.query_one("#progress", Static).update(

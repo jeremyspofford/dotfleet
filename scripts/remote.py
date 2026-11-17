@@ -1,6 +1,6 @@
 """Run a validated Fleet action through the target's own installed manager.
 
-Usage: dotfleet status MACHINE; dotfleet machines set-ssh MACHINE SSH_TARGET.
+Usage: dotfleet status MACHINE; dotfleet machines set-ssh --target mini-pc.
 SSH reads the user's connection settings and keys. Requests travel through stdin,
 never through the remote shell command. No files or profiles cross machines.
 Help: python3 scripts/remote.py --help.
@@ -14,6 +14,8 @@ import subprocess
 import sys
 
 import registry
+import connections
+import topology
 import style
 from render_run import render_view
 
@@ -56,9 +58,21 @@ def refusal(machine, action):
     return 2
 
 
-def one_line(text):
-    # SSH diagnostics can contain several lines. Keep connection failures to one report line.
-    return " ".join(re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", text).split())
+def test_connection(home, name, target):
+    try:
+        result = connections.invoke(target, "true", probe=True)
+        if result.returncode:
+            raise ConnectionError(
+                result.stderr or result.stdout or f"SSH test failed (exit {result.returncode})"
+            )
+    except (OSError, subprocess.TimeoutExpired) as error:
+        reason = connections.report_failure(home, name, target, error)
+        topology.remember(home, name, target, "connection test", reason, 2)
+        print("Saved connection kept. Retry after fixing access or waking the target.")
+        return 2
+    print(f"PASS: {name}: SSH connection test passed.")
+    topology.remember(home, name, target, "connection test", "SSH test passed", 0)
+    return 0
 
 
 def execute(home, machine, action, *, check=False, stat=False):
@@ -68,45 +82,20 @@ def execute(home, machine, action, *, check=False, stat=False):
     try:
         record = registry.load(home)["machines"].get(machine)
         if record is None:
-            raise ValueError("no saved machine; use machines set-ssh NAME SSH_TARGET first")
+            raise ValueError("no saved machine; use machines set-ssh --target HOST first")
         if not record.get("ssh_target"):
-            raise ValueError("no connection; use machines set-ssh NAME SSH_TARGET first")
+            raise ValueError("no connection; use machines set-ssh --name NAME --target HOST first")
         target = validate_target(record["ssh_target"])
-        result = subprocess.run(
-            [
-                "ssh",
-                "-T",
-                "-o",
-                "BatchMode=yes",
-                "-o",
-                "ConnectTimeout=10",
-                "-o",
-                "ConnectionAttempts=1",
-                "-o",
-                "ServerAliveInterval=15",
-                "-o",
-                "ServerAliveCountMax=2",
-                "-o",
-                "ClearAllForwardings=yes",
-                "-o",
-                "ForwardAgent=no",
-                "-o",
-                "ForwardX11=no",
-                "--",
-                target,
-                REMOTE_COMMAND,
-            ],
-            input=json.dumps(request) + "\n",
-            text=True,
-            capture_output=True,
-            env=dict(os.environ, SSH_ASKPASS_REQUIRE="never"),
-        )
     except (OSError, ValueError) as error:
-        print(f"Error: {machine}: {one_line(str(error))}.")
+        print(f"Error: {machine}: {connections.one_line(str(error))}.")
         return 2
-    if result.returncode == 255:
-        reason = one_line(result.stderr) or "SSH connection failed"
-        print(f"Error: {machine}: {reason}")
+    try:
+        result = connections.invoke(target, REMOTE_COMMAND, json.dumps(request) + "\n")
+        if result.returncode == 255:
+            raise ConnectionError(result.stderr or "SSH connection failed")
+    except OSError as error:
+        reason = connections.report_failure(home, machine, target, error)
+        topology.remember(home, machine, target, action, reason, 2)
         return 2
     print(render_view("Machine · " + machine, [("Connection", target)], str(home)), end="")
     if isinstance(sys.stdout, style.LoggerStream) and action == "diff":
@@ -116,12 +105,15 @@ def execute(home, machine, action, *, check=False, stat=False):
         if output:
             print(output, end="" if output.endswith("\n") else "\n")
     if result.returncode == 0:
-        print(f"{machine}: {action} succeeded (exit 0).")
+        state = action + " succeeded"
+        print(f"{machine}: {state} (exit 0).")
     elif result.returncode == 1 and (action in ("check", "diff") or check):
-        detail = "differences found" if action == "diff" else "updates available"
-        print(f"{machine}: {detail} (exit 1).")
+        state = "differences found" if action == "diff" else "updates available"
+        print(f"{machine}: {state} (exit 1).")
     else:
-        print(f"Error: {machine}: {action} failed (exit {result.returncode}).")
+        state = action + " failed"
+        print(f"Error: {machine}: {state} (exit {result.returncode}).")
+    topology.remember(home, machine, target, action, state, result.returncode)
     return result.returncode if result.returncode > 0 else int(result.returncode != 0)
 
 

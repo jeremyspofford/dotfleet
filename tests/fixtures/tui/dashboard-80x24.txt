@@ -15,7 +15,7 @@
  │Backups — list and restore                                                  │
  │Machines — records and SSH actions                                          │
  │Doctor — check this machine                                                 │
+ │Topology — connections from this machine                                    │
  │Configure — open the wizard                                                 │
- │                                                                            │
  ╰────────────────────────────────────────────────────────────────────────────╯
  ↑↓ / Tab move · Enter selects · Esc back · q quits

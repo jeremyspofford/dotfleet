@@ -17,7 +17,7 @@ Review planned changes before interactive apply. Read decisions from the termina
 ## 2. Keep the registry in the manager store
 
 The registry is `~/.local/share/fleet/registry.toml`. A registry holds saved machine records; TOML is its structured file format.
-Schema 1 uses a `machines` table keyed by hostname, the machine's name.
+Schema 1 uses a `machines` table keyed by saved machine name. Its legacy `hostname` field equals that key.
 Each record stores hostname, operating system, domain, content repository and commit, manager version, last run, and last backup.
 A commit identifies a saved Git version. The registry retains full commit identifiers and absolute backup paths.
 The `schema_version` field is 1. Each machine table contains these fields:
@@ -26,7 +26,9 @@ The `schema_version` field is 1. Each machine table contains these fields:
 - Booleans: `domain_chosen` and `enrolled`. These record explicit domain choice and whether the machine retains an installed profile.
 
 `ssh_target` is an optional string: an SSH configuration host name or `user@host`. Missing or empty means `no connection`.
-The machines set-ssh command records it under the same registry lock and backup rules as removal.
+Registration defaults the name to its SSH target. Either --name or --target supplies both, unless both flags differ.
+The machines set-ssh command saves under the same registry lock and backup rules as removal. It then tests SSH once.
+Failure keeps the saved link and returns exit 2 with guidance.
 New connection records may have no machine facts yet. Record refreshes preserve the saved connection.
 
 `last_run` uses UTC time in ISO format. UTC is the common time reference; ISO format stores an unambiguous date and time.
@@ -138,8 +140,26 @@ Incomplete profiles fail before action dispatch. Unattended file conflicts fail 
 Configure, rollback, and uninstall remain local-only. There is no persistent network listener, remote file editing, or cross-machine profile transfer.
 
 The target's shared renderer supplies human output. The caller adds the machine name and result, without recording a local install run.
-Check and diff preserve their meaningful exit 1 results. SSH failures return nonzero with one diagnostic line.
+Check and diff preserve their meaningful exit 1 results. SSH failures return nonzero with one diagnostic line and one next step.
 An interrupted connection leaves the update outcome unknown; the owner must inspect the target's last run.
+
+## SSH discovery and recorded topology
+
+The terminal picker and TUI read the same concrete Host names from the user’s SSH config and Include files.
+Relative Include paths start at ~/.ssh, matching OpenSSH. Includes expand file patterns in sorted order; visited files prevent include cycles.
+Wildcard and negated Host patterns, duplicate names, and registered names or targets are excluded.
+The collector does not execute Match commands. SSH itself resolves the chosen host's connection settings.
+No available names means typed input. No terminal means explicit flags are required.
+
+Registration runs the fixed SSH command true, with a ten-second total timeout. Remote operations still use the target's own manager.
+Fleet never configures networks, relays, SSH keys, or SSH settings. Missing access produces guidance, not an automatic setup attempt.
+
+The local contact cache is ~/.local/share/fleet/contacts.json. Schema 1 records target, action, outcome, exit code, and observation time per saved name.
+Writes are private, atomic, and locked. Cache failures warn without changing the remote operation's outcome.
+Topology reads this cache and the local check cache. It never fetches or copies another machine's store.
+A changed target cannot inherit an old target's observation. Missing observations say never contacted.
+Every saved result has its time and a recorded label. The header names the viewing machine; views are not synchronized.
+Only the explicit topology --json option prints structured output. The normal CLI and TUI share the same tree renderer.
 
 ## Product name and stores
 

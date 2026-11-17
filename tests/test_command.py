@@ -254,7 +254,11 @@ class CommandTests(unittest.TestCase):
             "node pin is floating",
         ]:
             self.assertIn(text, output)
-        for fix in ["dotfleet domain", "dotfleet configure", "dotfleet pins set node@VERSION"]:
+        for fix in [
+            "dotfleet domain",
+            "dotfleet configure",
+            "dotfleet pins set --tool node --version VERSION",
+        ]:
             self.assertIn(fix, output)
         self.assertNotIn("Supply --", output)
 
@@ -271,12 +275,12 @@ class CommandTests(unittest.TestCase):
         output = self.cli("doctor", expected=1)
         self.assertIn("FAIL · UNCHOSEN", output)
         self.assertIn("never explicitly chosen", output)
-        self.assertIn("dotfleet domain NAME", output)
+        self.assertIn("dotfleet domain --name NAME", output)
         self.assertNotIn("Supply --domain", output)
         choices = self.cli("domain")
         self.assertIn("UNCHOSEN", choices)
         self.assertIn("Personal shortcut", choices)
-        self.assertIn("dotfleet domain NAME", choices)
+        self.assertIn("dotfleet domain --name NAME", choices)
         self.assertEqual(path.read_bytes(), before)
         self.cli("domain", "core")
         self.assertTrue(tomllib.loads(path.read_text())["domain_chosen"])
@@ -307,7 +311,7 @@ elif args[0]=='latest':
 else: sys.exit(1)
 """)
         mise.chmod(0o700)
-        output = self.cli("pins", "set", "node@24.14.1")
+        output = self.cli("pins", "set", "--tool", "node", "--version", "24.14.1")
         self.assertIn("24.14.1", output)
         record, _ = self.record()
         self.assertIn("node", record["completed_software"])

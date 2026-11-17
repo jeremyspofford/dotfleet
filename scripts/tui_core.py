@@ -1,7 +1,8 @@
 """Expose existing command cores to the terminal interface. No Textual dependency.
 
-Usage: python3 scripts/tui_core.py ACTION [BACKUP] [--machine NAME].
-Actions: dashboard, status, check, update, diff, backups, rollback, machines, doctor.
+Usage: python3 scripts/tui_core.py ACTION [--backup PATH] [--machine NAME].
+Actions include dashboard, status, check, update, diff, backups, rollback, machines,
+topology, add-connection, and doctor.
 The private channel carries screen data and confirmations. stdout carries human output.
 """
 
@@ -30,6 +31,8 @@ ACTIONS = (
     "rollback",
     "machines",
     "doctor",
+    "topology",
+    "add-connection",
 )
 
 
@@ -56,6 +59,19 @@ def dashboard(home):
     ]
 
 
+def send_connections(home):
+    ui_channel.send(
+        {
+            "kind": "connections",
+            "items": [
+                name
+                for name, record in sorted(registry.load(home)["machines"].items())
+                if record.get("ssh_target")
+            ],
+        }
+    )
+
+
 def dispatch(action, backup=None, machine=None):
     home = Path.home()
     if machine:
@@ -66,20 +82,15 @@ def dispatch(action, backup=None, machine=None):
     if action == "backups":
         folders = command.records(home)
         ui_channel.send({"kind": "backups", "items": [str(path) for path in reversed(folders)]})
-    if action == "machines":
-        ui_channel.send(
-            {
-                "kind": "connections",
-                "items": [
-                    name
-                    for name, record in sorted(registry.load(home)["machines"].items())
-                    if record.get("ssh_target")
-                ],
-            }
-        )
+    if action in ("machines", "topology"):
+        send_connections(home)
+    if action == "add-connection":
+        result = command.main(["machines", "set-ssh"])
+        send_connections(home)
+        return result
     if action == "rollback" and not backup:
         raise ValueError("Select a backup before restoring.")
-    return command.main([action, *([backup] if backup else [])])
+    return command.main([action, *(["--backup", backup] if backup else [])])
 
 
 def main(argv=None):
@@ -87,13 +98,17 @@ def main(argv=None):
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument("action", choices=ACTIONS, help="existing core action to run")
-    parser.add_argument(
-        "backup", nargs="?", help="saved folder for rollback; no other action accepts it"
-    )
+    # An interface opened before a manager update can still send the old argument.
+    parser.add_argument("legacy_backup", nargs="?", help=argparse.SUPPRESS)
+    parser.add_argument("--backup", help="saved folder for rollback; no other action accepts it")
     parser.add_argument(
         "--machine", help="saved remote machine; only status, check, diff, doctor, update"
     )
     args = parser.parse_args(argv)
+    if args.legacy_backup is not None:
+        if args.backup is not None:
+            parser.error("do not combine --backup with an old positional backup")
+        args.backup = args.legacy_backup
     if args.backup and args.action != "rollback":
         parser.error("only rollback accepts a backup")
     if args.machine and (args.action not in remote.CAPABLE or args.backup):

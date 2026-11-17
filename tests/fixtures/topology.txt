@@ -1,0 +1,13 @@
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Topology from example-dell
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Recorded observations only; no live checks. Other machines may have different views.
+
+example-dell · domain personal
+  updates current · recorded 2026-11-17T14:05:00+00:00
+├── mini-pc · SSH uses this name · domain personal
+│   status succeeded · recorded 2026-11-17T14:00:00+00:00
+├── retired · no connection · domain client
+│   never contacted
+└── workstation · SSH user@lab · domain work
+    never contacted

@@ -22,6 +22,9 @@ import manager
 import enrollment
 import registry
 import remote
+import connections
+import topology
+import command_arguments
 import owned_views
 import style
 import updates
@@ -45,6 +48,10 @@ CONTROLS = {
     COMMAND,
 }
 DESCRIPTIONS = {
+    "topology": (
+        "Show this machine’s recorded view as a tree. Topology means connection layout. "
+        "Each observation has its time. Nothing is checked live; other machines may have different views."
+    ),
     "tui": (
         "Open the terminal interface, a full-screen view of Fleet commands. "
         "Arrows and Tab move; Enter selects; Esc goes back; q quits. "
@@ -74,9 +81,9 @@ DESCRIPTIONS = {
     ),
     "machines": (
         "Show recorded machine facts from registry.toml. The registry is the manager’s file of"
-        " saved machine records. This command makes no live network queries. Export shows "
+        " saved machine records. Listing them makes no live network queries. Export shows "
         "this machine; remove deletes a stale record. SSH securely connects to another machine. "
-        "Set-ssh records its host name from your SSH config or user@host. It never connects."
+        "Set-ssh saves a target and tests SSH once. One name supplies both fields. Without flags, pick a host in a terminal. A failed test keeps the saved target and exits 2."
     ),
     "addons": (
         "List installed add-ons, optional manager extensions. A manifest declares an "
@@ -159,7 +166,7 @@ def parser():
         prog=display,
         description="Manage enrolled machines. A profile saves each machine’s choices.",
         epilog="Exit codes: 0 success, help, or cancellation; 1 failed operation or check; 2 invalid arguments or check failure; 130 interrupted. Check uses 1 for available updates.\n"
-        f"Examples: {display} update; {display} status; {display} domain personal.\n"
+        f"Examples: {display} update; {display} status; {display} domain --name personal.\n"
         "First install or manager recovery: use the README one-line installer.\n" + TERMS,
         formatter_class=HelpFormatter,
     )
@@ -184,87 +191,12 @@ def parser():
             description=detail,
             formatter_class=HelpFormatter,
             epilog=f"Example: {display} "
-            + name
+            + command_arguments.EXAMPLES.get(name, name).replace("; ", f"; {display} ")
             + "\n"
             + TERMS
             + f"\nRun {display} --help for exit codes. All prompts require Enter and use the terminal.",
         )
-        if name == "machines":
-            command_parser.add_argument(
-                "action",
-                nargs="?",
-                choices=["export", "remove", "set-ssh"],
-                help="export shows this machine; remove deletes a stale record; set-ssh saves a connection",
-            )
-            command_parser.add_argument(
-                "hostname", nargs="?", help="recorded machine name for remove or set-ssh"
-            )
-            command_parser.add_argument(
-                "ssh_target", nargs="?", help="for set-ssh: SSH config host name or user@host"
-            )
-            command_parser.add_argument(
-                "--output",
-                metavar="FILE",
-                help=(
-                    "with export, save one private TOML record for transfer; the terminal "
-                    "stays human-readable"
-                ),
-            )
-        elif name == "status":
-            command_parser.add_argument(
-                "--check",
-                action="store_true",
-                help="fetch and cache update results first; exit 0 current, 1 updates, or 2 could not check",
-            )
-        elif name == "diff":
-            command_parser.add_argument(
-                "--stat",
-                action="store_true",
-                help="print changed paths only, without patch bodies; use the same exit codes",
-            )
-        elif name == "rollback":
-            command_parser.add_argument(
-                "backup",
-                nargs="?",
-                help="backup folder name or path; omit to list and choose in a terminal",
-            )
-            command_parser.add_argument(
-                "machine",
-                nargs="?",
-                help="remote rollback is refused; restore on the target itself",
-            )
-        elif name == "domain":
-            command_parser.add_argument(
-                "name", nargs="?", help="domain name from the listed content choices"
-            )
-        elif name == "groups":
-            command_parser.add_argument(
-                "name",
-                nargs="?",
-                help="group name from the content manifest, the repository’s settings file",
-            )
-            command_parser.add_argument(
-                "state",
-                nargs="?",
-                choices=["on", "off"],
-                help="on includes content; off removes selected content",
-            )
-        elif name == "pins":
-            command_parser.add_argument(
-                "action",
-                nargs="?",
-                choices=["set", "remove"],
-                help="set installs and records; remove unpins and reapplies",
-            )
-            command_parser.add_argument(
-                "pin",
-                nargs="?",
-                help="TOOL@VERSION for set; TOOL for remove. Example: node@24.14.1",
-            )
-        if name in (*remote.CAPABLE, "configure", "uninstall"):
-            command_parser.add_argument(
-                "machine", nargs="?", help="one saved machine name; omit to use this machine"
-            )
+        command_arguments.add_parameters(command_parser, name)
     return argument_parser
 
 
@@ -355,7 +287,7 @@ def command_profile_gaps(saved_profile):
         if gap.startswith("Domain "):
             gap = gap.replace(
                 "Supply --domain.",
-                f"Run {display} domain to list choices, then {display} domain NAME.",
+                f"Run {display} domain to list choices, then {display} domain --name NAME.",
             )
         elif gap.startswith(("Git name ", "Git email ")):
             gap = gap.split(". Supply ", 1)[0] + f". Run {display} configure."
@@ -363,7 +295,7 @@ def command_profile_gaps(saved_profile):
             tool = gap.split(" pin is floating ", 1)[0]
             gap = (
                 gap.split(". Supply ", 1)[0]
-                + f". Run {display} pins set {tool}@VERSION with a full version."
+                + f". Run {display} pins set --tool {tool} --version VERSION with a full version."
             )
         gaps.append(gap)
     return gaps
@@ -401,7 +333,9 @@ def read_view(args, home, saved_profile):
             ("Choice", "chosen" if saved_profile.get("domain_chosen", False) else "UNCHOSEN"),
         ]
         pairs += list(domain_choices(home).items())
-        pairs.append(("Choose", f"{display} domain NAME · replace NAME with a listed choice"))
+        pairs.append(
+            ("Choose", f"{display} domain --name NAME · replace NAME with a listed choice")
+        )
     elif name == "groups":
         pairs = [
             (
@@ -844,7 +778,8 @@ def main(argv=None):
         except (OSError, ValueError, RuntimeError) as error:
             print("Preview failed: " + str(error), file=sys.stderr)
             return 2
-    args = parser().parse_args(argv)
+    argument_parser = parser()
+    args = command_arguments.normalize(argument_parser.parse_args(argv), argument_parser)
     if getattr(args, "machine", None):
         return remote.execute(
             home,
@@ -857,6 +792,15 @@ def main(argv=None):
         from tui_environment import launch
 
         return launch(home, ROOT)
+    if args.command == "topology":
+        view = topology.view(home)
+        if args.json:
+            stream = getattr(sys.stdout, "stream", sys.stdout)
+            stream.write(json.dumps(view, indent=2) + "\n")
+            stream.flush()
+        else:
+            print(topology.render(view), end="")
+        return 0
     try:
         saved_profile = profile(home)
         display = command_name(saved_profile)
@@ -868,19 +812,23 @@ def main(argv=None):
             return result
         if args.command == "machines":
             if args.action == "set-ssh":
-                if not args.hostname or not args.ssh_target or args.output:
-                    parser().error(
-                        "machines set-ssh needs NAME SSH_TARGET; --output is not accepted"
-                    )
-                return set_machine_ssh(home, args.hostname, args.ssh_target)
+                if args.output:
+                    parser().error("machines set-ssh does not accept --output")
+                name, target = args.hostname, args.ssh_target
+                if name is None and target is None:
+                    target = connections.pick(home)
+                    if not target:
+                        print("Cancelled. No connection saved.")
+                        return 0
+                return set_machine_ssh(home, name or target, target or name)
             if args.ssh_target:
                 parser().error("only machines set-ssh accepts an SSH target")
             if args.action == "remove":
                 if not args.hostname or args.output:
-                    parser().error("machines remove needs a hostname and does not accept --output")
+                    parser().error("machines remove needs --name; --output is not accepted")
                 return remove_machine(home, args.hostname)
             if args.hostname or args.output and args.action != "export":
-                parser().error("use machines export --output FILE or machines remove HOSTNAME")
+                parser().error("use machines export --output FILE or machines remove --name NAME")
             if args.action == "export":
                 info(
                     "Machine export",
@@ -973,11 +921,11 @@ def main(argv=None):
             return manager.main(["--defaults", "--domain", args.name])
         if args.command == "groups":
             if not args.state:
-                parser().error("groups NAME needs on or off")
+                parser().error("groups --name needs --state on or off")
             return manager.main(["--defaults", "--group", args.name + "=" + args.state])
         if args.command == "pins":
             if not args.pin:
-                parser().error("pins needs TOOL@VERSION for set, or TOOL for remove")
+                parser().error("pins set needs --tool and --version; pins remove needs --tool")
             if args.action == "remove":
 
                 def unpin(value):
@@ -995,7 +943,7 @@ def main(argv=None):
                 or tool.startswith("-")
             ):
                 parser().error(
-                    "pins set needs TOOL@VERSION with an exact version, such as node@24.14.1"
+                    "pins set needs --tool TOOL --version VERSION with an exact version, such as 24.14.1"
                 )
             installed = enrollment.installed(home).get(tool, [])
             present = next((item for item in installed if item.get("version") == version), None)
@@ -1060,10 +1008,7 @@ def remove_machine(home, hostname):
 
 
 def set_machine_ssh(home, hostname, target):
-    import re
-
-    if not re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_.-]{0,254}", hostname):
-        raise ValueError("Machine name must use letters, numbers, dots, underscores, or hyphens.")
+    remote.validate_target(hostname)
     remote.validate_target(target)
 
     def connect(data):
@@ -1075,7 +1020,8 @@ def set_machine_ssh(home, hostname, target):
             data["machines"][hostname].update(hostname=hostname, result="not recorded")
         data["machines"][hostname]["ssh_target"] = target
 
-    return change_registry(home, connect)
+    result = change_registry(home, connect)
+    return result or remote.test_connection(home, hostname, target)
 
 
 def change_registry(home, edit):

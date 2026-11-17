@@ -23,8 +23,10 @@ import remote
 import tui_core
 import ui_channel
 import updates
+import connections
+import topology
 from render_run import render
-from tui import ActionScreen, FleetApp, Review, styled
+from tui import ActionScreen, ConnectionPicker, FleetApp, MachineActions, Review, styled
 from textual.widgets import Input, OptionList, RichLog, Static
 
 
@@ -183,7 +185,7 @@ class ScreenTests(unittest.IsolatedAsyncioTestCase):
                 await pilot.press("down", "down", "down", "down", "enter")
                 await self.settle(pilot, app)
                 options = app.screen.query_one("#actions", OptionList)
-                self.assertEqual(options.option_count, len(remote.CAPABLE) + 1)
+                self.assertEqual(options.option_count, len(remote.CAPABLE) + 2)
                 text = "\n".join(line.text for line in app.screen.query_one(RichLog).lines)
                 self.assertIn("offline-record", text)
                 self.assertIn("no connection", text)
@@ -257,8 +259,116 @@ class ScreenTests(unittest.IsolatedAsyncioTestCase):
         app = FleetApp(FixtureSession())
         async with app.run_test() as pilot:
             await self.settle(pilot, app)
-            await pilot.press(*(["down"] * 6), "enter")
+            app.query_one("#menu", OptionList).highlighted = 7
+            await pilot.press("enter")
         self.assertEqual(app.return_value, "configure")
+
+    async def test_topology_uses_shared_tree_and_only_connected_actions(self):
+        records = {}
+        for name, target in (("mini-pc", "mini-pc"), ("offline-record", "")):
+            record = registry.machine(self.home, "0.2.0")
+            record.update(hostname=name, ssh_target=target)
+            records[name] = record
+        path = self.home / registry.REGISTRY
+        path.parent.mkdir(parents=True)
+        path.write_text(registry.serialize({"schema_version": 1, "machines": records}))
+        app = FleetApp(FixtureSession())
+        with patch.object(remote, "execute", return_value=0) as execute:
+            async with app.run_test(size=(80, 24)) as pilot:
+                await self.settle(pilot, app)
+                app.query_one("#menu", OptionList).highlighted = 6
+                await pilot.press("enter")
+                await self.settle(pilot, app)
+                self.assertEqual(app.screen.action, "topology")
+                text = "\n".join(line.text for line in app.screen.query_one(RichLog).lines)
+                self.assertIn("Topology from example-hub", text)
+                self.assertIn("offline-record", text)
+                self.assertIn("never contacted", text)
+                options = app.screen.query_one("#actions", OptionList)
+                self.assertEqual(options.option_count, 2)
+                self.assertEqual(str(options.get_option("machine-0").prompt), "mini-pc")
+                await pilot.press("enter")
+                await pilot.pause()
+                self.assertIsInstance(app.screen, MachineActions)
+                self.assertEqual(app.screen.query_one(OptionList).option_count, 6)
+                await pilot.press("enter")
+                await self.settle(pilot, app)
+                execute.assert_called_with(self.home, "mini-pc", "status", check=False, stat=False)
+
+    async def test_machines_add_picker_registers_and_tests_the_selected_host(self):
+        from types import SimpleNamespace
+
+        config = self.home / ".ssh/config"
+        config.parent.mkdir()
+        config.write_text("Host mini-pc other *.example\n")
+
+        def save(home, edit):
+            data = registry.load(home)
+            edit(data)
+            path = home / registry.REGISTRY
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(registry.serialize(data))
+            print(render(self.record), end="")
+            return 0
+
+        app = FleetApp(FixtureSession())
+        with (
+            patch.object(ui_channel, "active", return_value=True),
+            patch.object(command, "change_registry", side_effect=save),
+            patch.object(
+                connections, "invoke", return_value=SimpleNamespace(returncode=0)
+            ) as probe,
+        ):
+            async with app.run_test(size=(32, 24)) as pilot:
+                await self.settle(pilot, app)
+                app.query_one("#menu", OptionList).highlighted = 4
+                await pilot.press("enter")
+                await self.settle(pilot, app)
+                await pilot.press("enter")
+                await pilot.pause()
+                self.assertIsInstance(app.screen, ConnectionPicker)
+                self.assertEqual(app.screen.query_one(OptionList).option_count, 2)
+                self.assertEqual(app.screen.query_one(Input).region.right <= 32, True)
+                await pilot.press("enter")
+                await self.settle(pilot, app)
+                probe.assert_called_once_with("mini-pc", "true", probe=True)
+                self.assertEqual(
+                    registry.load(self.home)["machines"]["mini-pc"]["ssh_target"], "mini-pc"
+                )
+                text = "\n".join(line.text for line in app.screen.query_one(RichLog).lines)
+                self.assertIn("connection test passed", text)
+                self.assertIn("6 · Next steps", text)
+
+    async def test_machines_add_without_config_types_target_and_cancel_saves_nothing(self):
+        from types import SimpleNamespace
+
+        saved = []
+        app = FleetApp(FixtureSession())
+        with (
+            patch.object(ui_channel, "active", return_value=True),
+            patch.object(
+                command, "set_machine_ssh", side_effect=lambda *args: saved.append(args) or 0
+            ),
+        ):
+            async with app.run_test(size=(80, 24)) as pilot:
+                await self.settle(pilot, app)
+                app.query_one("#menu", OptionList).highlighted = 4
+                await pilot.press("enter")
+                await self.settle(pilot, app)
+                await pilot.press("enter")
+                await pilot.pause()
+                self.assertIsInstance(app.screen, ConnectionPicker)
+                self.assertIn("No SSH config", app.screen.request["notice"])
+                await pilot.press("escape")
+                await self.settle(pilot, app)
+                self.assertEqual(saved, [])
+                self.assertFalse((self.home / registry.REGISTRY).exists())
+                await pilot.press("enter")
+                await pilot.pause()
+                app.screen.query_one(Input).value = "user@host"
+                await pilot.press("enter")
+                await self.settle(pilot, app)
+                self.assertEqual(saved, [(self.home, "user@host", "user@host")])
 
     async def test_diff_and_read_only_screens_keep_core_output(self):
         app = FleetApp(FixtureSession())
