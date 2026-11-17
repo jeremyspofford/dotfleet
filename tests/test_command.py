@@ -31,6 +31,7 @@ class CommandTests(unittest.TestCase):
     def enroll(self):
         self.origin = self.base / "manager-origin"
         command("git", "clone", "--no-hardlinks", str(ROOT), str(self.origin))
+        command("git", "-C", str(self.origin), "checkout", "-B", "main")
         for name in command("git", "-C", str(ROOT), "ls-files", "-z").split("\0"):
             if name and (ROOT / name).is_file():
                 target = self.origin / name
@@ -51,6 +52,8 @@ class CommandTests(unittest.TestCase):
             "feat: command fixture",
         )
         command("git", "-C", str(self.origin), "remote", "set-url", "origin", str(self.origin))
+        command("git", "-C", str(self.origin), "config", "branch.main.remote", "origin")
+        command("git", "-C", str(self.origin), "config", "branch.main.merge", "refs/heads/main")
         self.content = repository(
             self.base / "content",
             {

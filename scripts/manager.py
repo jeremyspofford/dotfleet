@@ -15,6 +15,7 @@ Messages use logger.sh. Prompts use /dev/tty.
 
 import argparse
 import style
+from updates import CACHE
 import traceback
 import datetime
 import hashlib
@@ -716,7 +717,11 @@ def prepare(home, checkout, profile, manifest, folder):
                 target = target.with_name("private_" + target.name)
             atomic(target, content)
         names |= set(generated)
-    private_state = names & {".local/share/dotfleet/fleet.toml", ".config/dotfleet/profile.toml"}
+    private_state = names & {
+        CACHE,
+        ".local/share/dotfleet/fleet.toml",
+        ".config/dotfleet/profile.toml",
+    }
     if private_state:
         raise ValueError("Content cannot own manager state: " + ", ".join(sorted(private_state)))
     state_path = home / ".local/state/dotfleet/outputs.json"

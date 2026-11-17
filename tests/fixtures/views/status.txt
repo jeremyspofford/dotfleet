@@ -11,3 +11,4 @@
   Last backup       ~/dotfleet-backups/20261116-120000
   Manager config    ~/.config/chezmoi/chezmoi.toml
   Converted source  ~/.local/share/dotfleet/chezmoi-source
+Updates: not checked — run: fleet check

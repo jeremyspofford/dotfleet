@@ -22,6 +22,7 @@ import enrollment
 import registry
 import owned_views
 import style
+import updates
 from installation import COMMAND, MANAGER
 from render_run import render, render_view
 from run_account import RunAccount, commit, profile_changes
@@ -30,6 +31,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PROFILE = ".config/dotfleet/profile.toml"
 CONTROLS = {
     registry.REGISTRY,
+    updates.CACHE,
     PROFILE,
     ".config/chezmoi/chezmoi.toml",
     ".local/state/dotfleet/outputs.json",
@@ -38,6 +40,11 @@ CONTROLS = {
     COMMAND,
 }
 DESCRIPTIONS = {
+    "check": (
+        "Fetch the manager and content upstreams quietly, with a 10-second limit per fetch. "
+        "An upstream is the remote branch tracked by a checkout. Cache both results only "
+        "when both checks succeed. Exit codes: 0 current; 1 updates available; 2 could not check."
+    ),
     "profile": (
         "Show saved domain, identity, pins, groups, and agents from profile.toml. An agent "
         "is a coding assistant. Change choices through their commands or configure."
@@ -70,7 +77,8 @@ DESCRIPTIONS = {
     ),
     "status": (
         "Show this machine’s profile, saved choices, installed pins, groups, checkout "
-        "state, drift, and recent backups. Drift means managed files differ."
+        "state, drift, recent backups, and the last update check. "
+        "Drift means managed files differ. No fetch runs unless --check is given."
     ),
     "diff": (
         "Show pending file paths and unified patches from chezmoi. A patch shows removed "
@@ -137,7 +145,7 @@ def parser():
     argument_parser = style.ArgumentParser(
         prog="dotfleet",
         description="Manage this machine after enrollment. A profile saves your choices.",
-        epilog="Exit codes: 0 success, help, or cancellation; 1 failed operation or check; 2 invalid arguments; 130 interrupted.\n"
+        epilog="Exit codes: 0 success, help, or cancellation; 1 failed operation or check; 2 invalid arguments or check failure; 130 interrupted. Check uses 1 for available updates.\n"
         "Examples: dotfleet update; dotfleet status; dotfleet domain personal.\n"
         "First install or manager recovery: use the README one-line installer.\n" + TERMS,
         formatter_class=HelpFormatter,
@@ -176,6 +184,12 @@ def parser():
                     "with export, save one private TOML record for transfer; the terminal "
                     "stays human-readable"
                 ),
+            )
+        elif name == "status":
+            command_parser.add_argument(
+                "--check",
+                action="store_true",
+                help="fetch and cache update results first; exit 0 current, 1 updates, or 2 could not check",
             )
         elif name == "diff":
             command_parser.add_argument(
@@ -464,24 +478,13 @@ def read_view(args, home, saved_profile):
             ),
         ]
     info(name.capitalize(), pairs or [("Selections", "none")], home)
+    if name == "status":
+        print(updates.summary(home))
     return 0
 
 
 def prepare_manager(home, workspace):
-    source = home / MANAGER
-    if not (source / ".git").exists():
-        raise ValueError(
-            "Manager checkout is missing. Run the README one-line installer to recover it."
-        )
-    if run("git", "-C", str(source), "status", "--porcelain").strip():
-        raise ValueError("Manager checkout has local edits. Commit or move them before updating.")
-    remote = run("git", "-C", str(source), "remote", "get-url", "origin").strip()
-    staged = workspace / "manager"
-    run("git", "clone", remote, str(staged))
-    old = commit(source)
-    run("git", "-C", str(staged), "fetch", str(source), old)
-    run("git", "-C", str(staged), "merge-base", "--is-ancestor", old, "HEAD")
-    return staged
+    return updates.stage(home / MANAGER, workspace / "manager")
 
 
 def preview(home, saved_profile, stat=False):
@@ -790,6 +793,12 @@ def main(argv=None):
     args = parser().parse_args(argv)
     try:
         saved_profile = profile(home)
+        if args.command == "check":
+            return updates.check(home, saved_profile)
+        if args.command == "status" and args.check:
+            result = updates.check(home, saved_profile, display=False)
+            read_view(args, home, saved_profile)
+            return result
         if args.command == "machines":
             if args.action == "remove":
                 if not args.hostname or args.output:
@@ -828,7 +837,9 @@ def main(argv=None):
         if args.command == "update":
             with tempfile.TemporaryDirectory(prefix="dotfleet-update-") as folder:
                 staged = prepare_manager(home, Path(folder))
-                return subprocess.call(["bash", str(staged / "install.sh")])
+                environment = dict(os.environ)
+                environment.pop("DOTFLEET_LOCAL_CONTENT", None)
+                return subprocess.call(["bash", str(staged / "install.sh")], env=environment)
         if args.command == "diff":
             return preview(home, saved_profile, args.stat)
         if args.command == "configure":
@@ -944,6 +955,9 @@ def main(argv=None):
                 before_apply=install,
             )
     except (OSError, ValueError, RuntimeError) as error:
+        if args.command == "check" or args.command == "status" and args.check:
+            print("Warning: Could not check updates: " + str(error), file=sys.stderr)
+            return 2
         style.record_failure()
         print("Error: " + str(error), file=sys.stderr)
         return 2 if args.command == "diff" else 1

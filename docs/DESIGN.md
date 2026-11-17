@@ -64,9 +64,28 @@ Keep profile data and the registry out of the content repository. Machine synchr
 
 `dotfleet status` reports this machine only. It shows profile choices, checkout state, drift, and recent runs and backups.
 A checkout is a local Git copy. Drift means managed files differ from the selected content.
-The behind count compares content with the last fetched remote state. Status does not fetch another machine's information.
+The behind count compares content with the last fetched remote state. Plain status never fetches.
+It adds one line from the saved update check. `dotfleet status --check` runs a check first.
 `dotfleet doctor` checks local readiness and names fixes. Missing domain provenance counts as unchosen until a user selects a domain.
 Provenance records how a choice was made. Passing a domain explicitly records a human choice.
+
+### Share update selection
+
+`dotfleet check` and update share upstream selection and comparison. An upstream is the remote branch tracked by a checkout's current branch.
+They compare both manager and content. Update preserves these upstream settings when replacing its manager checkout.
+Both refuse uncommitted edits and diverged histories. Diverged histories contain new local and remote commits that cannot combine by moving forward.
+Local commits stay intact when the remote adds nothing. Adopted content without a remote stays local.
+
+Check quietly fetches each source with a ten-second limit. Update fetches into temporary checkouts before review and backup.
+Neither substitutes the remote's default branch for the selected upstream. New commits after a check can change the next update's result.
+
+The manager owns `~/.local/share/dotfleet/check.json`. Content cannot manage this file.
+Schema 1 stores `checked_at` and `sources`. Each source records its name, path, branch, remote, current and upstream commits, target commit, and ahead/behind counts.
+The time includes its time zone. The cache keeps full paths and commit identifiers; command output shortens commits.
+Check replaces the private cache atomically only after both sources succeed. A failed check leaves the previous cache unchanged.
+It creates no backup or run record and writes no profile or managed files.
+Exit codes are 0 for current, 1 for updates, and 2 for an unavailable check. `status --check` returns the same codes.
+Plain status reads only the cache. Without a valid cache, it says “not checked.”
 
 ## 4. Let Dotfleet own releases
 

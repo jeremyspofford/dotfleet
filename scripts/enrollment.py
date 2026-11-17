@@ -22,6 +22,7 @@ from convert import FURNITURE, detect
 import manager
 import agent_detection
 import scan_view
+import updates
 
 STEPS = ["source", "domain", "identity", "pins", "groups", "agents"]
 PRIVATE_NAMES = re.compile(
@@ -103,24 +104,13 @@ def detected_agents(home=None, tools=None):
 def stage_repo(home, repo, workspace):
     """Fetch into scratch, enforcing the same clean/fast-forward rules as an update."""
     canonical = home / "dotfiles"
-    if canonical.exists() or canonical.is_symlink():
-        if canonical.is_symlink() or not (canonical / ".git").is_dir():
-            raise ValueError(
-                f"{canonical} already exists and is not the selected clone. Move it aside before setup."
-            )
-        result = subprocess.run(
-            ["git", "-C", str(canonical), "config", "--get", "remote.origin.url"],
-            text=True,
-            capture_output=True,
-        )
-        remote = result.stdout.strip() if result.returncode == 0 else str(canonical)
-        if manager.repo_id(remote) != manager.repo_id(repo) and str(canonical) != repo:
-            raise ValueError(f"{canonical} belongs to another repository. Nothing was overwritten.")
-        if run("git", "-C", str(canonical), "status", "--porcelain").strip():
-            raise ValueError(f"{canonical} has local edits. Preserve them before updating.")
-        if repo == str(canonical) and result.returncode == 0:
-            repo = remote
     destination = workspace / f"checkout-{len(list(workspace.glob('checkout-*')))}"
+    if canonical.exists() or canonical.is_symlink():
+        updates.validate_content(canonical, repo)
+        if not os.environ.get("DOTFLEET_LOCAL_CONTENT"):
+            local_only = str(canonical) == repo
+            return updates.stage(canonical, destination, local_only=local_only)
+        updates.require_clean(canonical)
     source = (
         str(canonical) if os.environ.get("DOTFLEET_LOCAL_CONTENT") and canonical.exists() else repo
     )
