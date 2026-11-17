@@ -23,21 +23,22 @@
   − ~/.local/share/fleet/chezmoi-source
   − ~/.local/share/fleet/tui-venv
 
-4 · Profile changes — 14 changed.
-  Domain            core → not set
-  Domain confirmed  on → not set
-  Git name          Command Example → not set
-  Git email         command@example.invalid → not set
-  Content repo      https://example.invalid/dotfiles → not set
-  Content format    plain → not set
-  Group extra       on → not set
-  Agent claude      off → not set
-  Agent codex       off → not set
-  Agent gemini      off → not set
-  Agent grok        off → not set
-  Agent ollama      off → not set
-  Agent opencode    off → not set
-  Agent pi          off → not set
+4 · Profile changes — 15 changed.
+  Domain             core → not set
+  Domain confirmed   on → not set
+  Git name           Command Example → not set
+  Git email          command@example.invalid → not set
+  Content repo       https://example.invalid/dotfiles → not set
+  Content format     plain → not set
+  Group extra        on → not set
+  Agent antigravity  off → not set
+  Agent claude       off → not set
+  Agent codex        off → not set
+  Agent gemini       off → not set
+  Agent grok         off → not set
+  Agent ollama       off → not set
+  Agent opencode     off → not set
+  Agent pi           off → not set
 
 5 · Locations
   Content  ~/dotfiles
