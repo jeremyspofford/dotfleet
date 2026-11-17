@@ -261,7 +261,12 @@ class IndexIntegrationTests(unittest.TestCase):
         self.assertTrue(
             all(entry["stage"] == "preflight" and entry["result"] == "FAILED" for entry in entries)
         )
-        self.assertTrue(all("python3" in entry["error"] for entry in entries))
+        self.assertTrue(
+            all(
+                "Missing required commands:" in entry["error"] and "python3" in entry["error"]
+                for entry in entries
+            )
+        )
         self.assertTrue(
             all(path.stat().st_mode & 0o777 == 0o600 for path in run_index.files(self.home))
         )

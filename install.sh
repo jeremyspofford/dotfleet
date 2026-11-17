@@ -100,7 +100,8 @@ if [[ -n $script_dir && -r $script_dir/scripts/logger.sh ]]; then
 	logger=$script_dir/scripts/logger.sh
 else
 	command -v curl >/dev/null || {
-		printf 'Missing required command: curl\n' >&2
+		run_error='Missing required command: curl.'
+		printf '%s\n' "$run_error" >&2
 		exit 1
 	}
 	mkdir "$work_dir/scripts"
@@ -212,10 +213,22 @@ else
 	index_script="$work_dir/run_index.py"
 	curl -fsSL "$raw/scripts/run_index.py" -o "$index_script"
 fi
-FLEET_RUN_ID=$(python3 -B "$index_script" begin --command "$run_command")
-export FLEET_RUN_ID
-require_commands git curl tar python3
-python3 -c 'import sys; sys.exit(sys.version_info < (3, 11))' || error_exit 'Python 3.11 or newer is required.'
+if command_exists python3; then
+	FLEET_RUN_ID=$(python3 -B "$index_script" begin --command "$run_command")
+	export FLEET_RUN_ID
+fi
+missing_commands=()
+for prerequisite in git curl tar python3; do
+	if ! command_exists "$prerequisite"; then missing_commands+=("$prerequisite"); fi
+done
+if [[ ${#missing_commands[@]} != 0 ]]; then
+	run_error="Missing required commands: ${missing_commands[*]}."
+	error_exit "$run_error"
+fi
+python3 -c 'import sys; sys.exit(sys.version_info < (3, 11))' || {
+	run_error='Python 3.11 or newer is required.'
+	error_exit "$run_error"
+}
 run_stage="manager checkout"
 python3 -B "$index_script" stage --name "$run_stage"
 if [[ -z $script_dir ]]; then
