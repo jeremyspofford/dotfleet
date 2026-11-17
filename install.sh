@@ -90,7 +90,9 @@ Source choices: adopt keeps existing files; defaults uses our examples; repo use
 Adoption scans root dotfiles and .config files. It excludes credential and shell-history names, secret patterns, binary files, and files above 2 MiB.
 The scan cannot prove a file contains no secrets. Review the local repository before pushing it.
 Review lists planned software, checkout, file, and profile changes, plus locations and next steps. Type confirm to apply, quit to cancel, or a step name to go back.
-Nothing in your home changes before confirmation. Temporary tool downloads stay outside your home.
+Old stores move to the Fleet paths before setup. Profiles and backup folders stay intact.
+The review lists those moves. Cancelling apply keeps them. Other home changes wait for confirmation.
+Temporary tool downloads stay outside your home.
 Adopted file contents stay unchanged, including existing Mise files. Profile choices do not rewrite adopted files.
 Pins use full versions. Enter accepts the prompt's stated action; skip leaves a choice incomplete.
 Complete profiles need no profile prompts. Every summary prints all six categories, including scripted runs.

@@ -60,7 +60,8 @@ Only accepted files enter the first local Git commit. Nothing is uploaded.
 
 An unrelated `~/dotfiles` stops setup. Preserve it before choosing another repository or adopting files.
 Native chezmoi templates and hooks can execute code. Use trusted content only.
-Quitting review leaves home unchanged. Preparation uses temporary files outside home; missing tools move into `~/.local/bin` only after confirmation.
+Quitting review cancels planned file changes. Earlier [store moves](README.md#store-migration) stay in place.
+Preparation uses temporary files outside home; missing tools move into `~/.local/bin` only after confirmation.
 
 ### Flags and updates
 

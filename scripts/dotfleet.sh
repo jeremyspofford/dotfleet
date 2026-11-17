@@ -18,6 +18,14 @@ usage() { python3 -B "$manager/scripts/command.py" --help; }
 case ${1:---help} in
 -h | --help) usage ;;
 *)
+	for argument in "$@"; do
+		case $argument in
+		-h | --help | --version)
+			python3 -B "$manager/scripts/command.py" "$@"
+			exit 0
+			;;
+		esac
+	done
 	work_dir=$(mktemp -d)
 	trap 'rm -rf -- "$work_dir"' EXIT
 	python3 -B "$manager/scripts/store_migration.py" --record "$work_dir/store-moves.json"

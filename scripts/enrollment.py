@@ -489,7 +489,7 @@ def review(profile, account, warnings):
         ]
     details += [
         "confirm: back up files and apply these choices.",
-        "quit: leave your home unchanged.",
+        "quit: cancel planned file changes; earlier store moves stay in place.",
         "source, domain, identity, pins, groups, agents: return to that step, then review again.",
         "Type a word and press Enter. Enter alone quits.",
     ]

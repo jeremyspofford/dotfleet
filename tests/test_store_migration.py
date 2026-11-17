@@ -117,6 +117,16 @@ class StoreMigrationTests(unittest.TestCase):
         self.assertNotIn("Store moved:", self.cli("update"))
         self.assert_quiet_status()
 
+    def test_help_leaves_legacy_stores_in_place(self):
+        self.enroll()
+        profile, stores, _ = self.legacy_stores()
+        output = self.cli("status", "--help")
+        self.assertIn("Usage: dotfleet status", output)
+        for old, new in stores:
+            self.assertTrue((self.home / old).is_dir())
+            self.assertFalse((self.home / new).exists())
+        self.assertEqual((self.home / ".config/dotfleet/profile.toml").read_bytes(), profile)
+
     def test_conflict_stops_before_moving_any_store(self):
         self.enroll()
         _, _, _ = self.legacy_stores()
