@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Purpose: Install Dotfleet and enroll or update a content checkout.
+# Purpose: Install Fleet and enroll or update a content checkout.
 # Usage: bash install.sh [OPTIONS]
 # Parameters: --repo chooses content; --configure asks again; --defaults skips prompts for complete profiles.
 # --domain, --git-name, and --git-email supply profile choices. Repeat --pin TOOL=VERSION for full tool versions.
@@ -9,8 +9,8 @@
 # Exit codes: 0 success/help; 1 setup failure; 2 invalid arguments.
 # Author: Jeremy Spofford / Aria Labs; Version: read from VERSION.
 set -euo pipefail
-raw=https://raw.githubusercontent.com/jeremyspofford/dotfleet/main
-manager_repo=https://github.com/jeremyspofford/dotfleet.git
+raw=https://raw.githubusercontent.com/jeremyspofford/fleet/main
+manager_repo=https://github.com/jeremyspofford/fleet.git
 script_dir=''
 if [[ -n ${BASH_SOURCE[0]:-} && -f ${BASH_SOURCE[0]} ]]; then
 	script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
@@ -41,7 +41,7 @@ finish_run() {
 		# No record exists yet. Do not invent an account of unknown operations.
 		log_error "Setup stopped (exit $result) before the run renderer completed."
 		if [[ -e $DOTFLEET_APPLY_MARKER ]]; then
-			log_warn 'Inspect the latest ~/dotfleet-backups/ folder for RUN.json before retrying.'
+			log_warn 'Inspect the latest ~/fleet-backups/ folder for RUN.json before retrying.'
 		else
 			log_info 'Run record: not created; setup stopped before apply.'
 		fi
@@ -51,9 +51,9 @@ finish_run() {
 }
 trap finish_run EXIT
 usage() {
-	log_section "Dotfleet help"
+	log_section "Fleet help"
 	log_heredoc '' <<EOF
-Dotfleet $DOTFILES_VERSION manages home configuration with a saved machine profile.
+Fleet $DOTFILES_VERSION manages home configuration with a saved machine profile.
 Usage: bash install.sh [OPTIONS]
        curl -fsSL $raw/install.sh | bash
 Options:
@@ -80,7 +80,7 @@ Domains choose optional additions from your content repository. Identity and too
 Domain descriptions and command names come from your content. Empty overlays say they add nothing yet.
 The domain prompt inspects the selected checkout and lists its domain command additions.
 Custom repositories can define other behavior; check their documentation when additions are not described.
-A new profile defaults to core. Later prompts show the domain saved in ~/.config/dotfleet/profile.toml.
+A new profile defaults to core. Later prompts show the domain saved in ~/.config/fleet/profile.toml.
 Press Enter to confirm that domain, or type another domain name and press Enter.
 The profile also saves Git identity, exact tool versions, and group choices. Mise tracks installed versions.
 Groups select optional files or alias blocks. Each prompt defines on and off.
@@ -90,7 +90,9 @@ Source choices: adopt keeps existing files; defaults uses our examples; repo use
 Adoption scans root dotfiles and .config files. It excludes credential and shell-history names, secret patterns, binary files, and files above 2 MiB.
 The scan cannot prove a file contains no secrets. Review the local repository before pushing it.
 Review lists planned software, checkout, file, and profile changes, plus locations and next steps. Type confirm to apply, quit to cancel, or a step name to go back.
-Nothing in your home changes before confirmation. Temporary tool downloads stay outside your home.
+Old stores move to the Fleet paths before setup. Profiles and backup folders stay intact.
+The review lists those moves. Cancelling apply keeps them. Other home changes wait for confirmation.
+Temporary tool downloads stay outside your home.
 Adopted file contents stay unchanged, including existing Mise files. Profile choices do not rewrite adopted files.
 Pins use full versions. Enter accepts the prompt's stated action; skip leaves a choice incomplete.
 Complete profiles need no profile prompts. Every summary prints all six categories, including scripted runs.
@@ -103,9 +105,9 @@ Headings, input, and warnings use the shared logger's colors. Choices also have 
 Set NO_COLOR to disable colors, even with an empty value. Redirected output and TERM=dumb remain plain.
 Requires git, curl, tar, and Python 3.11+. Supports Linux, macOS, and WSL (Windows Subsystem for Linux).
 Missing chezmoi and Mise go in ~/.local/bin. Setup never uses sudo or installs content-default tools.
-Content lives in ~/dotfiles. Backups live in ~/dotfleet-backups/<timestamp>/.
+Content lives in ~/dotfiles. Backups live in ~/fleet-backups/<timestamp>/.
 The installer adds ~/.local/bin/dotfleet. Run dotfleet --help for updates, checks, rollback, and saved choices.
-The manager checkout lives in ~/.local/share/dotfleet/manager. Software results include the installed command.
+The manager checkout lives in ~/.local/share/fleet/manager. Software results include the installed command.
 Review MANIFEST.json before restoring backup home/ files and recorded external targets.
 Native chezmoi templates and hooks can execute code. Use only trusted content repositories.
 Examples:
@@ -139,6 +141,15 @@ while [[ $# -gt 0 ]]; do
 done
 require_commands git curl tar python3
 python3 -c 'import sys; sys.exit(sys.version_info < (3, 11))' || error_exit 'Python 3.11 or newer is required.'
+if [[ -z $script_dir ]]; then
+	script_dir="$work_dir/manager"
+	git clone "$manager_repo" "$script_dir" </dev/null
+fi
+python3 -B "$script_dir/scripts/store_migration.py" --record "$work_dir/store-moves.json"
+export DOTFLEET_STORE_MOVES_FILE="$work_dir/store-moves.json"
+if [[ $script_dir == "$HOME/.local/share/dotfleet/"* ]]; then
+	script_dir="$HOME/.local/share/fleet/${script_dir#"$HOME/.local/share/dotfleet/"}"
+fi
 case $(uname -s) in
 Linux)
 	host=Linux
@@ -147,7 +158,7 @@ Linux)
 Darwin) host=macOS ;;
 *) error_exit 'Supported systems: Linux, macOS, or WSL.' ;;
 esac
-log_section "Dotfleet setup"
+log_section "Fleet setup"
 log_info "Host: $host / $(uname -m)"
 export PATH="$HOME/.local/bin:$PATH"
 umask 077
@@ -165,9 +176,5 @@ if ! command -v mise >/dev/null; then
 	export DOTFLEET_STAGED_MISE="$work_dir/bin/mise"
 fi
 export PATH="$work_dir/bin:$PATH"
-if [[ -z $script_dir ]]; then
-	script_dir="$work_dir/manager"
-	git clone "$manager_repo" "$script_dir" </dev/null
-fi
 # Python uses the same logger style for output and terminal prompts.
 python3 -u "$script_dir/scripts/manager.py" "${arguments[@]}" </dev/null

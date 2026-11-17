@@ -11,8 +11,8 @@
   Content commit     12345678
   Manager version    0.1.0
   Last run           2026-11-16T12:00:00+00:00
-  Last backup        ~/dotfleet-backups/20261116-120000
-  Run record         ~/dotfleet-backups/20261116-120000/RUN.json
+  Last backup        ~/fleet-backups/20261116-120000
+  Run record         ~/fleet-backups/20261116-120000/RUN.json
   Result             SUCCESS
   Enrolled           on
   Carry this record  Use dotfleet machines export --output FILE to save a private TOML copy.

@@ -21,7 +21,7 @@ Only the owner can declare production readiness and manually release 1.0.0. That
 
 ## Baseline and operation
 
-Dotfleet starts at 0.1.0. The bootstrap commit excludes the previous documentation-only history.
+Fleet starts at 0.1.0. The bootstrap commit excludes the previous documentation-only history.
 The release driver and policy tests moved from dotfiles. Content commits no longer trigger releases there.
 Keep VERSION and the derived manifest equal. Release proposals remain open for owner review.
 GitHub Actions runs the policy tests before proposing or publishing a release.

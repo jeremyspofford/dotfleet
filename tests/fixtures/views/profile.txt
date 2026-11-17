@@ -1,7 +1,7 @@
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   Profile
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  Profile file   ~/.config/dotfleet/profile.toml
+  Profile file   ~/.config/fleet/profile.toml
   Domain         personal
   Domain choice  chosen
   Git name       Example Person

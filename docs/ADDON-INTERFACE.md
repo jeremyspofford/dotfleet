@@ -1,16 +1,16 @@
 # Add-on contract
 
-An add-on is an optional Dotfleet extension. Dotfleet is its host: the manager that controls access, installation, and removal.
+An add-on is an optional Fleet extension. Fleet is its host: the manager that controls access, installation, and removal.
 A profile saves machine choices. A domain selects personal, employer, client, or shared content.
 This document defines manifest schema 1. A manifest is a file that declares an add-on's requirements and owned outputs.
 
-No add-on ships with Dotfleet. The repository contains a test fixture only.
+No add-on ships with Fleet. The repository contains a test fixture only.
 `dotfleet addons` lists recorded local installations. It does not install, execute, enable, or remove add-ons.
 The executable lifecycle remains deferred. This contract defines its required behavior before that interface is built.
 
 ## Store and versions
 
-Keep add-on records in `~/.local/share/dotfleet/addons/<id>/`.
+Keep add-on records in `~/.local/share/fleet/addons/<id>/`.
 Store the declaration as `addon.toml` and the installation receipt as `receipt.toml`.
 A receipt records explicit opt-in and the outputs written by a completed installation.
 A declaration without a receipt is not an installed add-on.

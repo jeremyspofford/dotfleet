@@ -62,7 +62,7 @@ def generate(home, os_name, dry_run, *, profile=None, content_root=None):
     manifest = tomllib.loads((ROOT / "agents/manifest.toml").read_text())
     if manifest["schema_version"] != 1:
         raise ValueError("Unsupported manifest schema")
-    profile_path = home / ".config/dotfleet/profile.toml"
+    profile_path = home / ".config/fleet/profile.toml"
     if profile is None:
         profile = tomllib.loads(profile_path.read_text()) if profile_path.exists() else {}
     content_root = (content_root or home / "dotfiles").resolve()

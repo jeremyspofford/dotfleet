@@ -6,6 +6,7 @@ Author: Jeremy Spofford / Aria Labs; Version: read from ../VERSION.
 """
 
 import argparse
+from convert import content_manifest
 import contextlib
 import io
 import json
@@ -23,12 +24,13 @@ import registry
 import owned_views
 import style
 import updates
+import store_migration
 from installation import COMMAND, MANAGER
 from render_run import render, render_view
 from run_account import RunAccount, commit, profile_changes
 
 ROOT = Path(__file__).resolve().parents[1]
-PROFILE = ".config/dotfleet/profile.toml"
+PROFILE = ".config/fleet/profile.toml"
 CONTROLS = {
     registry.REGISTRY,
     updates.CACHE,
@@ -62,14 +64,14 @@ DESCRIPTIONS = {
         " state, and short Git status. Change nothing."
     ),
     "machines": (
-        "Show recorded machine facts from fleet.toml. The registry is the manager’s file of"
+        "Show recorded machine facts from registry.toml. The registry is the manager’s file of"
         " saved machine records. This command makes no live network queries. Export shows "
         "this machine; remove deletes a stale record."
     ),
     "addons": (
         "List installed add-ons, optional manager extensions. A manifest declares an "
         "extension’s actions. A receipt records its owned outputs. No add-ons ship with "
-        "Dotfleet."
+        "Fleet."
     ),
     "update": (
         "Pull the manager and content repositories, then apply your saved choices. A "
@@ -243,11 +245,7 @@ def profile(home):
 
 def records(home):
     return sorted(
-        (
-            path
-            for path in (home / "dotfleet-backups").glob("*")
-            if (path / "MANIFEST.json").is_file()
-        ),
+        (path for path in (home / "fleet-backups").glob("*") if (path / "MANIFEST.json").is_file()),
         key=lambda path: (path.name[:15], int(path.name[16:] or "0")),
     )
 
@@ -305,7 +303,7 @@ def format_pin(value):
 
 
 def domain_choices(home):
-    descriptions = read_toml(home / "dotfiles/dotfleet.toml").get("domains", {})
+    descriptions = content_manifest(home / "dotfiles").get("domains", {})
     return {
         name: descriptions.get(
             name,
@@ -340,7 +338,7 @@ def command_profile_gaps(saved_profile):
 
 def read_view(args, home, saved_profile):
     name = args.command
-    manifest = read_toml(home / "dotfiles/dotfleet.toml")
+    manifest = content_manifest(home / "dotfiles")
     if name == "profile":
         pairs = owned_views.profile_rows(home, saved_profile)
     elif name == "backups":
@@ -357,7 +355,7 @@ def read_view(args, home, saved_profile):
         items = installed_addons(home, (ROOT / "VERSION").read_text().strip())
         pairs = [(item["id"], item["version"] + " · " + item["description"]) for item in items]
         if not pairs:
-            pairs = [("Installed add-ons", "none; no add-ons ship with Dotfleet.")]
+            pairs = [("Installed add-ons", "none; no add-ons ship with Fleet.")]
     elif name == "version":
         pairs = [
             ("Manager", (ROOT / "VERSION").read_text().strip()),
@@ -574,16 +572,17 @@ def confirm(word, explanation):
 def validate_backup(home, selected):
     folder = Path(selected).expanduser()
     if not folder.is_absolute():
-        folder = home / "dotfleet-backups" / folder
+        folder = home / "fleet-backups" / folder
     folder = folder.resolve()
-    if folder.parent != (home / "dotfleet-backups").resolve():
-        raise ValueError("Select a backup directly inside ~/dotfleet-backups.")
+    if folder.parent != (home / "fleet-backups").resolve():
+        raise ValueError("Select a backup directly inside ~/fleet-backups.")
     entries = load_json(folder / "MANIFEST.json", None)
     if not isinstance(entries, list):
         raise ValueError("Backup MANIFEST.json is missing or invalid.")
     operations = []
     for item in entries:
-        name = str(relative(item["path"]))
+        saved_name = str(relative(item["path"]))
+        name = store_migration.relative_path(saved_name)
         if name == registry.REGISTRY:
             continue  # Other machines' records must not rewind during local restore.
         destination = home / name
@@ -591,7 +590,7 @@ def validate_backup(home, selected):
             raise ValueError("Restore parent leaves home: " + name)
         if item["state"] not in ("saved", "absent"):
             raise ValueError("Invalid backup state: " + name)
-        source = folder / "home" / name if item["state"] == "saved" else None
+        source = folder / "home" / saved_name if item["state"] == "saved" else None
         if source:
             if not source.parent.resolve().is_relative_to((folder / "home").resolve()):
                 raise ValueError("Backup parent leaves backup: " + name)
@@ -709,7 +708,7 @@ def transaction(home, operations, label, selected=None, require_word=None, tree_
             raise ValueError("Files changed during review. Run the command again.")
         manager.backup(home, backup_paths, folder)
         account.bind_backup(folder)
-        source = home / ".local/share/dotfleet/chezmoi-source"
+        source = home / ".local/share/fleet/chezmoi-source"
         if source.is_dir():
             shutil.copytree(source, folder / "previous-chezmoi-source", symlinks=True)
         try:
@@ -743,6 +742,7 @@ def transaction(home, operations, label, selected=None, require_word=None, tree_
                 if path.exists():
                     path.rename(folder / ("removed-" + path.name))
                     account.applied_files.add(str(path))
+            store_migration.repair_config(home)
             account.profile_written = True
             account.confirm_files(manager.fingerprint)
             drift = status(home) if (home / ".config/chezmoi/chezmoi.toml").exists() else ""
@@ -887,7 +887,7 @@ def main(argv=None):
                 "Remove the manager and listed managed files. Content and backups stay.",
                 selected,
                 "uninstall",
-                [home / MANAGER, home / ".local/share/dotfleet/chezmoi-source"],
+                [home / MANAGER, home / ".local/share/fleet/chezmoi-source"],
             )
         os.environ["DOTFLEET_LOCAL_CONTENT"] = "1"
         if args.command == "domain":
@@ -1046,7 +1046,7 @@ def snapshot(home, operations):
         account.status = status(home)
         manager.backup(home, [name for name, _ in operations], folder)
         account.bind_backup(folder)
-        source = home / ".local/share/dotfleet/chezmoi-source"
+        source = home / ".local/share/fleet/chezmoi-source"
         if source.exists():
             shutil.copytree(source, folder / "previous-chezmoi-source", symlinks=True)
         return account.finish(

@@ -11,8 +11,8 @@
 
 6 · Next steps
   Update    dotfleet update
-  Rollback  ~/dotfleet-backups/20261116-140000/MANIFEST.json
+  Rollback  ~/fleet-backups/20261116-140000/MANIFEST.json
   Wizard    dotfleet configure
 
 chezmoi status: clean · warnings: none
-Run record: ~/dotfleet-backups/20261116-140000/RUN.json
+Run record: ~/fleet-backups/20261116-140000/RUN.json

@@ -17,7 +17,7 @@ import sys
 from common import atomic
 from installation import MANAGER
 
-CACHE = ".local/share/dotfleet/check.json"
+CACHE = ".local/share/fleet/check.json"
 FETCH_TIMEOUT = 10
 
 

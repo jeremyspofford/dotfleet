@@ -3,7 +3,7 @@
 Internal wizard helpers use manager.py's logger-backed terminal prompts.
 The installer is the command-line entry point; run bash install.sh --help.
 
-Usage: import this module from Dotfleet.
+Usage: import this module from Fleet.
 Help: python3 scripts/enrollment.py --help.
 Direct execution without help keeps its existing behavior.
 """
@@ -33,7 +33,7 @@ SECRET = re.compile(
     rb'-----BEGIN [A-Z ]*PRIVATE KEY-----|\b(?:AKIA|ASIA)[A-Z0-9]{16}\b|\bgh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]+|\b[A-Za-z0-9_]*(?:api[_-]?key|token|password|passwd|secret|access[_-]?key)[A-Za-z0-9_]*\b[\w\s"\x27.-]*[:=]\s*["\x27]?[^\s"\x27#]{4,}',
     re.I,
 )
-EXCLUDE_CONFIG = {"dotfleet", "chezmoi", "dotfiles/profile.toml"}
+EXCLUDE_CONFIG = {"fleet", "dotfleet", "chezmoi", "dotfiles/profile.toml"}
 
 
 def scan(home):
@@ -147,10 +147,10 @@ def adopt(home, workspace, found, excluded):
         else:
             shutil.copy2(source, target)
     atomic(
-        destination / "dotfleet.toml", toml({"format": "plain", "adopted": True, "paths": selected})
+        destination / "fleet.toml", toml({"format": "plain", "adopted": True, "paths": selected})
     )
     run("git", "init", "-b", "main", str(destination))
-    run("git", "-C", str(destination), "add", "--force", "--", *selected, "dotfleet.toml")
+    run("git", "-C", str(destination), "add", "--force", "--", *selected, "fleet.toml")
     run(
         "git",
         "-C",
@@ -158,7 +158,7 @@ def adopt(home, workspace, found, excluded):
         "-c",
         "core.hooksPath=/dev/null",
         "-c",
-        "user.name=Dotfleet",
+        "user.name=Fleet",
         "-c",
         "user.email=dotfleet@localhost",
         "commit",
@@ -178,7 +178,7 @@ def welcome(home, sources, profile=None, record=None):
             " is discarded."
         )
     )
-    print("Quit at review to leave your home unchanged.")
+    print("Quit at review to cancel file changes. Earlier store moves stay in place.")
     found, excluded = scan(home)
     tools = installed(home)
     os_name = (
@@ -213,7 +213,7 @@ def door_options(home, profile, found, excluded):
         (home / name).exists()
         for name in (
             "dotfiles",
-            ".config/dotfleet/profile.toml",
+            ".config/fleet/profile.toml",
             ".config/dotfiles/profile.toml",
             ".config/chezmoi/chezmoi.toml",
         )
@@ -489,7 +489,7 @@ def review(profile, account, warnings):
         ]
     details += [
         "confirm: back up files and apply these choices.",
-        "quit: leave your home unchanged.",
+        "quit: cancel planned file changes; earlier store moves stay in place.",
         "source, domain, identity, pins, groups, agents: return to that step, then review again.",
         "Type a word and press Enter. Enter alone quits.",
     ]

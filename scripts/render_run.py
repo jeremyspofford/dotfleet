@@ -3,7 +3,7 @@
 The installer supplies the same record that it saves as RUN.json.
 Use future=True for the wizard's planned actions. See install.sh --help.
 
-Usage: import this module from Dotfleet.
+Usage: import this module from Fleet.
 Help: python3 scripts/render_run.py --help.
 Direct execution without help keeps its existing behavior.
 """
@@ -191,12 +191,16 @@ def render(record, future=False):
     sections.append(lines)
 
     changes = record.get("profile_changes", []) if future or record.get("profile_written") else []
-    has_changes |= bool(changes)
+    moves = record.get("store_moves", [])
+    has_changes |= bool(changes or moves)
+    count = len(changes) + len(moves)
     lines = [
         "4 · Profile changes — "
         + (
-            f"{len(changes)} " + ("will change." if future else "changed.")
-            if changes
+            f"{len(moves)} stores moved, {len(changes)} values will change."
+            if future and moves
+            else f"{count} " + ("will change." if future else "changed.")
+            if count
             else "no changes."
         )
     ]
@@ -207,6 +211,10 @@ def render(record, future=False):
         ],
         home,
     )
+    for item in moves:
+        lines += wrap(
+            "Store moved: " + human(item["old"], home) + " → " + human(item["new"], home), "  "
+        )
     if future and record.get("selected_profile"):
         lines += ["  Selected choices:"]
         lines += block(

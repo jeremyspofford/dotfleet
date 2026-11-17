@@ -86,7 +86,7 @@ class RunAccountTests(unittest.TestCase):
         self.assertIn("  − ~/.removed\n", text)
         self.assertIn("Group extra  on → off", text)
         self.assertIn(f"Content  {old[:8]} → {new[:8]} · ~/dotfiles", text)
-        latest = sorted((self.home / "dotfleet-backups").iterdir())[-1]
+        latest = sorted((self.home / "fleet-backups").iterdir())[-1]
         record = json.loads((latest / "RUN.json").read_text())
         from render_run import render
 
@@ -119,10 +119,10 @@ class RunAccountTests(unittest.TestCase):
         self.assertEqual(category(text, 5).strip(), "5 · Locations — recorded in RUN.json.")
         self.assertEqual(len([line for line in text.splitlines() if line]), 12)
         record = json.loads(
-            sorted((self.home / "dotfleet-backups").glob("*/RUN.json"))[-1].read_text()
+            sorted((self.home / "fleet-backups").glob("*/RUN.json"))[-1].read_text()
         )
         self.assertEqual(
-            record["locations"]["Profile file"], str(self.home / ".config/dotfleet/profile.toml")
+            record["locations"]["Profile file"], str(self.home / ".config/fleet/profile.toml")
         )
         self.assertIn("MANIFEST.json", category(text, 6))
         self.assertIn("dotfleet configure", category(text, 6))
@@ -166,7 +166,7 @@ class RunAccountTests(unittest.TestCase):
         new = command("git", "-C", str(manager), "rev-parse", "HEAD").strip()
         text = summary(self.enroll(root=manager))
         self.assertIn(f"{old[:8]} → {new[:8]}", text)
-        self.assertIn("~/.local/share/dotfleet/manager", text)
+        self.assertIn("~/.local/share/fleet/manager", text)
         self.assertEqual(category(text, 2).count("→"), 1)
 
     def test_review_has_full_future_account_and_cancel_has_no_changes(self):
@@ -267,7 +267,7 @@ class RunAccountTests(unittest.TestCase):
         for name in [
             ".config/mise/config.toml",
             ".config/chezmoi/chezmoi.toml",
-            ".config/dotfleet/profile.toml",
+            ".config/fleet/profile.toml",
         ]:
             self.assertIn("~ ~/" + name, category(text, 3))
         self.assert_quiet_status()

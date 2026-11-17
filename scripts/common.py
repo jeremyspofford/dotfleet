@@ -1,6 +1,6 @@
 """Shared profile and path helpers. No command-line interface.
 
-Usage: import this module from Dotfleet.
+Usage: import this module from Fleet.
 Help: python3 scripts/common.py --help.
 Direct execution without help keeps its existing behavior.
 """

@@ -1,17 +1,23 @@
-# Dotfleet
+# Fleet
 
-Dotfleet manages home configuration across machines. A profile saves each machine's repository, domain, Git identity, tool pins, and content groups.
+Renamed from Dotfleet, November 2026.
+
+The installed command is `dotfleet`. Users can type the `fleet` alias.
+Rancher's Fleet already provides a `fleet` command. We keep `dotfleet` to avoid PATH wars.
+PATH lists the folders your shell searches for commands. The alias stays undefined when a real `fleet` command already exists.
+
+Fleet manages home configuration across machines. A profile saves each machine's repository, domain, Git identity, tool pins, and content groups.
 Git records history. chezmoi applies files. Mise selects developer tool versions. A pin selects a version; a group selects optional content.
 
 ## Install
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/jeremyspofford/dotfleet/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/jeremyspofford/fleet/main/install.sh | bash
 ```
 
 - Setup backs up existing files and keeps your editable content at `~/dotfiles`.
 - Re-run the same command to update. Saved selections remain unchanged.
-- Backups live in `~/dotfleet-backups/<timestamp>/`. Review `MANIFEST.json` before restoring `home/` files and external targets.
+- Backups live in `~/fleet-backups/<timestamp>/`. Review `MANIFEST.json` before restoring `home/` files and external targets.
 
 Requires Bash, git, curl, tar, and Python 3.11+. Use Linux, macOS, or WSL (Windows Subsystem for Linux).
 Missing chezmoi and Mise install into `~/.local/bin`. Setup never uses sudo.
@@ -54,12 +60,13 @@ Only accepted files enter the first local Git commit. Nothing is uploaded.
 
 An unrelated `~/dotfiles` stops setup. Preserve it before choosing another repository or adopting files.
 Native chezmoi templates and hooks can execute code. Use trusted content only.
-Quitting review leaves home unchanged. Preparation uses temporary files outside home; missing tools move into `~/.local/bin` only after confirmation.
+Quitting review cancels planned file changes. Earlier [store moves](README.md#store-migration) stay in place.
+Preparation uses temporary files outside home; missing tools move into `~/.local/bin` only after confirmation.
 
 ### Flags and updates
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/jeremyspofford/dotfleet/main/install.sh | bash -s -- --configure
+curl -fsSL https://raw.githubusercontent.com/jeremyspofford/fleet/main/install.sh | bash -s -- --configure
 ```
 
 `--configure` repeats the wizard with saved choices. `--defaults` uses complete recorded values without prompts; new groups default to on.
@@ -123,28 +130,28 @@ This example is checked against the renderer's recorded test fixture:
 
 5 · Locations
   Content  ~/dotfiles
-  Profile  ~/.config/dotfleet/profile.toml
-  Source   ~/.local/share/dotfleet/chezmoi-source
-  Backup   ~/dotfleet-backups/20261116-140000
+  Profile  ~/.config/fleet/profile.toml
+  Source   ~/.local/share/fleet/chezmoi-source
+  Backup   ~/fleet-backups/20261116-140000
 
 6 · Next steps
   Update    dotfleet update
-  Rollback  ~/dotfleet-backups/20261116-140000/MANIFEST.json
+  Rollback  ~/fleet-backups/20261116-140000/MANIFEST.json
   Wizard    dotfleet configure
 
 chezmoi status: clean · warnings: none
-Run record: ~/dotfleet-backups/20261116-140000/RUN.json
+Run record: ~/fleet-backups/20261116-140000/RUN.json
 ```
 
 ## How it works
 
-[dotfiles](https://github.com/jeremyspofford/dotfiles) provides plain content with real home names. It works without Dotfleet.
+[dotfiles](https://github.com/jeremyspofford/dotfiles) provides plain content with real home names. It works without Fleet.
 The [content contract](docs/CONTENT-CONTRACT.md) defines files, formats, groups, secrets, and ownership.
-Dotfleet converts plain files into a private chezmoi source. Native chezmoi repositories use their checkout directly.
+Fleet converts plain files into a private chezmoi source. Native chezmoi repositories use their checkout directly.
 Stow layouts under `packages/<package>/` also work; their package prefixes do not reach the home directory.
 
-Your profile lives at `~/.config/dotfleet/profile.toml`. It saves the domain, Git identity, exact tool versions, and group choices between runs.
-Edit pins there, then rerun the installer. Mise records which versions are installed; Dotfleet reads that list during setup.
+Your profile lives at `~/.config/fleet/profile.toml`. It saves the domain, Git identity, exact tool versions, and group choices between runs.
+Edit pins there, then rerun the installer. Mise records which versions are installed; Fleet reads that list during setup.
 A saved pin selects a version. It does not mean that version is installed.
 Setup asks when identity is incomplete, the domain choice is unconfirmed, or a pin floats, such as `latest`.
 Prompts show recorded values. Press Enter to use the stated action, or type `skip` to leave a choice incomplete.
@@ -171,7 +178,7 @@ The manager creates Git identity, domain, Mise settings, and a private secrets f
 A reference such as `op://Vault/Item/field` names a secret in 1Password. References are disabled unless explicitly enabled.
 
 Old Layer 0 enrollment migrates automatically. Setup reads old chezmoi data, rendered Mise pins, and saved installer data before applying files.
-Migration also saves existing Mise settings in the profile. Existing Dotfleet profiles remain authoritative. Backups preserve replaced files and prior staged sources.
+Migration also saves existing Mise settings in the profile. Existing Fleet profiles remain authoritative. Backups preserve replaced files and prior staged sources.
 Conflict menus explain letter keys and require Enter. Skipping changes can leave differences; the summary reports that as incomplete enrollment.
 
 1. Edit content files in `~/dotfiles`. Change profile choices through `dotfleet domain`, `pins`, `groups`, or `configure`.
@@ -198,7 +205,7 @@ They check adoption, secret exclusions, review cancellation, repeat runs, shell 
 ## After enrollment
 
 Use `dotfleet` for daily commands. The installer places it in `~/.local/bin` on every run.
-It keeps the manager checkout at `~/.local/share/dotfleet/manager`. The command uses that copy and its VERSION file.
+It keeps the manager checkout at `~/.local/share/fleet/manager`. The command uses that copy and its VERSION file.
 Keep `~/.local/bin` on PATH, the list of folders your shell searches for commands.
 The one-line installer remains the first-install and recovery path.
 
@@ -244,6 +251,22 @@ Uninstall offers to restore the oldest backup. Otherwise, it removes known manag
 Uninstall keeps installed tools, the content checkout, and all backups. Removal includes local edits, which the new backup preserves.
 Rollback and uninstall require terminal confirmation. A scripted rollback without a folder only lists backups.
 
+## Store migration
+
+The installer and installed command move old stores before enrollment or update work:
+
+- `~/.config/dotfleet/` moves to `~/.config/fleet/`.
+- `~/dotfleet-backups/` moves to `~/fleet-backups/`.
+- `~/.local/share/dotfleet/` moves to `~/.local/share/fleet/`.
+
+Folders move intact; profiles keep their bytes, and old backups come along.
+The registry becomes `~/.local/share/fleet/registry.toml`. The content manifest is `fleet.toml` in the content checkout.
+Older `dotfleet.toml` content manifests still work. When both names exist, `fleet.toml` wins.
+
+Fleet updates chezmoi's source pointer during migration. Rollback translates old backup paths to the new locations.
+The review lists each store move under Profile changes. Cancelling later apply does not undo these earlier moves.
+If both old and new stores exist, migration stops before moving folders. Resolve that conflict before retrying; Fleet never merges them silently.
+
 ## Check for updates
 
 1. Run `fleet check` to fetch manager and content changes without applying them.
@@ -260,14 +283,14 @@ Both preserve local commits when the remote has no new commits. Both refuse loca
 Locally adopted content without a remote has no updates to fetch.
 Update fetches again, so commits published after a check can also arrive.
 
-Successful checks save both results in `~/.local/share/dotfleet/check.json` with owner-only permissions.
+Successful checks save both results in `~/.local/share/fleet/check.json` with owner-only permissions.
 This cache is saved check data. It contains the check time, full commit identifiers, and source paths.
 Check creates no backup or run record and never writes the profile or managed files.
 Status shows “not checked” until a valid result exists. Plain status keeps working offline.
 
 ## Recorded machines
 
-The fleet registry records machines in `~/.local/share/dotfleet/fleet.toml`, inside the manager store. It is not content and never enters your dotfiles checkout.
+The fleet registry records machines in `~/.local/share/fleet/registry.toml`, inside the manager store. It is not content and never enters your dotfiles checkout.
 Run `dotfleet machines` to read this machine's record and any other records in that file.
 These are saved facts, not live results. Cross-machine queries and automatic registry transfer are deferred.
 
@@ -286,14 +309,14 @@ Content cannot manage the registry or profile file. These belong to the manager.
 
 ## Add-on records
 
-An add-on is an optional manager extension. Run `dotfleet addons` to list validated installed records. No add-ons ship with Dotfleet.
+An add-on is an optional manager extension. Run `dotfleet addons` to list validated installed records. No add-ons ship with Fleet.
 The [add-on contract](docs/ADDON-INTERFACE.md) defines installation declarations, allowed data access, output ownership, and safe teardown.
 A test fixture validates the contract. It is not installed or offered as a product add-on.
 
 Use `dotfleet machines export` to view this machine’s saved record alone.
 Use `dotfleet machines export --output FILE` to save a private TOML copy for transfer. FILE must not exist.
 TOML is the configuration format used by the registry. Export never prints its raw contents.
-Use `dotfleet machines remove HOSTNAME` to remove another machine’s stale record. Dotfleet backs up the registry and records the change.
+Use `dotfleet machines remove HOSTNAME` to remove another machine’s stale record. Fleet backs up the registry and records the change.
 The active machine’s record cannot be removed this way.
 
 Use `dotfleet profile` to inspect saved choices. Change them through `domain`, `pins`, `groups`, or `configure`; do not edit profile.toml.
