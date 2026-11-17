@@ -73,6 +73,62 @@ A block starts with `# dotfleet:group NAME begin` and ends with `# dotfleet:grou
 Markers occupy complete lines. Each declared block must appear exactly once per file. Disabled groups omit the entire marked block.
 All groups default to on. Later runs keep choices; new groups prompt with on preselected.
 
+## Agents table
+
+An agent is an installed coding assistant, such as Claude Code or Codex.
+The optional `agents` table in `fleet.toml` declares agent configuration in a neutral format. A neutral format names no agent's file layout.
+Fleet validates the whole table before it plans any write. One failure stops the run.
+Content without the table declares nothing for agents.
+
+| Table or key | Holds |
+| --- | --- |
+| `agents.schema` | The integer 1. Fleet rejects a number that it does not know. |
+| `agents.skills.NAME` | Domain limits for one skill folder. |
+| `agents.rules.NAME` | One rule set: a tracked Markdown file of agent instructions. |
+| `agents.mcp.NAME` | One MCP server. MCP means Model Context Protocol; a server offers tools to an agent. |
+| `agents.connectors.NAME` | One hosted service that an agent reaches after the user signs in. |
+| `agents.plugins.NAME` | One plugin, with one source per agent. |
+| `agents.hooks.NAME` | One command that an agent runs when a named event occurs. |
+
+Item names use lowercase letters, digits, and single hyphens. A name is unique within its table.
+Unknown keys and unknown tables fail validation. A new key needs a new schema number.
+Provider entries, such as OpenRouter or API-key providers, are not agents. The table has no kind for them.
+
+Rule sets, servers, connectors, plugins, and hooks require `description`, one plain sentence.
+They accept `agents`, a list of agent names, and `domains`, a list of declared domains.
+Without `agents`, every selected agent that supports the item receives it. Without `domains`, every machine receives it.
+An unknown agent name prints a warning and is skipped. Content can name an agent that an older manager lacks.
+A domain must be one that the content declares.
+
+Skills are ordinary content. Each folder under `.agents/skills/` that holds `SKILL.md` is one skill.
+A skill entry accepts `domains` only. It needs a tracked `.agents/skills/NAME/SKILL.md`.
+
+A rule set's `file` and a hook's `command` name files that Git tracks, relative to the repository root.
+Absolute paths and parent traversal fail. A hook command must be executable in Git, mode 100755.
+
+An MCP server's `transport` is `stdio` or `http`. `stdio` starts a local program; `http` calls a web address.
+
+| Key | Transport | Meaning |
+| --- | --- | --- |
+| `command` | stdio, required | The program to start. |
+| `args` | stdio | A list of arguments. |
+| `env` | stdio | Variable names with plain, non-secret values. |
+| `pass_env` | stdio | Names of variables that the server reads from the user's environment. |
+| `url` | http, required | The server address. |
+| `headers` | http | Header names with plain, non-secret values. |
+| `header_env` | http | Header names mapped to variable names. |
+| `bearer_token_env` | http | The variable that holds a bearer token, a secret string that proves access. |
+
+The table holds variable names, never secret values. The `secrets` table can supply those variables through `~/.secrets`.
+Fleet scans `env` and `headers` values with the adoption scan's secret patterns. A match fails validation.
+A key from the other transport fails validation.
+
+A connector accepts an optional `url` that starts with `https://`.
+A plugin's `sources` maps an agent name to an `id` and an optional `marketplace`. Fleet treats both as that agent's own notation.
+A hook's `event` is `session-start`, `session-end`, `prompt-submit`, `before-tool`, `after-tool`, or `stop`.
+Tool events accept `tools`: `shell`, `edit`, `read`, or `mcp`. `timeout` counts whole seconds.
+Hooks and stdio servers run commands from content. Use only trusted repositories.
+
 ## Manager-owned outputs
 
 Fleet reserves `~/.config/git/local.gitconfig`, `~/.config/dotfiles/domain`, `~/.config/mise/config.toml`, and `~/.secrets`.

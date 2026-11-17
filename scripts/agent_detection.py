@@ -28,6 +28,9 @@ def detected(home, manifest, tools=None):
         packages = set(spec.get("mise_packages", [spec["command"]]))
         folders = {str(Path(path).parent) for path in spec.get("config_paths", {}).values() if path}
         folders.update(spec.get("config_folders", []))
+        # Another program can share the command name; its own settings file rules it out.
+        if any((home / marker).exists() for marker in spec.get("conflict_markers", [])):
+            continue
         if (
             shutil.which(spec["command"])
             or packages & installed

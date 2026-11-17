@@ -29,17 +29,22 @@ Records for absent agents and unused outputs remain for review. Removing an agen
 | Agent | Configuration in home | Skills in home |
 | --- | --- | --- |
 | [claude](https://code.claude.com/docs/en/settings) | `~/.claude/settings.json` | `~/.claude/skills` |
-| [codex](https://developers.openai.com/codex/config-basic/) | `~/.codex/config.toml` | `~/.agents/skills` |
+| [codex](https://learn.chatgpt.com/docs) | `~/.codex/config.toml` | `~/.agents/skills` |
 | [gemini](https://geminicli.com/docs/cli/skills/) | `~/.gemini/settings.json` | `~/.gemini/skills` |
-| [grok](https://docs.x.ai/build/settings) | `~/.grok/config.toml` | `~/.grok/skills` |
-| [pi](https://github.com/badlogic/pi-mono/tree/main/packages/coding-agent) | `~/.pi/agent/settings.json` | `~/.pi/agent/skills` |
+| [grok](https://docs.x.ai/build/settings) | Detected only; Fleet writes nothing | Detected only |
+| [pi](https://docs.pi.dev) | `~/.pi/agent/settings.json` | `~/.pi/agent/skills` |
 | [opencode](https://opencode.ai/docs/config/) | `~/.config/opencode/opencode.json` | `~/.config/opencode/skills` |
+| [antigravity](https://antigravity.google/docs) | Detected only; Fleet writes nothing | Detected only |
 | [Ollama](https://docs.ollama.com/faq) | Process/service environment; no portable file path | None |
 
 The manifest maps Linux, macOS, Windows, and WSL (Windows Subsystem for Linux).
 Bash setup supports Linux, macOS, and WSL. Native Windows paths are descriptive; links require developer mode or suitable privileges.
 WSL configures Linux agents, not Windows executables. Custom agent-home environment variables require matching manifest changes.
 Defaults target documented standard homes.
+
+Antigravity and Grok are detected only. Fleet renders nothing for either until a tested install confirms their paths.
+Antigravity's command is `agy`. A community tool also installs a `grok` command; its `~/.grok/user-settings.json` file rules out Grok detection.
+Pi detection also matches its renamed package, `@earendil-works/pi-coding-agent`.
 
 Ollama is unsupported: it uses process/service environment settings, not a portable configuration file.
 Service setup differs across Linux's systemd, macOS's launchctl, and Windows.

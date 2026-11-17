@@ -14,6 +14,7 @@ Messages use logger.sh. Prompts use /dev/tty.
 """
 
 import argparse
+import agent_table
 from convert import content_domains, content_manifest, require_domain
 import style
 import run_index
@@ -673,6 +674,10 @@ def prepare(home, checkout, profile, manifest, folder):
     folder.mkdir()
     # Content defines the domains. A removed domain stops before any plan or write.
     require_domain(manifest, profile.get("domain", "core"), command_name(profile))
+    # The agents table must validate as a whole before Fleet plans any agent output.
+    agents_table = agent_table.load(checkout, manifest, wizard.agent_manifest())
+    for warning in agents_table.warnings:
+        print("Warning: " + warning)
     defaults = wizard.content_defaults(checkout)
     generated, pins, available = generated_files(home, profile, manifest, defaults)
     source, items, _ = convert(checkout, folder / "source", profile, profile["format"])
