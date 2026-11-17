@@ -17,6 +17,41 @@ def directory(title, entities, home, empty="None recorded."):
     print(render_entities(title, entities, str(home), empty), end="")
 
 
+KIND_LABELS = {
+    "skills": "Skill",
+    "rules": "Rule set",
+    "mcp": "MCP server",
+    "connectors": "Connector",
+    "plugins": "Plugin",
+    "hooks": "Hook",
+}
+
+
+def agent_entities(home, profile):
+    import agent_table
+    import command
+
+    exceptions = agent_table.exceptions(profile)
+    entities = []
+    for key, item in command.agent_items(home).items():
+        spec = item.spec
+        state = {"off": "off on this machine", "local": "local value on this machine"}.get(
+            exceptions.get(key), "on"
+        )
+        if "domains" in spec and profile.get("domain", "core") not in spec["domains"]:
+            state = "not in domain " + profile.get("domain", "core")
+        agents = spec.get("agents") or (sorted(spec["sources"]) if item.kind == "plugins" else [])
+        fields = [
+            ("Kind", KIND_LABELS[item.kind]),
+            ("Adds", spec.get("description", f"Skill folder .agents/skills/{item.name}")),
+            ("Agents", ", ".join(agents) or "every selected agent that supports it"),
+            ("Domains", ", ".join(spec.get("domains", [])) or "every domain"),
+            ("State", state),
+        ]
+        entities.append({"name": key, "fields": fields})
+    return entities
+
+
 def collection(name, home, profile, manifest):
     import command
 
@@ -24,6 +59,8 @@ def collection(name, home, profile, manifest):
         return registry.entities(home, (command.ROOT / "VERSION").read_text().strip())
     if name == "backups":
         return owned_views.backup_entities(home, command.records(home))
+    if name == "agents":
+        return agent_entities(home, profile)
     if name == "groups":
         return [
             {

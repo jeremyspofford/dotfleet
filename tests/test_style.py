@@ -22,6 +22,7 @@ import command
 import registry
 import owned_views
 import updates
+import agent_table
 import datetime
 import style
 from common import toml
@@ -50,6 +51,7 @@ def command_goldens():
             "pins": {"node": "26.13.1"},
             "groups": {"helpers": True, "docker": False},
             "agents": {"codex": False},
+            "agent_items": {"mcp.docs": "local"},
             "content_repo": "https://example.invalid/dotfiles",
         }
         root = home / "manager-fixture"
@@ -61,6 +63,10 @@ def command_goldens():
             '[groups.helpers]\ndescription = "Fleet command shortcut."\n'
             '[groups.docker]\ndescription = "Container shortcuts."\n'
             "[secrets]\nEXAMPLE_API_TOKEN = {}\nUNSET_TOKEN = {}\n"
+            '[agents]\nschema = 1\n[agents.mcp.docs]\ndescription = "Search the documentation."\n'
+            'transport = "stdio"\ncommand = "npx"\n'
+            '[agents.mcp.issues]\ndescription = "Read work issues."\ntransport = "http"\n'
+            'url = "https://mcp.example.com/issues"\ndomains = ["work"]\n'
         )
         (home / ".config/fleet").mkdir(parents=True)
         (home / ".config/fleet/profile.toml").write_text(toml(profile))
@@ -124,8 +130,14 @@ def command_goldens():
                 },
             ),
             patch.object(socket, "gethostname", return_value="example-hub"),
+            patch.object(
+                agent_table,
+                "tracked",
+                return_value={".agents/skills/notes/SKILL.md": "100644"},
+            ),
         ):
             for name in [
+                "agents",
                 "status",
                 "doctor",
                 "machines",

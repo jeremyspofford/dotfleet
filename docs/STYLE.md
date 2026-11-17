@@ -38,6 +38,7 @@ The command audit uses these forms:
 | backups delete | Exactly one of --all, --keep, or --name |
 | machines export | --output |
 | domain list / set | set requires --name |
+| agents list / set | set requires --name and --state |
 | groups list / set | set requires --name and --state |
 | tools set | TOOL, --version |
 | tools remove | TOOL |

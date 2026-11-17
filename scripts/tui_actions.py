@@ -100,6 +100,30 @@ def group_arguments(home):
     return ["groups", "set", "--name", selected, "--state", state] if state is not None else None
 
 
+def agent_item_arguments(home):
+    saved = command.profile(home)
+    choices = [
+        (key + " — " + item.spec.get("description", "skill folder"), key)
+        for key, item in command.agent_items(home).items()
+    ]
+    selected = choose("Choose an agent item", "Agent item", choices)
+    if selected is None:
+        return None
+    states = [
+        ("on — Fleet manages it on this machine", "on"),
+        ("off — remove Fleet's output on this machine", "off"),
+    ]
+    if not selected.startswith("skills."):
+        states.append(("local — keep this machine's own value unmanaged", "local"))
+    state = choose(
+        "Agent item: " + selected,
+        "State",
+        states,
+        saved.get("agent_items", {}).get(selected, "on"),
+    )
+    return ["agents", "set", "--name", selected, "--state", state] if state is not None else None
+
+
 def pin_arguments(home):
     answer = form(
         "Install and select a tool version",
@@ -183,6 +207,7 @@ FORMS = {
     "command-help": help_arguments,
     "domain-set": domain_arguments,
     "group-set": group_arguments,
+    "agent-set": agent_item_arguments,
     "pin-set": pin_arguments,
     "pin-remove": unpin_arguments,
     "tool-uninstall": uninstall_tool_arguments,

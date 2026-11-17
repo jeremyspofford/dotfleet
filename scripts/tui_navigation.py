@@ -17,6 +17,8 @@ ACTIONS = {
     "diff-stat": ("Changed paths only", ("diff", "--stat")),
     "doctor": ("Doctor — check this machine", ("doctor",)),
     "topology": ("Topology — recorded connections", ("topology",)),
+    "agents": ("Agents — declared items", ("agents", "list")),
+    "agent-set": ("Turn an agent item on, off, or local", ("agents", "set")),
     "domain": ("Domains — choices and current domain", ("domain", "list")),
     "domain-set": ("Choose a domain", ("domain", "set")),
     "groups": ("Groups — content switches", ("groups", "list")),
@@ -50,7 +52,7 @@ ACTIONS = {
 
 AREAS = {
     "Machine": ("status", "check", "update", "diff", "doctor", "topology"),
-    "Configuration": ("domain", "groups", "pins", "secrets", "content", "configure"),
+    "Configuration": ("domain", "groups", "agents", "pins", "secrets", "content", "configure"),
     "Machines": (
         "machines",
         "add-connection",
@@ -67,6 +69,7 @@ RELATED = {
     "help": ("command-help",),
     "domain": ("domain-set",),
     "groups": ("group-set",),
+    "agents": ("agent-set",),
     "pins": ("pin-set", "pin-remove", "tool-uninstall"),
     "diff": ("diff-stat",),
     "machines": ("add-connection", "name-connection", "machine-export", "machine-remove"),
@@ -77,6 +80,7 @@ CHANGING = {
     "update",
     "domain-set",
     "group-set",
+    "agent-set",
     "pin-set",
     "pin-remove",
     "tool-uninstall",

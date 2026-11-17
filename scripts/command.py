@@ -50,6 +50,12 @@ CONTROLS = {
     COMMAND,
 }
 DESCRIPTIONS = {
+    "agents": (
+        "Show or switch agent items on this machine.\n"
+        "An agent is a coding assistant; the content's agents table declares its items.\n"
+        "The exception list in the profile turns an item off or keeps a local value.\n"
+        "Off removes Fleet's output here. Local keeps this machine's own value unmanaged."
+    ),
     "addons": (
         "List optional manager extensions.\n"
         "A manifest declares an extension’s actions.\n"
@@ -240,8 +246,12 @@ def load_json(path, default):
 
 
 def status(home):
-    output = run("chezmoi", "status")
-    return output.strip()
+    """Return drift lines: chezmoi status, then agent outputs that differ from their records."""
+    import agent_deploy
+
+    output = run("chezmoi", "status").strip()
+    agent_drift = agent_deploy.drift(home, read_toml(home / PROFILE))
+    return "\n".join(filter(None, [output, *("agent " + line for line in agent_drift)]))
 
 
 def info(title, pairs, home):
@@ -332,18 +342,30 @@ def read_view(args, home, saved_profile):
     manifest = content_manifest(home / "dotfiles")
     if name == "content":
         pairs = owned_views.content_rows(home, saved_profile, checkout_state)
-    elif name in ("backups", "secrets", "machines", "addons", "domain", "groups", "tools"):
+    elif name in (
+        "agents",
+        "backups",
+        "secrets",
+        "machines",
+        "addons",
+        "domain",
+        "groups",
+        "tools",
+    ):
         entities = command_views.collection(name, home, saved_profile, manifest)
         empty = {
             "backups": f"No backups yet. Run {display} backups create.",
             "secrets": "No secret variables declared.",
             "tools": "No tool versions recorded.",
             "groups": "No content groups declared.",
+            "agents": "No agent items declared.",
             "addons": "No installed add-ons. None ship with Fleet.",
         }.get(name, "None recorded.")
         command_views.directory(name.capitalize(), entities, home, empty)
         if name == "domain":
             print(f"\nChoose: {display} domain set --name NAME · use a name listed above")
+        if name == "agents" and entities:
+            print(f"\nChange: {display} agents set --name ITEM --state on, off, or local")
         return 0
     elif name == "version":
         pairs = [
@@ -539,10 +561,17 @@ def preview_current(home, saved_profile, stat=False):
         _, manifest = manager.detect(checkout, saved_profile.get("format"))
         # Agent planning messages are progress, not differences.
         with contextlib.redirect_stdout(io.StringIO()):
-            plan = manager.prepare(home, checkout, saved_profile, manifest, workspace / "plan")
+            plan = manager.prepare(
+                home, checkout, saved_profile, manifest, workspace / "plan", preview=True
+            )
         from preview_diff import patches
 
         changes = patches(home, saved_profile, plan, workspace / "plan", ROOT)
+        conflicts = plan["agents"].conflicts
+        for line in conflicts:
+            print("Agent conflict: " + line)
+        if conflicts and not changes:
+            return 1
         if not changes:
             print(
                 f"No differences. Your files match {saved_profile['content_repo']} @ {commit(checkout)[:8]}."
@@ -1052,6 +1081,8 @@ def dispatch(args, argument_parser, home):
             return manager.main(["--defaults", "--domain", args.name])
         if args.command == "groups":
             return manager.main(["--defaults", "--group", args.name + "=" + args.state])
+        if args.command == "agents":
+            return set_agent_item(home, args.name, args.state, display)
         if args.command == "tools":
             if args.action == "uninstall":
                 from tool_actions import uninstall
@@ -1121,6 +1152,37 @@ def dispatch(args, argument_parser, home):
         print("Error: " + str(error), file=sys.stderr)
         return 2 if args.command == "diff" else 1
     return 0
+
+
+def agent_items(home):
+    """Return validated items plus skill folders, keyed by KIND.NAME."""
+    import agent_table
+
+    checkout = home / "dotfiles"
+    table = agent_table.load(checkout, content_manifest(checkout), enrollment.agent_manifest())
+    items = {item.key: item for item in table.items}
+    for skill in agent_table.skills(checkout):
+        items.setdefault("skills." + skill, agent_table.Item("skills", skill, {}))
+    return items
+
+
+def set_agent_item(home, name, state, display):
+    items = agent_items(home)
+    if name not in items:
+        raise ValueError(f"Unknown agent item {name}. Run {display} agents list to see items.")
+    if name.startswith("skills.") and state == "local":
+        raise ValueError("Skills are content files; choose on or off for a skill.")
+
+    def edit(value):
+        exceptions = value.setdefault("agent_items", {})
+        if state == "on":
+            exceptions.pop(name, None)
+        else:
+            exceptions[name] = state
+        if not exceptions:
+            value.pop("agent_items")
+
+    return manager.main(["--defaults"], edit=edit)
 
 
 def remove_machine(home, hostname):

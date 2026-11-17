@@ -93,6 +93,7 @@ def profile_key(name):
         ("pins.", "Tool"),
         ("groups.", "Group"),
         ("agents.", "Agent"),
+        ("agent_items.", "Agent item"),
         ("defaults.", "Content tool version"),
     ]:
         if name.startswith(prefix):
