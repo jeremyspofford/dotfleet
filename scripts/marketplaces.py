@@ -303,7 +303,8 @@ def summary(home):
         if result is None:
             parts.append(f"{name} not checked yet")
         elif result["behind"] and names[name].get("pin"):
-            parts.append(f"{name} +{result['behind']} (pinned)")
+            # Status says held, not pinned: tool selections own no pin wording there.
+            parts.append(f"{name} +{result['behind']}, held at {names[name]['pin']}")
         elif result["behind"]:
             parts.append(f"{name} +{result['behind']}")
     return ", ".join(parts) or "none"

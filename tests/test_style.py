@@ -23,6 +23,7 @@ import registry
 import owned_views
 import updates
 import agent_table
+import marketplaces
 import datetime
 import style
 from common import toml
@@ -183,6 +184,18 @@ def command_goldens():
             outputs["help"] = command.parser().format_help()
             with (
                 patch.object(updates, "validate_content"),
+                patch.object(
+                    marketplaces,
+                    "check",
+                    return_value={
+                        "agent-market": {
+                            "current": "abcdef0123456789abcdef0123456789abcdef01",
+                            "latest": "1234567890abcdef1234567890abcdef12345678",
+                            "behind": 2,
+                            "pin": "v1.0.0",
+                        }
+                    },
+                ),
                 patch.object(
                     updates,
                     "compare",

@@ -264,10 +264,11 @@ def check_marketplaces(home, display):
         count = result["behind"]
         unit = "commit" if count == 1 else "commits"
         state = f"{count} {unit} behind" if count else "up to date"
+        state += f" @ {result['current'][:8]}"
         if result["pin"] and count:
-            state += f"; pinned at {result['pin']}, so the pin blocks the update"
+            state += f"\n  Pinned at {result['pin']}; the pin blocks the update."
         if display:
-            print(f"\nMarketplace {name}: {state} @ {result['current'][:8]}")
+            print(f"\nMarketplace {name}: {state}")
     return int(any(result["behind"] and not result["pin"] for result in results.values()))
 
 

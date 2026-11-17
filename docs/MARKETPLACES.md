@@ -60,6 +60,7 @@ It prints how many commits each marketplace is behind. A pinned marketplace also
 Check exits 1 when the manager, the content, or an unpinned marketplace is behind. A pinned marketplace alone does not change the exit code.
 A failed marketplace fetch prints a warning and exits 2. The earlier marketplace result stays saved.
 `fleet status` and `fleet marketplaces list` read the saved result, `~/.local/share/fleet/marketplaces-check.json`. They never fetch.
+Status describes a pinned marketplace that is behind as held at its pin.
 `fleet update` does not move marketplaces. Run `fleet marketplaces update` for that.
 
 `--name` saves the marketplace under another name. The default is the repository name.
