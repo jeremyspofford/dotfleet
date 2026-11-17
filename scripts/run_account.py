@@ -130,6 +130,12 @@ class RunAccount:
         self.adoption_excluded = []
         self.scan = {}
         self.debug_details = None
+        self.update_triggers = json.loads(os.environ.get("FLEET_UPDATE_TRIGGERS", "[]"))
+        if not isinstance(self.update_triggers, list) or any(
+            trigger not in ("manager update", "content update", "drift repair")
+            for trigger in self.update_triggers
+        ):
+            raise ValueError("Invalid update reasons. Run update again.")
         style.ACTIVE_RECORD = self
 
     def plan(self, plan, checkout, profile, backup_path, manifest):
@@ -219,6 +225,7 @@ class RunAccount:
             "adoption_excluded": self.adoption_excluded,
             "scan": self.scan,
             "debug_details": self.debug_details,
+            "update_triggers": self.update_triggers,
         }
 
     def save(self):

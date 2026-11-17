@@ -122,6 +122,9 @@ class RegistryCommandTests(unittest.TestCase):
         for line in output.splitlines():
             self.assertLessEqual(len(line), 100)
         Path("/tmp/dotfleet-machines-example.txt").write_text(output)
+        from test_updates import advance
+
+        advance(self.content, 1, ".file", "new content")
         self.cli("update")
         self.assertEqual(registry.load(self.home)["machines"]["recorded-machine"], other)
         after = registry.load(self.home)["machines"][local]

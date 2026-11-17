@@ -19,7 +19,7 @@ class CoreSession:
     def __init__(self, root):
         self.root = root
 
-    async def run(self, action, output, event, confirm, backup=None, machine=None):
+    async def run(self, action, output, event, confirm, backup=None, machine=None, selected=None):
         parent, child = socket.socketpair()
         environment = dict(os.environ, NO_COLOR="1", PYTHONDONTWRITEBYTECODE="1")
         environment[CHANNEL] = str(child.fileno())
@@ -28,6 +28,8 @@ class CoreSession:
             arguments.extend(["--backup", backup])
         if machine:
             arguments.extend(["--machine", machine])
+        for name in selected or []:
+            arguments.extend(["--selected-backup", name])
         process = None
         writer = None
         tasks = []

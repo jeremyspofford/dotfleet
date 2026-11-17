@@ -139,3 +139,7 @@ ConnectionPicker {
     height: 3;
     min-width: 8;
 }
+#backup-selection {
+    height: auto;
+    max-height: 7;
+}

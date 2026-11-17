@@ -154,6 +154,20 @@ sys.exit(result.returncode)
             request = json.loads(item["request"])
             self.assertEqual(set(request), {"version", "action", "check", "stat"})
 
+    def test_current_remote_update_returns_statement_without_target_backup(self):
+        self.connect()
+        import updates
+
+        before = {path: path.read_bytes() for path in self.home.glob("fleet-backups/*/RUN.json")}
+        output = self.call("update", "beelink")
+        self.assertIn("Machine · beelink", output)
+        self.assertIn(updates.CURRENT_MESSAGE, output)
+        self.assertNotIn("6 · Next steps", output)
+        self.assertEqual(
+            {path: path.read_bytes() for path in self.home.glob("fleet-backups/*/RUN.json")}, before
+        )
+        self.assertTrue((self.home / updates.CACHE).is_file())
+
     def test_update_returns_review_and_writes_only_target_record(self):
         self.connect()
         before = self.caller_files()

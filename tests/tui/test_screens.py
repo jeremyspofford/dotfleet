@@ -38,13 +38,13 @@ from tui import (
     styled,
 )
 from tui_navigation import ACTIONS, AREAS, RELATED
-from textual.widgets import Input, OptionList, RichLog, Select, Static
+from textual.widgets import Input, OptionList, RichLog, Select, SelectionList, Static
 
 
 class FixtureSession:
     """Use the actual dispatcher; mock only external core operations in tests."""
 
-    async def run(self, action, output, event, confirm, backup=None, machine=None):
+    async def run(self, action, output, event, confirm, backup=None, machine=None, selected=None):
         loop = asyncio.get_running_loop()
 
         async def deliver(callback, value):
@@ -63,7 +63,7 @@ class FixtureSession:
                 patch.object(ui_channel, "send", side_effect=send),
                 contextlib.redirect_stdout(captured),
             ):
-                result = tui_core.dispatch(action, backup, machine)
+                result = tui_core.dispatch(action, backup, machine, selected)
             for line in captured.getvalue().splitlines():
                 asyncio.run_coroutine_threadsafe(deliver(output, line), loop).result(10)
             return result
@@ -393,6 +393,57 @@ class ScreenTests(unittest.IsolatedAsyncioTestCase):
                 await pilot.press(*"restore", "enter")
                 await self.settle(pilot, app)
                 self.assertEqual(len(restored), 1)
+
+    async def test_backup_checkboxes_delete_only_two_selected_after_typed_confirm(self):
+        from common import atomic
+
+        folders = [self.home / "fleet-backups/20261116-140000"]
+        for day in (17, 18):
+            folder = self.home / "fleet-backups" / f"202611{day}-140000"
+            atomic(folder / "MANIFEST.json", "[]")
+            atomic(folder / "RUN.json", '{"result":"SUCCESS"}')
+            atomic(folder / "home/.file", "original")
+            folders.append(folder)
+        app = FleetApp(FixtureSession())
+        with patch.object(ui_channel, "active", return_value=True):
+            async with app.run_test(size=(80, 24)) as pilot:
+                await self.settle(pilot, app)
+                await self.open_command(pilot, app, "backups")
+                await self.settle(pilot, app)
+                selections = app.screen.query_one("#backup-selection", SelectionList)
+                selections.focus()
+                await pilot.press("space", "down", "space")
+                selected = {Path(path) for path in selections.selected}
+                self.assertEqual(len(selected), 2)
+                actions = app.screen.query_one("#actions", OptionList)
+                actions.highlighted = actions.get_option_index("backup-delete-selected")
+                actions.focus()
+                await pilot.press("enter")
+                await pilot.pause()
+                self.assertIsInstance(app.screen, Review)
+                text = "\n".join(line.text for line in app.screen.query_one(RichLog).lines)
+                self.assertIn("2 backups", text)
+                self.assertIn("bytes", text)
+                self.assertTrue(all(folder.exists() for folder in folders))
+                await pilot.press("d", "enter")
+                self.assertIsInstance(app.screen, Review)
+                self.assertTrue(all(folder.exists() for folder in folders))
+                await pilot.press("escape")
+                await self.settle(pilot, app)
+                self.assertTrue(all(folder.exists() for folder in folders))
+                actions = app.screen.query_one("#actions", OptionList)
+                actions.highlighted = actions.get_option_index("backup-delete-selected")
+                actions.focus()
+                await pilot.press("enter")
+                await pilot.pause()
+                await pilot.press(*"delete", "enter")
+                await self.settle(pilot, app)
+                self.assertTrue(all(not folder.exists() for folder in selected))
+                self.assertTrue(all(folder.exists() for folder in set(folders) - selected))
+                self.assertEqual(
+                    app.screen.query_one("#backup-selection", SelectionList).option_count, 1
+                )
+                self.assertTrue(list(self.home.glob(".local/share/fleet/cleanup-runs/*/RUN.json")))
 
     async def test_phone_width_keyboard_and_plain_themes(self):
         for environment in ({"NO_COLOR": ""}, {"TERM": "dumb"}):

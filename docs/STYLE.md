@@ -34,6 +34,7 @@ The command audit uses these forms:
 | --- | --- |
 | machines set-ssh | --name, --target; no flags opens the terminal picker |
 | machines remove | --name |
+| backups delete | Exactly one of --all, --keep, or --name |
 | machines export | --output |
 | domain list / set | set requires --name |
 | groups list / set | set requires --name and --state |

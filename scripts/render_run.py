@@ -192,6 +192,22 @@ def render(record, future=False):
                 else:
                     lines.append("  " + markers[kind])
                     lines += wrap(text, "    ")
+                if detail := next(
+                    (
+                        entry
+                        for entry in record.get("backup_cleanup", [])
+                        if entry["path"] == item["path"]
+                    ),
+                    None,
+                ):
+                    lines += wrap(f"{detail['date']} · {detail['size']:,} bytes", "    ")
+    if record.get("backup_cleanup"):
+        selected = {item["path"] for item in files}
+        size = sum(entry["size"] for entry in record["backup_cleanup"] if entry["path"] in selected)
+        lines.append(
+            f"  Total: {len(selected)} backup{'s' if len(selected) != 1 else ''} · {size:,} bytes "
+            + ("will be freed." if future else "freed.")
+        )
     sections.append(lines)
 
     changes = record.get("profile_changes", []) if future or record.get("profile_written") else []
@@ -258,7 +274,11 @@ def render(record, future=False):
                 ("Update", command + " update"),
                 (
                     "Rollback",
-                    str(backup) + "/MANIFEST.json" if backup else "not needed; nothing applied",
+                    "Deleted backups cannot be restored."
+                    if record.get("backup_cleanup")
+                    else str(backup) + "/MANIFEST.json"
+                    if backup
+                    else "not needed; nothing applied",
                 ),
                 ("Wizard", command + " configure"),
             ],
@@ -266,7 +286,11 @@ def render(record, future=False):
         )
     )
 
-    lines = []
+    lines = (
+        wrap("Update triggered by: " + ", ".join(record["update_triggers"]) + ".")
+        if record.get("update_triggers")
+        else []
+    )
     for section in sections:
         if lines:
             lines.append("")
@@ -296,7 +320,7 @@ def render(record, future=False):
     if len(footer) > WIDTH or "\n" in raw_status or structured_status:
         footer = f"chezmoi status: details in RUN.json · warnings: {len(warnings) if warnings else 'none'}"
     lines += ["", footer]
-    record_path = str(backup) + "/RUN.json" if backup else None
+    record_path = record.get("record_path") or (str(backup) + "/RUN.json" if backup else None)
     pointer = (
         "Run record: " + human(record_path, home)
         if record_path

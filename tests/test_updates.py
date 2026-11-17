@@ -242,7 +242,7 @@ class UpdateTests(unittest.TestCase):
         advance(self.origin, 1, content="remote")
         self.assertIn("diverged", self.cli("check", expected=2))
         self.assertEqual((self.home / updates.CACHE).read_bytes(), cache)
-        self.assertIn("diverged", self.cli("update", expected=1))
+        self.assertIn("diverged", self.cli("update", expected=2))
         self.assertEqual(before, self.snapshot())
 
     def test_dirty_or_untracked_upstream_refuses_both_actions(self):
@@ -254,11 +254,11 @@ class UpdateTests(unittest.TestCase):
         dirty = local / "README.fixture"
         dirty.write_text("uncommitted")
         self.assertIn("local edits", self.cli("check", expected=2))
-        self.assertIn("local edits", self.cli("update", expected=1))
+        self.assertIn("local edits", self.cli("update", expected=2))
         dirty.unlink()
         command("git", "-C", str(local), "config", "--unset", "branch.main.merge")
         self.assertIn("no remote upstream", self.cli("check", expected=2))
-        self.assertIn("no remote upstream", self.cli("update", expected=1))
+        self.assertIn("no remote upstream", self.cli("update", expected=2))
         self.assertEqual((self.home / updates.CACHE).read_bytes(), cache)
         self.assertEqual(before, self.snapshot())
 

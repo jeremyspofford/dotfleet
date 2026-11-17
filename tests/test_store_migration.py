@@ -113,6 +113,9 @@ class StoreMigrationTests(unittest.TestCase):
     def test_update_moves_stores_before_reading_profile(self):
         self.enroll()
         profile, stores, inodes = self.legacy_stores()
+        from test_updates import advance
+
+        advance(self.origin, 1)
         self.assert_migration(self.cli("update"), profile, stores, inodes)
         self.assertNotIn("Store moved:", self.cli("update"))
         self.assert_quiet_status()

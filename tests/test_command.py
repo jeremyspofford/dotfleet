@@ -233,7 +233,7 @@ class CommandTests(unittest.TestCase):
         Path("/tmp/dotfleet-command-status.txt").write_text(status)
         self.assertIn("Content commit", self.cli("version"))
         self.assertIn("needs a terminal", self.cli("configure", expected=1))
-        self.assertIn("no changes.", self.cli("update"))
+        self.assertIn("No backup taken.", self.cli("update"))
 
     def test_configure_keeps_the_terminal_wizard_and_standard_review(self):
         self.enroll()

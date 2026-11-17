@@ -18,6 +18,8 @@ GROUPS = {
         "remove": "Remove a stale machine record.\nKeep the active machine.",
     },
     "backups": {
+        "delete": "Delete saved backups after typing delete to confirm.\n"
+        "Deleted backups cannot be rolled back to.",
         "create": "Copy managed files and the profile into a new private backup.\n"
         "Change no managed files.\nPrint the backup location and run record.",
         "list": "List saved copies with their dates, results, sizes, and locations.",
@@ -46,7 +48,7 @@ EXAMPLES = {
     "domain": "domain list; domain set --name personal",
     "groups": "groups list; groups set --name docker --state off",
     "pins": "pins list; pins set --tool node --version 24.14.1; pins remove --tool node",
-    "backups": "backups create; backups list",
+    "backups": "backups create; backups list; backups delete --name BACKUP; backups delete --keep 2; backups delete --all",
     "secrets": "secrets list",
     "content": "content show",
     "profile": "profile show",
@@ -112,7 +114,16 @@ def add_groups(parser, name, formatter, display):
 
 
 def add_action_parameters(parser, name, action):
-    if name == "machines":
+    if name == "backups" and action == "delete":
+        selectors = parser.add_mutually_exclusive_group(required=True)
+        selectors.add_argument(
+            "--all", dest="all_backups", action="store_true", help="delete every saved backup"
+        )
+        selectors.add_argument(
+            "--keep", type=int, help="keep the newest N backups; delete older ones; zero keeps none"
+        )
+        selectors.add_argument("--name", help="one folder name from backups list")
+    elif name == "machines":
         if action == "set-ssh":
             # Keep the specifically promised old registration syntax out of help.
             parser.add_argument("legacy_name", nargs="?", help=argparse.SUPPRESS)

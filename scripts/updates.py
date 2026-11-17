@@ -7,6 +7,7 @@ Help: python3 scripts/updates.py --help.
 """
 
 import datetime
+
 import json
 import os
 from pathlib import Path
@@ -19,6 +20,9 @@ from installation import MANAGER
 
 CACHE = ".local/share/fleet/check.json"
 FETCH_TIMEOUT = 10
+CURRENT_MESSAGE = (
+    "Fleet is up to date — manager and content match upstream, checked just now. No backup taken."
+)
 
 
 class CheckError(RuntimeError):

@@ -16,7 +16,7 @@ from textual.containers import Vertical, VerticalScroll
 from textual.screen import ModalScreen, Screen
 from textual.theme import BUILTIN_THEMES, Theme
 from textual.worker import WorkerCancelled, get_current_worker
-from textual.widgets import Button, Input, OptionList, RichLog, Select, Static
+from textual.widgets import Button, Input, OptionList, RichLog, Select, SelectionList, Static
 from textual.widgets.option_list import Option
 
 from render_run import human, render
@@ -248,6 +248,11 @@ class ActionScreen(Screen):
             title += " · " + self.machine
         yield Static("Fleet · " + title, classes="heading")
         yield RichLog(id="output", wrap=True, highlight=False, min_width=1)
+        if self.action == "backups":
+            yield SelectionList(id="backup-selection")
+            yield Static(
+                "Space toggles a backup. Tab moves to restore or delete actions.", classes="keys"
+            )
         yield Static("Working…", id="progress")
         yield OptionList(Option("Back", id="back"), id="actions")
         yield Static("↑↓ / Tab move · Enter selects · Esc back · q quits", classes="keys")
@@ -285,11 +290,24 @@ class ActionScreen(Screen):
             for index, machine in enumerate(self.connections):
                 options.add_option(Option(machine, id=f"machine-{index}"))
         for action in RELATED.get(self.action, ()):
-            options.add_option(Option(ACTIONS[action][0], id=action))
+            disabled = (
+                action == "backup-delete-selected"
+                and not self.query_one("#backup-selection", SelectionList).selected
+            )
+            options.add_option(Option(ACTIONS[action][0], id=action, disabled=bool(disabled)))
         options.add_option(Option("Back", id="back"))
         options.disabled = False
         options.highlighted = 0
         options.focus()
+
+    @on(SelectionList.SelectedChanged, "#backup-selection")
+    def backup_selection_changed(self):
+        options = self.query_one("#actions", OptionList)
+        if any(option.id == "backup-delete-selected" for option in options.options):
+            options.get_option("backup-delete-selected").disabled = not self.query_one(
+                SelectionList
+            ).selected
+            options.refresh()
 
     @on(OptionList.OptionSelected, "#actions")
     async def selected(self, event):
@@ -298,6 +316,11 @@ class ActionScreen(Screen):
             self.app.exit()
         elif choice == "back":
             await self.app.action_back()
+        elif choice == "backup-delete-selected":
+            selected = self.query_one("#backup-selection", SelectionList).selected
+            self.app.perform_action(self, choice, selected=[Path(path).name for path in selected])
+        elif choice == "backup-delete-all":
+            self.app.perform_action(self, choice)
         elif choice.startswith("restore-"):
             self.app.perform_action(
                 self, "rollback", self.backups[int(choice.removeprefix("restore-"))]
@@ -412,7 +435,7 @@ class FleetApp(App[str]):
             self.push_screen(ActionScreen(action))
 
     @work
-    async def perform_action(self, screen, action, backup=None):
+    async def perform_action(self, screen, action, backup=None, selected=None):
         if self.busy:
             return
         self.busy = True
@@ -435,6 +458,14 @@ class FleetApp(App[str]):
         def event(message):
             if message["kind"] == "backups":
                 screen.backups = message["items"]
+                if screen.action == "backups":
+                    choices = screen.query_one("#backup-selection", SelectionList)
+                    selected = set(choices.selected)
+                    choices.clear_options()
+                    choices.add_options(
+                        [(Path(path).name, path, path in selected) for path in screen.backups]
+                    )
+                    choices.highlighted = 0 if screen.backups else None
             elif message["kind"] == "connections":
                 screen.connections = message["items"]
             elif message["kind"] == "uninstalled":
@@ -448,6 +479,7 @@ class FleetApp(App[str]):
                 self.confirm,
                 backup,
                 **({"machine": screen.machine} if screen.machine else {}),
+                **({"selected": selected} if selected is not None else {}),
             )
             normal = result == 0 or action in ("check", "diff") and result == 1
             progress.update(
