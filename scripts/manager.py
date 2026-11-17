@@ -809,6 +809,13 @@ def prepare(home, checkout, profile, manifest, folder):
     )
     agent_deploy.require_no_conflicts(agents, command_name(profile))
     changed |= agents.changed_paths(home)
+    # Agent installers change their own settings. Back those files up; they are not Fleet outputs.
+    plugin_agents = {record["agent"] for record in agents.plugin_installs + agents.plugin_removals}
+    plugin_files = {
+        relative
+        for agent in plugin_agents
+        for relative in wizard.agent_manifest()[agent].get("plugin_files", [])
+    }
     changed |= {name for name in stale if fingerprint(home / name) is not None}
     controls = {
         ".local/share/fleet/registry.toml",
@@ -833,6 +840,7 @@ def prepare(home, checkout, profile, manifest, folder):
             changed.add(name)
     # Output inventories are bookkeeping, not rendered home settings.
     all_paths = names | set(generated) | stale | controls | agents.all_paths() | changed | removed
+    all_paths |= plugin_files
     for tool in ["chezmoi", "mise"]:
         if os.environ.get("DOTFLEET_STAGED_" + tool.upper()):
             all_paths.add(".local/bin/" + tool)
@@ -847,7 +855,7 @@ def prepare(home, checkout, profile, manifest, folder):
         or target.stat().st_mode & 0o777 != 0o700
     ):
         changed.add(COMMAND)
-    if agents.all_paths() or (home / agent_deploy.INVENTORY).exists():
+    if agents.all_paths() or plugin_agents or (home / agent_deploy.INVENTORY).exists():
         all_paths.add(agent_deploy.INVENTORY)
         changed.add(agent_deploy.INVENTORY)
     return dict(
@@ -914,6 +922,12 @@ def publish_checkout(home, checkout, profile, backup_path):
     return canonical
 
 
+def wizard_catalog():
+    import enrollment as wizard
+
+    return wizard.agent_manifest()
+
+
 def apply_confirmed_plan(
     home, checkout, profile, plan, backup_path, account, before_apply, warnings
 ):
@@ -968,7 +982,7 @@ def apply_confirmed_plan(
         # Retire only this path's remembered entry; preserve all other conflict state.
         run("chezmoi", "state", "delete", "--bucket=entryState", "--key=" + str(path))
     # Agent outputs first: earlier skill links must leave before content installs skill folders.
-    agent_deploy.apply(home, plan["agents"])
+    agent_deploy.apply(home, plan["agents"], wizard_catalog(), account)
     account.confirm_files(fingerprint)
     result = subprocess.run(["bash", str(ROOT / "scripts/apply.sh")])
     account.confirm_files(fingerprint)

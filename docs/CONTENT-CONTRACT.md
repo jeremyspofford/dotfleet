@@ -130,6 +130,7 @@ A key from the other transport fails validation.
 
 A connector accepts an optional `url` that starts with `https://`.
 A plugin's `sources` maps an agent name to an `id` and an optional `marketplace`. Fleet treats both as that agent's own notation.
+Fleet installs and removes declared plugins through each agent's own installer. See [agent configuration](AGENTS.md#plugins).
 A hook's `event` is `session-start`, `session-end`, `prompt-submit`, `before-tool`, `after-tool`, or `stop`.
 Tool events accept `tools`: `shell`, `edit`, `read`, or `mcp`. `timeout` counts whole seconds.
 Hooks and stdio servers run commands from content. Use only trusted repositories.

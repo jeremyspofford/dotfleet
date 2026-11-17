@@ -193,6 +193,12 @@ class RunAccount:
         self.status = plan["status"]
         agents = plan.get("agents")
         self.agent_steps = (agents.kept + agents.notes + agents.steps) if agents else []
+        if agents:
+            import agent_deploy
+
+            # Plugin actions are software changes. Replan replaces earlier rows.
+            self.software = [item for item in self.software if not item.get("plugin")]
+            self.software += agent_deploy.plugin_software(agents)
         run_index.stage("review")
 
     def bind_backup(self, path):

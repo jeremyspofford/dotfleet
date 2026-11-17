@@ -72,6 +72,57 @@ SIGN_IN = {
 OPENCODE_SCHEMA = "https://opencode.ai/config.json"
 
 
+def extension_name(source):
+    """Gemini CLI uninstalls by extension name: the last part of its source address."""
+    return source.rstrip("/").removesuffix(".git").rsplit("/", 1)[-1]
+
+
+# Plugins are fully managed through each agent's own installer, driven by the inventory.
+# Fleet's review is the consent step. Claude Code still asks before any marketplace command.
+PLUGIN_COMMANDS = {
+    "claude": {
+        "marketplace": lambda command, source: [command, "plugin", "marketplace", "add", source],
+        "install": lambda command, source: [
+            command,
+            "plugin",
+            "install",
+            source,
+            "--scope",
+            "user",
+        ],
+        "uninstall": lambda command, source: [
+            command,
+            "plugin",
+            "uninstall",
+            source,
+            "--scope",
+            "user",
+        ],
+    },
+    "codex": {
+        "marketplace": lambda command, source: [command, "plugin", "marketplace", "add", source],
+        "install": lambda command, source: [command, "plugin", "add", source],
+        "uninstall": lambda command, source: [command, "plugin", "remove", source],
+    },
+    "gemini": {
+        "install": lambda command, source: [command, "extensions", "install", source, "--consent"],
+        "uninstall": lambda command, source: [
+            command,
+            "extensions",
+            "uninstall",
+            extension_name(source),
+        ],
+    },
+    "opencode": {
+        "install": lambda command, source: [command, "plugin", source, "--global"],
+    },
+    "pi": {
+        "install": lambda command, source: [command, "install", source],
+        "uninstall": lambda command, source: [command, "remove", source],
+    },
+}
+
+
 @dataclass
 class Output:
     """An owned path: a tree file or a pointer link that Fleet creates and owns whole."""
@@ -146,6 +197,10 @@ class Plan:
     adopted: list = field(default_factory=list)
     previous: dict = field(default_factory=dict)
     files: dict = field(default_factory=dict)
+    plugins: list = field(default_factory=list)
+    plugin_installs: list = field(default_factory=list)
+    plugin_removals: list = field(default_factory=list)
+    released_plugins: list = field(default_factory=list)
 
     def changed_paths(self, home):
         """Home-relative paths that apply would create, replace, or remove."""
@@ -197,7 +252,7 @@ def load_inventory(home):
     for relative, record in data.items():
         saved = {"link": record["link"]} if "link" in record else {"sha256": record["sha256"]}
         paths[relative] = {"agent": record.get("agent", ""), "item": "legacy", "fingerprint": saved}
-    return {"schema_version": SCHEMA, "paths": paths, "entries": []}
+    return {"schema_version": SCHEMA, "paths": paths, "entries": [], "plugins": []}
 
 
 def matches(path, saved):
@@ -486,9 +541,22 @@ class Planner:
         if self.items("pi", "rules"):
             self.plan.notes.append("pi: rule sets are unsupported; Pi reads no include file.")
 
+    def plugins(self, agent):
+        for item in self.items(agent, "plugins"):
+            source = item.spec["sources"][agent]
+            self.plan.plugins.append(
+                {
+                    "agent": agent,
+                    "item": item.key,
+                    "id": source["id"],
+                    "marketplace": source.get("marketplace", ""),
+                }
+            )
+
     def build(self, agents):
         for agent in agents:
             getattr(self, agent)()
+            self.plugins(agent)
         return self.plan
 
 
@@ -795,6 +863,7 @@ def plan(home, checkout, profile, table, catalog, managed=frozenset()):
             result.kept.append(
                 f"{old.agent}: {old.item} in ~/{old.file} changed after Fleet wrote it; kept."
             )
+    plan_plugins(result, inventory, profile, off_agents)
     for relative, edits in files.items():
         outcome = edited_text(home, relative, edits[0][0].format, edits)
         if outcome is not None:
@@ -803,6 +872,119 @@ def plan(home, checkout, profile, table, catalog, managed=frozenset()):
     result.steps = list(dict.fromkeys(result.steps))
     result.notes = list(dict.fromkeys(result.notes))
     return result
+
+
+def plugin_key(record):
+    return (record["agent"], record["item"])
+
+
+def plan_plugins(result, inventory, profile, off_agents):
+    """Compare desired plugins with recorded installs. Install, replace, or remove."""
+    recorded = {plugin_key(record): record for record in inventory.get("plugins", [])}
+    desired = {plugin_key(record): record for record in result.plugins}
+    exceptions = agent_table.exceptions(profile)
+    for key, record in desired.items():
+        old = recorded.get(key)
+        if old and (old["id"], old["marketplace"]) == (record["id"], record["marketplace"]):
+            continue
+        if old:
+            result.plugin_removals.append(old)
+        result.plugin_installs.append(record)
+    for key, old in recorded.items():
+        if key in desired or old["agent"] in off_agents:
+            continue  # Turning an agent off keeps its plugins.
+        if exceptions.get(old["item"]) == "local":
+            result.released_plugins.append(old)
+            result.notes.append(
+                f"{old['agent']}: {old['item']} stays installed; Fleet released it."
+            )
+        else:
+            result.plugin_removals.append(old)
+
+
+def plugin_software(result):
+    """Describe plugin actions as software rows for the run account."""
+    rows = []
+    for action, records in (
+        ("removed", result.plugin_removals),
+        ("installed", result.plugin_installs),
+    ):
+        for record in records:
+            rows.append(
+                {
+                    "name": f"{record['agent']} plugin {record['item'].removeprefix('plugins.')}",
+                    "version": record["id"],
+                    "old": None,
+                    "path": f"{record['agent']}'s own plugin installer",
+                    "action": action,
+                    "plugin": True,
+                }
+            )
+    return rows
+
+
+def run_installer(arguments):
+    """Run one agent installer command. Fleet decided; the agent never reads Fleet's input."""
+    result = subprocess.run(arguments, stdin=subprocess.DEVNULL, text=True, capture_output=True)
+    if result.returncode:
+        detail = (result.stderr.strip() or result.stdout.strip()).splitlines()[-3:]
+        raise RuntimeError(f"{' '.join(arguments)} failed: " + " ".join(detail))
+    return result
+
+
+def remove_opencode_plugin(home, catalog, module):
+    """OpenCode has no uninstall command. Remove the module from its plugin list."""
+    relative = catalog["opencode"]["mcp_file"]
+    _, data = read_shared(home, relative, "json")
+    plugins = data.get("plugin", [])
+    kept = [name for name in plugins if name != module and not str(name).startswith(module + "@")]
+    if kept == plugins:
+        return
+    data["plugin"] = kept
+    if not kept:
+        del data["plugin"]
+    path = home / relative
+    atomic(path, json.dumps(data, indent=2) + "\n", path.stat().st_mode & 0o777)
+
+
+def apply_plugins(home, result, catalog, inventory, account=None):
+    """Run each planned uninstall, then each install. Record every success at once."""
+    import shutil
+
+    released = {plugin_key(old) for old in result.released_plugins}
+    inventory["plugins"] = [
+        record for record in inventory.get("plugins", []) if plugin_key(record) not in released
+    ]
+    save_inventory(home, inventory)
+    for record in result.plugin_removals:
+        command = shutil.which(catalog[record["agent"]]["command"])
+        commands = PLUGIN_COMMANDS[record["agent"]]
+        if record["agent"] == "opencode":
+            remove_opencode_plugin(home, catalog, record["id"])
+        elif command:
+            run_installer(commands["uninstall"](command, record["id"]))
+        else:
+            raise RuntimeError(f"{record['agent']} is not on PATH; cannot remove {record['item']}.")
+        inventory["plugins"] = [item for item in inventory["plugins"] if item != record]
+        save_inventory(home, inventory)
+        if account:
+            account.applied_software.add(plugin_software(Plan(plugin_removals=[record]))[0]["name"])
+    for record in result.plugin_installs:
+        command = shutil.which(catalog[record["agent"]]["command"])
+        if not command:
+            raise RuntimeError(
+                f"{record['agent']} is not on PATH; cannot install {record['item']}."
+            )
+        commands = PLUGIN_COMMANDS[record["agent"]]
+        if record["marketplace"] and "marketplace" in commands:
+            run_installer(commands["marketplace"](command, record["marketplace"]))
+        run_installer(commands["install"](command, record["id"]))
+        inventory["plugins"] = [
+            item for item in inventory["plugins"] if plugin_key(item) != plugin_key(record)
+        ] + [record]
+        save_inventory(home, inventory)
+        if account:
+            account.applied_software.add(plugin_software(Plan(plugin_installs=[record]))[0]["name"])
 
 
 def require_no_conflicts(result, display="fleet"):
@@ -814,8 +996,11 @@ def require_no_conflicts(result, display="fleet"):
         )
 
 
-def apply(home, result):
-    """Write the tree, pointers, and owned entries. Record intent before the first write."""
+def apply(home, result, catalog=None, account=None):
+    """Write the tree, pointers, and owned entries, then run plugin installers.
+
+    Record intent before the first write.
+    """
     inventory = {
         "schema_version": SCHEMA,
         "paths": {
@@ -828,6 +1013,7 @@ def apply(home, result):
             for item in result.previous.get("entries", [])
             if entry_from(item).key() not in {entry.key() for entry in result.stale_entries}
         ],
+        "plugins": list(result.previous.get("plugins", [])),
     }
     if not (result.outputs or result.entries or result.previous.get("paths")) and not (
         result.previous.get("entries") or (home / INVENTORY).exists()
@@ -870,6 +1056,8 @@ def apply(home, result):
         del inventory["paths"][relative]
     remove_empty_folders(home / TREE)
     save_inventory(home, inventory)
+    if result.plugin_installs or result.plugin_removals or result.released_plugins:
+        apply_plugins(home, result, catalog, inventory, account)
 
 
 def pending_edits(home, result, relative):
@@ -969,6 +1157,9 @@ def describe(result):
         f"Remove stale agent entry: {entry.item} in ~/{entry.file}"
         for entry in result.stale_entries
     ]
+    for row in plugin_software(result):
+        verb = "Install" if row["action"] == "installed" else "Remove"
+        lines.append(f"{verb} plugin: {row['name']} ({row['version']})")
     return lines + result.kept + result.notes + result.steps
 
 

@@ -57,7 +57,9 @@ FILES = {
 ALL = ["claude", "codex", "gemini", "opencode", "pi"]
 
 
-class DeployTests(unittest.TestCase):
+class Fixture(unittest.TestCase):
+    """A throwaway home and content checkout with every rendered agent on."""
+
     def setUp(self):
         self.folder = tempfile.TemporaryDirectory()
         base = Path(self.folder.name)
@@ -92,6 +94,8 @@ class DeployTests(unittest.TestCase):
     def read_json(self, relative):
         return json.loads((self.home / relative).read_text())
 
+
+class DeployTests(Fixture):
     def test_claude_and_gemini_receive_one_pointer_each_to_the_tree(self):
         self.run_plan()
         tree = self.home / agent_deploy.TREE
@@ -351,6 +355,111 @@ class DeployTests(unittest.TestCase):
             servers = json.loads(restored.read_text())["mcpServers"]
         self.assertEqual(servers["docs"]["command"], "npx")
         self.assertEqual(servers["mine"], {"command": "mine"})
+
+
+PLUGINS = """
+[agents]
+schema = 1
+[agents.plugins.review-kit]
+description = "Review commands."
+[agents.plugins.review-kit.sources]
+claude = { id = "review-kit@example", marketplace = "example/plugins" }
+gemini = { id = "https://github.com/example/review-kit" }
+opencode = { id = "opencode-review" }
+pi = { id = "npm:@example/review" }
+"""
+
+
+class PluginTests(Fixture):
+    """Plugins install and uninstall through each agent's own installer."""
+
+    def setUp(self):
+        super().setUp()
+        self.bin = Path(self.folder.name) / "bin"
+        self.bin.mkdir()
+        self.log = Path(self.folder.name) / "installers.log"
+        for name in ALL:
+            script = self.bin / name
+            script.write_text(
+                f'#!/bin/sh\necho "{name} $*" >> {self.log}\n'
+                f"[ -e {self.folder.name}/fail-{name} ] && exit 3\nexit 0\n"
+            )
+            script.chmod(0o755)
+        path = patch.dict(os.environ, {"PATH": f"{self.bin}:{os.environ['PATH']}"})
+        path.start()
+        self.addCleanup(path.stop)
+
+    def calls(self):
+        lines = self.log.read_text().splitlines() if self.log.exists() else []
+        self.log.write_text("")
+        return lines
+
+    def deploy(self, text=PLUGINS):
+        result = self.plan(text)
+        agent_deploy.apply(self.home, result, CATALOG)
+        return result
+
+    def plugins(self):
+        return json.loads((self.home / agent_deploy.INVENTORY).read_text())["plugins"]
+
+    def test_declared_plugins_install_through_each_agent_installer(self):
+        result = self.deploy()
+        self.assertEqual(
+            self.calls(),
+            [
+                "claude plugin marketplace add example/plugins",
+                "claude plugin install review-kit@example --scope user",
+                "gemini extensions install https://github.com/example/review-kit --consent",
+                "pi install npm:@example/review",
+                "opencode plugin opencode-review --global",
+            ],
+        )
+        self.assertEqual(len(self.plugins()), 4)
+        rows = agent_deploy.plugin_software(result)
+        self.assertEqual(rows[0]["name"], "claude plugin review-kit")
+        self.assertEqual({row["action"] for row in rows}, {"installed"})
+        self.deploy()
+        self.assertEqual(self.calls(), [])
+
+    def test_removed_declarations_uninstall_and_changed_sources_reinstall(self):
+        self.deploy()
+        self.calls()
+        settings = self.home / ".config/opencode/opencode.json"
+        settings.parent.mkdir(parents=True, exist_ok=True)
+        settings.write_text(json.dumps({"plugin": ["opencode-review@1.2.0", "mine"]}))
+        changed = PLUGINS.replace("npm:@example/review", "npm:@example/review-two")
+        changed = changed.replace('opencode = { id = "opencode-review" }\n', "")
+        changed = changed.replace('gemini = { id = "https://github.com/example/review-kit" }\n', "")
+        self.deploy(changed)
+        self.assertEqual(
+            self.calls(),
+            [
+                "pi remove npm:@example/review",
+                "gemini extensions uninstall review-kit",
+                "pi install npm:@example/review-two",
+            ],
+        )
+        self.assertEqual(json.loads(settings.read_text())["plugin"], ["mine"])
+        self.assertEqual({record["agent"] for record in self.plugins()}, {"claude", "pi"})
+
+    def test_agent_off_keeps_plugins_and_local_exceptions_release_them(self):
+        self.deploy()
+        self.calls()
+        self.profile["agents"]["pi"] = False
+        self.profile["agent_items"] = {"plugins.review-kit": "local"}
+        result = self.deploy()
+        self.assertEqual(self.calls(), [])
+        self.assertIn(
+            "claude: plugins.review-kit stays installed; Fleet released it.", result.notes
+        )
+        self.assertEqual([record["agent"] for record in self.plugins()], ["pi"])
+
+    def test_failed_installs_stop_and_record_only_completed_work(self):
+        (Path(self.folder.name) / "fail-gemini").touch()
+        with self.assertRaises(RuntimeError) as caught:
+            self.deploy()
+        self.assertIn("gemini extensions install", str(caught.exception))
+        self.assertEqual([record["agent"] for record in self.plugins()], ["claude"])
 
 
 if __name__ == "__main__":

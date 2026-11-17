@@ -68,6 +68,29 @@ OpenCode and Pi run hooks only through code plugins. Fleet reports their hooks a
 OpenCode merges `opencode.jsonc` after `opencode.json`. A same-name server there overrides Fleet's entry.
 Fleet then skips that server for OpenCode and reports the override. The run continues.
 
+## Plugins
+
+A plugin is a package that an agent installs to add skills, commands, hooks, or servers.
+Fleet fully manages declared plugins. It runs each agent's own installer, driven by the inventory:
+
+| Agent | Install | Remove |
+| --- | --- | --- |
+| claude | `claude plugin marketplace add MARKETPLACE`, then `claude plugin install ID --scope user` | `claude plugin uninstall ID --scope user` |
+| codex | `codex plugin marketplace add MARKETPLACE`, then `codex plugin add ID` | `codex plugin remove ID` |
+| gemini | `gemini extensions install ID --consent` | `gemini extensions uninstall NAME`, where NAME is the last part of ID |
+| opencode | `opencode plugin ID --global` | Fleet removes ID from the `plugin` list in `opencode.json`; OpenCode has no uninstall command. |
+| pi | `pi install ID` | `pi remove ID` |
+
+Fleet's review is the consent step. Gemini CLI's own confirmation is skipped with `--consent`.
+Claude Code still refuses a marketplace-declared command without a person's approval. That install then fails and names the command.
+The run account lists plugin installs and removals under Software. Backups copy each agent's settings file first.
+Fleet runs no other agent command to write settings.
+
+An install runs when a plugin is declared for an agent that is on. Changing a plugin's `id` or `marketplace` removes the old install first.
+A removed declaration or a domain change uninstalls the plugin. Turning an agent off keeps its plugins.
+The `local` exception releases a plugin: it stays installed, and Fleet stops managing it.
+A failed installer stops the run. The inventory records only completed installs and removals.
+
 ## Ownership, drift, and removal
 
 `~/.local/state/dotfleet/agents.json` is the inventory. It lists each owned path, each owned entry, and the keys Fleet wrote.

@@ -7,6 +7,8 @@ skills_source = "agents/skills"
 
 [agents.claude]
 render = true
+# The agent's own plugin installer writes these files; backups keep a copy.
+plugin_files = [".claude/settings.json"]
 command = "claude"
 mise_packages = ["claude", "claude-code", "@anthropic-ai/claude-code"]
 format = "json"
@@ -26,6 +28,8 @@ wsl = ".claude/skills"
 
 [agents.codex]
 render = true
+# The agent's own plugin installer writes these files; backups keep a copy.
+plugin_files = [".codex/config.toml"]
 # Codex accepts no pointer. Fleet writes owned entries in these shared files.
 mcp_file = ".codex/config.toml"
 hooks_file = ".codex/hooks.json"
@@ -48,6 +52,8 @@ wsl = ".agents/skills"
 
 [agents.gemini]
 render = true
+# The agent's own plugin installer writes these files; backups keep a copy.
+plugin_files = [".gemini/extensions/extension-enablement.json"]
 command = "gemini"
 mise_packages = ["gemini", "gemini-cli", "@google/gemini-cli"]
 format = "json"
@@ -89,6 +95,8 @@ wsl = ".grok/skills"
 
 [agents.pi]
 render = true
+# The agent's own plugin installer writes these files; backups keep a copy.
+plugin_files = [".pi/agent/settings.json"]
 mcp_file = ".pi/agent/mcp.json"
 command = "pi"
 mise_packages = ["pi", "pi-coding-agent", "@mariozechner/pi-coding-agent", "@earendil-works/pi-coding-agent"]
@@ -109,6 +117,8 @@ wsl = ".pi/agent/skills"
 
 [agents.opencode]
 render = true
+# The agent's own plugin installer writes these files; backups keep a copy.
+plugin_files = [".config/opencode/opencode.json"]
 mcp_file = ".config/opencode/opencode.json"
 command = "opencode"
 mise_packages = ["opencode", "opencode-ai"]

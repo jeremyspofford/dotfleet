@@ -116,6 +116,35 @@ class AgentModuleTests(unittest.TestCase):
         self.assertEqual(sorted((self.home / "fleet-backups").iterdir()), backups)
         self.assertIn('command = "my-docs"', (self.home / ".codex/config.toml").read_text())
 
+    def test_declared_plugins_install_through_the_agent_and_show_as_software(self):
+        self.enroll()
+        log = self.base / "claude.log"
+        fake = self.base / "tools/claude"
+        fake.write_text(f'#!/bin/sh\necho "$*" >> {log}\n')
+        fake.chmod(0o755)
+        (self.home / ".claude").mkdir()
+        manifest = (self.content / "dotfleet.toml").read_text()
+        plugin = (
+            "[agents]\nschema = 1\n[agents.plugins.review-kit]\n"
+            'description = "Review commands."\n'
+            '[agents.plugins.review-kit.sources]\nclaude = { id = "review-kit@example" }\n'
+        )
+        self.commit_content({"dotfleet.toml": manifest + plugin}, "feat: declare a plugin")
+        output = command(
+            "bash",
+            str(self.origin / "install.sh"),
+            "--defaults",
+            "--agents",
+            "claude",
+            env=self.env,
+            cwd=self.home,
+        )
+        self.assertIn("1 · Software — 1 installed.", output)
+        self.assertIn("claude plugin review-kit", output)
+        self.assertEqual(log.read_text(), "plugin install review-kit@example --scope user\n")
+        record = json.loads((self.home / agent_deploy.INVENTORY).read_text())
+        self.assertEqual(record["plugins"][0]["id"], "review-kit@example")
+
 
 if __name__ == "__main__":
     unittest.main()
