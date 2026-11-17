@@ -829,6 +829,10 @@ def apply(home, result):
             if entry_from(item).key() not in {entry.key() for entry in result.stale_entries}
         ],
     }
+    if not (result.outputs or result.entries or result.previous.get("paths")) and not (
+        result.previous.get("entries") or (home / INVENTORY).exists()
+    ):
+        return  # Nothing to record: keep machines without agent outputs free of an inventory.
     for relative, output in result.outputs.items():
         inventory["paths"][relative] = {
             "agent": output.agent,
