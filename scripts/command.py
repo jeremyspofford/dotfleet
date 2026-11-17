@@ -25,6 +25,7 @@ import owned_views
 import style
 import updates
 import store_migration
+from command_display import command_name, current_command
 from installation import COMMAND, MANAGER
 from render_run import render, render_view
 from run_account import RunAccount, commit, profile_changes
@@ -144,11 +145,12 @@ TERMS = (
 
 
 def parser():
+    display = current_command()
     argument_parser = style.ArgumentParser(
-        prog="dotfleet",
+        prog=display,
         description="Manage this machine after enrollment. A profile saves your choices.",
         epilog="Exit codes: 0 success, help, or cancellation; 1 failed operation or check; 2 invalid arguments or check failure; 130 interrupted. Check uses 1 for available updates.\n"
-        "Examples: dotfleet update; dotfleet status; dotfleet domain personal.\n"
+        f"Examples: {display} update; {display} status; {display} domain personal.\n"
         "First install or manager recovery: use the README one-line installer.\n" + TERMS,
         formatter_class=HelpFormatter,
     )
@@ -159,15 +161,15 @@ def parser():
     for name, detail in DESCRIPTIONS.items():
         command_parser = subcommands.add_parser(
             name,
-            prog="dotfleet " + name,
+            prog=display + " " + name,
             help=detail.split(". ")[0] + ".",
             description=detail,
             formatter_class=HelpFormatter,
-            epilog="Example: dotfleet "
+            epilog=f"Example: {display} "
             + name
             + "\n"
             + TERMS
-            + "\nRun dotfleet --help for exit codes. All prompts require Enter and use the terminal.",
+            + f"\nRun {display} --help for exit codes. All prompts require Enter and use the terminal.",
         )
         if name == "machines":
             command_parser.add_argument(
@@ -266,7 +268,7 @@ def info(title, pairs, home):
 def checkout_state(path):
     sha = commit(path)
     if not sha:
-        return "missing; run dotfleet update"
+        return f"missing; run {current_command()} update"
     dirty = bool(run("git", "-C", str(path), "status", "--porcelain").strip())
     ref = subprocess.run(
         ["git", "-C", str(path), "rev-parse", "--abbrev-ref", "@{upstream}"],
@@ -317,26 +319,28 @@ def domain_choices(home):
 
 def command_profile_gaps(saved_profile):
     """Keep the manager's validation, with fixes users can run through this command."""
+    display = command_name(saved_profile)
     gaps = []
     for gap in manager.profile_gaps(saved_profile):
         if gap.startswith("Domain "):
             gap = gap.replace(
                 "Supply --domain.",
-                "Run dotfleet domain to list choices, then dotfleet domain NAME.",
+                f"Run {display} domain to list choices, then {display} domain NAME.",
             )
         elif gap.startswith(("Git name ", "Git email ")):
-            gap = gap.split(". Supply ", 1)[0] + ". Run dotfleet configure."
+            gap = gap.split(". Supply ", 1)[0] + f". Run {display} configure."
         elif " pin is floating " in gap:
             tool = gap.split(" pin is floating ", 1)[0]
             gap = (
                 gap.split(". Supply ", 1)[0]
-                + f". Run dotfleet pins set {tool}@VERSION with a full version."
+                + f". Run {display} pins set {tool}@VERSION with a full version."
             )
         gaps.append(gap)
     return gaps
 
 
 def read_view(args, home, saved_profile):
+    display = command_name(saved_profile)
     name = args.command
     manifest = content_manifest(home / "dotfiles")
     if name == "profile":
@@ -367,7 +371,7 @@ def read_view(args, home, saved_profile):
             ("Choice", "chosen" if saved_profile.get("domain_chosen", False) else "UNCHOSEN"),
         ]
         pairs += list(domain_choices(home).items())
-        pairs.append(("Choose", "dotfleet domain NAME · replace NAME with a listed choice"))
+        pairs.append(("Choose", f"{display} domain NAME · replace NAME with a listed choice"))
     elif name == "groups":
         pairs = [
             (
@@ -389,14 +393,14 @@ def read_view(args, home, saved_profile):
                 "Domain choice",
                 "PASS · chosen"
                 if saved_profile.get("domain_chosen", False)
-                else "FAIL · UNCHOSEN; run dotfleet domain",
+                else f"FAIL · UNCHOSEN; run {display} domain",
             )
         )
         pairs += [("Gap", gap) for gap in gaps]
         pairs += [
             (
                 "Managed files",
-                "FAIL · run dotfleet diff to inspect drift" if drift else "PASS · no drift",
+                f"FAIL · run {display} diff to inspect drift" if drift else "PASS · no drift",
             )
         ]
         for label, path in [
@@ -411,10 +415,10 @@ def read_view(args, home, saved_profile):
                     label,
                     "PASS · clean"
                     if clean
-                    else "FAIL · save local edits, then run dotfleet update",
+                    else f"FAIL · save local edits, then run {display} update",
                 )
             )
-        pairs.append(("Backup", "PASS" if records(home) else "FAIL · run dotfleet backup"))
+        pairs.append(("Backup", "PASS" if records(home) else f"FAIL · run {display} backup"))
         config_path = home / ".config/chezmoi/chezmoi.toml"
         source = read_toml(config_path).get("sourceDir", "")
         pairs.append(("Manager config", str(config_path)))
@@ -423,7 +427,7 @@ def read_view(args, home, saved_profile):
                 "Converted source",
                 "PASS · " + source
                 if source and Path(source).is_dir()
-                else "FAIL · run dotfleet update",
+                else f"FAIL · run {display} update",
             )
         )
         info("Doctor", pairs, home)
@@ -439,7 +443,7 @@ def read_view(args, home, saved_profile):
                 + (
                     " · chosen"
                     if saved_profile.get("domain_chosen", False)
-                    else " · UNCHOSEN; run dotfleet domain"
+                    else f" · UNCHOSEN; run {display} domain"
                 ),
             ),
             (
@@ -452,7 +456,7 @@ def read_view(args, home, saved_profile):
                 )
                 if saved_profile.get("git_name", "").strip()
                 and saved_profile.get("git_email", "").strip()
-                else "missing; run dotfleet configure",
+                else f"missing; run {display} configure",
             ),
         ]
         pairs += [("Pin " + key, value) for key, value in pin_rows(saved_profile, home)] or [
@@ -461,7 +465,7 @@ def read_view(args, home, saved_profile):
         pairs += [("Group " + key, value) for key, value in saved_profile.get("groups", {}).items()]
         pairs += [
             ("Content", checkout_state(home / "dotfiles")),
-            ("Drift", "present; run dotfleet diff" if status(home) else "none"),
+            ("Drift", f"present; run {display} diff" if status(home) else "none"),
             (
                 "Last run",
                 str(last) + " · " + str(record.get("result", "unknown")) if last else "none",
@@ -471,13 +475,13 @@ def read_view(args, home, saved_profile):
             (
                 "Converted source",
                 read_toml(home / ".config/chezmoi/chezmoi.toml").get(
-                    "sourceDir", "missing; run dotfleet update"
+                    "sourceDir", f"missing; run {display} update"
                 ),
             ),
         ]
     info(name.capitalize(), pairs or [("Selections", "none")], home)
     if name == "status":
-        print(updates.summary(home))
+        print(updates.summary(home, saved_profile))
     return 0
 
 
@@ -686,6 +690,7 @@ def transaction(home, operations, label, selected=None, require_word=None, tree_
     )
     account.profile = profile_changes(account.old_profile, new_profile)
     account.selected_profile = new_profile
+    account.instruction_commands["after"] = command_name(new_profile)
     with tempfile.TemporaryDirectory(prefix="dotfleet-restore-") as temporary:
         account.diff_path = Path(temporary) / "diff"
         diff = (
@@ -747,7 +752,9 @@ def transaction(home, operations, label, selected=None, require_word=None, tree_
             account.confirm_files(manager.fingerprint)
             drift = status(home) if (home / ".config/chezmoi/chezmoi.toml").exists() else ""
             return account.finish(
-                "SUCCESS", [], "differences remain; run dotfleet diff" if drift else "clean"
+                "SUCCESS",
+                [],
+                f"differences remain; run {current_command(home)} diff" if drift else "clean",
             )
         except (OSError, ValueError, RuntimeError) as error:
             account.confirm_files(manager.fingerprint)
@@ -793,6 +800,7 @@ def main(argv=None):
     args = parser().parse_args(argv)
     try:
         saved_profile = profile(home)
+        display = command_name(saved_profile)
         if args.command == "check":
             return updates.check(home, saved_profile)
         if args.command == "status" and args.check:
@@ -845,7 +853,7 @@ def main(argv=None):
         if args.command == "configure":
             if not manager.has_terminal():
                 raise ValueError(
-                    "Configure needs a terminal. Run dotfleet configure in an interactive shell."
+                    f"Configure needs a terminal. Run {display} configure in an interactive shell."
                 )
             return manager.main(["--configure"])
         if args.command == "rollback":
@@ -892,7 +900,7 @@ def main(argv=None):
         os.environ["DOTFLEET_LOCAL_CONTENT"] = "1"
         if args.command == "domain":
             if args.name not in domain_choices(home):
-                raise ValueError("Unknown domain. Run dotfleet domain to list choices.")
+                raise ValueError(f"Unknown domain. Run {display} domain to list choices.")
             return manager.main(["--defaults", "--domain", args.name])
         if args.command == "groups":
             if not args.state:
@@ -1019,7 +1027,9 @@ def remove_machine(home, hostname):
             atomic(path, after)
             account.confirm_files(manager.fingerprint)
     return account.finish(
-        "SUCCESS", [], "differences remain; run dotfleet diff" if status(home) else "clean"
+        "SUCCESS",
+        [],
+        f"differences remain; run {current_command(home)} diff" if status(home) else "clean",
     )
 
 
@@ -1050,7 +1060,9 @@ def snapshot(home, operations):
         if source.exists():
             shutil.copytree(source, folder / "previous-chezmoi-source", symlinks=True)
         return account.finish(
-            "SUCCESS", [], "differences remain; run dotfleet diff" if account.status else "clean"
+            "SUCCESS",
+            [],
+            f"differences remain; run {current_command(home)} diff" if account.status else "clean",
         )
 
 

@@ -85,7 +85,7 @@ class UpdateTests(unittest.TestCase):
         self.assertEqual([entry["path"] for entry in record["sources"]], list(map(str, paths)))
         behind_status = self.cli("status")
         self.assertIn(
-            f"Updates: manager +3, content +1 (checked {self.checked_time()}) — run: fleet update",
+            f"Updates: manager +3, content +1 (checked {self.checked_time()}) — run: dotfleet update",
             behind_status,
         )
         # Local-only choices must not leak into update and silently suppress content pulls.
@@ -134,7 +134,7 @@ class UpdateTests(unittest.TestCase):
             for path in self.paths()
         ]
         output = self.cli("status")
-        self.assertIn("Updates: not checked — run: fleet check", output)
+        self.assertIn("Updates: not checked — run: dotfleet check", output)
         self.assertFalse((self.home / updates.CACHE).exists())
         self.assertEqual(before, self.snapshot())
         for path, refs, fetched in git_state:
@@ -147,7 +147,7 @@ class UpdateTests(unittest.TestCase):
             )
         output = self.cli("status", "--check", expected=1)
         self.assertIn(
-            f"Updates: manager +3 (checked {self.checked_time()}) — run: fleet update", output
+            f"Updates: manager +3 (checked {self.checked_time()}) — run: dotfleet update", output
         )
         self.assertEqual(output.count("Updates:"), 1)
         self.assertNotIn("Manager: 3 commits behind", output)

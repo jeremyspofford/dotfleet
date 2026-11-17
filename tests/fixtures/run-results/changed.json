@@ -14,6 +14,13 @@
       "path": "/home/example/.local/bin/mise",
       "old": null,
       "action": "present"
+    },
+    {
+      "name": "dotfleet",
+      "version": "0.2.0",
+      "path": "/home/example/.local/bin/dotfleet",
+      "old": null,
+      "action": "present"
     }
   ],
   "checkouts": [
@@ -107,7 +114,15 @@
   "result": "SUCCESS",
   "warnings": [],
   "chezmoi_status_after": "CLEAN (no differences)",
-  "selected_profile": {},
+  "selected_profile": {
+    "groups": {
+      "helpers": true
+    }
+  },
   "available_defaults": {},
-  "adoption_excluded": []
+  "adoption_excluded": [],
+  "instruction_commands": {
+    "before": "fleet",
+    "after": "fleet"
+  }
 }

@@ -99,6 +99,8 @@ def profile_key(name):
 def render(record, future=False):
     """Return the complete plain-text view without changing the input record."""
     home = record.get("home", "")
+    phase = "after" if future or record.get("profile_written") else "before"
+    command = record.get("instruction_commands", {}).get(phase, "dotfleet")
     sections = []
     software = record.get("software", [])
     changed = [
@@ -117,7 +119,7 @@ def render(record, future=False):
         + (("will be " if future else "") + title + "." if changed else "no changes.")
     ]
     for item in changed:
-        label = item["name"]
+        label = "Fleet" if item["name"] == "dotfleet" else item["name"]
         value = (
             (item["old"] + " → " if item.get("old") else "")
             + item["version"]
@@ -126,7 +128,9 @@ def render(record, future=False):
         )
         lines += block([(label, value)], home)
     present = [
-        item["name"] + " " + item["version"] for item in software if item["action"] == "present"
+        ("Fleet" if item["name"] == "dotfleet" else item["name"]) + " " + item["version"]
+        for item in software
+        if item["action"] == "present"
     ]
     if present:
         lines += wrap("Already present: " + ", ".join(present), "  ")
@@ -251,12 +255,12 @@ def render(record, future=False):
         ["6 · Next steps"]
         + block(
             [
-                ("Update", UPDATE),
+                ("Update", command + " update"),
                 (
                     "Rollback",
                     str(backup) + "/MANIFEST.json" if backup else "not needed; nothing applied",
                 ),
-                ("Wizard", WIZARD),
+                ("Wizard", command + " configure"),
             ],
             home,
         )

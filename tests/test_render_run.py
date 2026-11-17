@@ -58,6 +58,31 @@ class RenderingTests(unittest.TestCase):
         self.assertIn("  − ~/.config/docker/aliases.zsh", future)
         self.assert_plain_view(future)
 
+    def test_review_uses_planned_command_and_cancellation_keeps_current_command(self):
+        record = self.record()
+        record["instruction_commands"] = {"before": "dotfleet", "after": "fleet"}
+        record["profile_written"] = False
+        self.assertIn("Update    fleet update", render(record, future=True))
+        self.assertIn("Wizard    fleet configure", render(record, future=True))
+        record["result"] = "CANCELLED"
+        self.assertIn("Update    dotfleet update", render(record))
+        self.assertIn("Wizard    dotfleet configure", render(record))
+        record["profile_written"] = True
+        self.assertIn("Update    fleet update", render(record))
+
+    def test_golden_labels_the_product_and_preserves_binary_paths(self):
+        record = self.record()
+        text = render(record)
+        self.assertIn("Fleet 0.2.0", text)
+        self.assertNotIn("dotfleet 0.2.0", text)
+        software = record["software"][-1]
+        software.update(action="upgraded", old="0.1.0")
+        record["completed_software"] = ["dotfleet"]
+        for future in (False, True):
+            text = render(record, future=future)
+            self.assertIn("Fleet  0.1.0 → 0.2.0 · ~/.local/bin/dotfleet", text)
+        self.assertEqual(software["name"], "dotfleet")
+
     def test_long_values_wrap_without_machine_dumps(self):
         record = self.record()
         record["profile_changes"].append(

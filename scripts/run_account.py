@@ -17,6 +17,7 @@ import shutil
 import subprocess
 
 from common import atomic, read_toml, run
+from command_display import command_name
 from render_run import render
 from installation import command_software, MANAGER
 import registry
@@ -69,6 +70,9 @@ class RunAccount:
         saved = home / RECORD
         previous = json.loads(saved.read_text()) if saved.exists() else {}
         self.old_profile = read_toml(home / ".config/fleet/profile.toml")
+        self.instruction_commands = dict.fromkeys(
+            ("before", "after"), command_name(self.old_profile)
+        )
         self.software = []
         for name in ("chezmoi", "mise"):
             staged = os.environ.get("DOTFLEET_STAGED_" + name.upper())
@@ -133,6 +137,7 @@ class RunAccount:
         self.locations["Converted source"] = str(plan["config"]["sourceDir"])
         self.locations["Backup folder"] = str(backup_path)
         self.profile = profile_changes(self.old_profile, profile)
+        self.instruction_commands["after"] = command_name(profile)
         self.selected_profile = {
             key: profile.get(key)
             for key in [
@@ -209,6 +214,7 @@ class RunAccount:
             "warnings": self.warnings,
             "chezmoi_status_after": self.status_after,
             "selected_profile": self.selected_profile,
+            "instruction_commands": self.instruction_commands,
             "available_defaults": self.available_defaults,
             "adoption_excluded": self.adoption_excluded,
             "scan": self.scan,
