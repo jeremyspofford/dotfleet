@@ -147,6 +147,14 @@ DESCRIPTIONS = {
 
 
 class HelpFormatter(argparse.HelpFormatter):
+    def add_argument(self, action):
+        super().add_argument(action)
+        # Older Python releases omit nested indentation when sizing command columns.
+        if action.help is not argparse.SUPPRESS:
+            for nested in self._iter_indented_subactions(action):
+                width = len(self._format_action_invocation(nested)) + self._current_indent
+                self._action_max_length = max(self._action_max_length, width)
+
     def _format_usage(self, usage, actions, groups, prefix):
         return super()._format_usage(usage, actions, groups, prefix or "Usage: ")
 
