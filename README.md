@@ -192,7 +192,7 @@ Restore the saved profile too. Keep the backup and rerun setup when you want to 
 ## Agents, add-ons, and releases
 
 An agent is a coding assistant. The optional [agent generator](docs/AGENTS.md) writes settings and links content skills; it installs no agents.
-The [add-on contract](docs/ADDON-INTERFACE.md) remains a proposal. The enrollment wizard uses terminal prompts. No full-screen interface, add-on runtime, custom sync engine, or daemon exists here.
+The [add-on contract](docs/ADDON-INTERFACE.md) remains a proposal. The enrollment wizard uses terminal prompts. The terminal interface uses the same command cores. No add-on runtime, custom sync engine, or daemon exists here.
 `VERSION` starts at 0.1.0. Release automation stays in 0.x; only the owner can approve a manual 1.0.0 release.
 Read [release rules](docs/RELEASES.md) and [writing rules](docs/WRITING.md).
 
@@ -201,6 +201,12 @@ Read [release rules](docs/RELEASES.md) and [writing rules](docs/WRITING.md).
 CI means automated change checks. It runs shell checks, formatting, release-policy tests, and container enrollment tests.
 Container tests cover plain content, the private Stow archive, and a native chezmoi fixture.
 They check adoption, secret exclusions, review cancellation, repeat runs, shell startup, group changes, saved profiles, and clean status.
+The plain suite runs without Textual. A separate environment runs Textual pilot tests, which simulate keys and mouse clicks.
+Pilot tests check the dashboard, updates, typed restore confirmation, narrow layouts, and plain themes.
+
+For local checks, create a test environment with `requirements-tui.txt`. Set `FLEET_TEST_TUI_ENV` to an installed manager environment for reusable enrollment fixtures.
+Run `python3 -m unittest discover -s tests -v` with standard Python.
+Run that environment's Python with `-m unittest discover -s tests/tui -v` for screen tests.
 
 ## After enrollment
 
@@ -211,6 +217,7 @@ The one-line installer remains the first-install and recovery path.
 
 | Command | Action |
 | --- | --- |
+| `dotfleet tui` | Open the full-screen terminal interface. Missing environments show plain command alternatives and exit 0. |
 | `dotfleet update` | Fetch the manager and content, then apply saved choices. Refuse dirty or diverged checkouts. |
 | `dotfleet profile` | Show saved choices and the profile location. Edit choices through commands or the wizard. |
 | `dotfleet backups` | List backup dates, results, and sizes without changing files. |
@@ -247,9 +254,44 @@ Rollback makes another backup first. It restores only recorded paths, including 
 It refuses directory replacement and changed external targets whose original symlink is missing.
 It verifies saved file fingerprints before writing. A fingerprint records the file's content hash and permissions, or its symlink target.
 A content checkout remains at its current commit after rollback. Use diff to review differences before updating again.
-Uninstall offers to restore the oldest backup. Otherwise, it removes known managed files and the manager's command, checkout, and converted source.
+Uninstall offers to restore the oldest backup. Otherwise, it removes known managed files and the manager's command, checkout, converted source, and terminal interface environment.
 Uninstall keeps installed tools, the content checkout, and all backups. Removal includes local edits, which the new backup preserves.
 Rollback and uninstall require terminal confirmation. A scripted rollback without a folder only lists backups.
+
+## Terminal interface
+
+Run `fleet tui` after enrollment. Use `dotfleet tui` when the guarded alias is unavailable.
+A terminal user interface (TUI) fills the terminal with navigable screens.
+The dashboard fits 80 columns and 24 rows. Narrow terminals keep one column; long dashboard values shorten with an ellipsis.
+Status shows the full values. Scroll the other screens to read long results.
+
+| Screen | Action |
+| --- | --- |
+| Dashboard | Show this machine, domain choice, content source and commit, manager version, cached updates, last backup, and drift. |
+| Status | Show the same local status as the plain command. |
+| Updates | Check both sources live. Offer update when the check finds new commits. |
+| Diff | Show pending file patches, or one clean-state line. |
+| Backups | List saved backups. Select one, review its changes, then type `restore` to confirm. |
+| Machines | Show saved registry records. No remote actions exist. |
+| Doctor | Run the existing local checks and show each result. |
+| Configure | Close the interface and run the existing terminal wizard. |
+
+Arrows and Tab move between choices. Enter selects. Esc goes back or cancels review. Press q to quit.
+During a change, q waits for that operation to finish. Review can still be cancelled before applying.
+Mouse selection also works. Set `NO_COLOR`, even empty, or `TERM=dumb` for the plain theme.
+
+The interface calls the existing command cores. Updates and rollback show the standard review and write the same RUN.json records.
+Type `confirm` for an update. Type `restore` for rollback. Empty or incorrect answers never approve changes.
+Incomplete profiles stop updates; choose Configure to finish them. Local file conflicts also stop unattended apply.
+Use the plain update command in a terminal to resolve those conflicts. No interface action guesses an overwrite choice.
+
+The installer and update create `~/.local/share/fleet/tui-venv`, a private Python environment owned by the manager.
+A virtual environment holds separate Python packages. [Textual](https://textual.textualize.io/) supplies the terminal widgets.
+`requirements-tui.txt` pins Textual and its dependencies. The Software category records environment creation or updates.
+An unchanged environment stays untouched. A replaced environment moves into that run's backup as `previous-tui-venv`.
+Failed environment installation restores the previous environment. A missing environment leaves the complete plain command interface available.
+Run `fleet update`, or the README installer, to restore it. No system packages or sudo are used.
+The command core needs only Python's standard library. Textual loads only in the interface process.
 
 ## Store migration
 

@@ -73,6 +73,10 @@ class EnrollmentTests(unittest.TestCase):
         self.base = Path(self.temp.name)
         self.home = self.base / "home"
         self.home.mkdir()
+        runtime = os.environ.get("FLEET_TEST_TUI_ENV")
+        if runtime:
+            # Cold installation has its own test. Other fixtures reuse its private dependencies.
+            shutil.copytree(runtime, self.home / ".local/share/fleet/tui-venv", symlinks=True)
         # Host agent commands must not affect a fixture's detected agents.
         tools = self.base / "tools"
         tools.mkdir()

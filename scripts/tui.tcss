@@ -1,0 +1,89 @@
+Screen {
+    background: $background;
+    color: $foreground;
+    layout: vertical;
+}
+
+.heading {
+    height: 1;
+    padding: 0 1;
+    color: $primary;
+    text-style: bold;
+}
+
+#facts {
+    height: 9;
+    padding: 0 1;
+    overflow: hidden hidden;
+}
+
+#menu {
+    height: 10;
+    margin: 0 1;
+    padding: 0;
+    border: round $primary;
+}
+
+.keys {
+    height: auto;
+    min-height: 1;
+    padding: 0 1;
+    color: $foreground;
+}
+
+#output {
+    height: 1fr;
+    width: 100%;
+    padding: 0 1;
+    overflow-x: hidden;
+}
+
+#progress {
+    height: auto;
+    padding: 0 1;
+    color: $warning;
+}
+
+#actions {
+    height: auto;
+    max-height: 7;
+    margin: 0 1;
+    padding: 0;
+    border: round $primary;
+}
+
+Review {
+    align: center middle;
+}
+
+#review-box {
+    width: 100%;
+    height: 100%;
+    border: heavy $primary;
+    padding: 0 1;
+}
+
+#review-text {
+    height: 1fr;
+    width: 100%;
+    overflow-x: hidden;
+}
+
+#confirm-help {
+    height: auto;
+}
+
+#confirm-error {
+    height: auto;
+    color: $error;
+}
+
+#confirmation {
+    height: 3;
+    width: 100%;
+}
+
+#cancel {
+    height: 3;
+    min-width: 8;
+}

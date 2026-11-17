@@ -25,6 +25,7 @@ import owned_views
 import style
 import updates
 import store_migration
+import ui_channel
 from command_display import command_name, current_command
 from installation import COMMAND, MANAGER
 from render_run import render, render_view
@@ -43,6 +44,12 @@ CONTROLS = {
     COMMAND,
 }
 DESCRIPTIONS = {
+    "tui": (
+        "Open the terminal interface, a full-screen view of local Fleet commands. "
+        "Arrows and Tab move; Enter selects; Esc goes back; q quits. "
+        "Configure returns to the existing wizard. If its environment is missing, "
+        "print plain command alternatives and exit 0."
+    ),
     "check": (
         "Fetch the manager and content upstreams quietly, with a 10-second limit per fetch. "
         "An upstream is the remote branch tracked by a checkout. Cache both results only "
@@ -433,60 +440,73 @@ def read_view(args, home, saved_profile):
         info("Doctor", pairs, home)
         return int(any("FAIL" in value for _, value in pairs))
     else:
-        backups = records(home)
-        last = next((path for path in reversed(backups) if (path / "RUN.json").exists()), None)
-        record = load_json(last / "RUN.json", {}) if last else {}
-        pairs = [
-            (
-                "Domain",
-                saved_profile.get("domain", "core")
-                + (
-                    " · chosen"
-                    if saved_profile.get("domain_chosen", False)
-                    else f" · UNCHOSEN; run {display} domain"
-                ),
-            ),
-            (
-                "Identity",
-                (
-                    saved_profile.get("git_name", "")
-                    + " <"
-                    + saved_profile.get("git_email", "")
-                    + ">"
-                )
-                if saved_profile.get("git_name", "").strip()
-                and saved_profile.get("git_email", "").strip()
-                else f"missing; run {display} configure",
-            ),
-        ]
-        pairs += [("Pin " + key, value) for key, value in pin_rows(saved_profile, home)] or [
-            ("Pins", "none")
-        ]
-        pairs += [("Group " + key, value) for key, value in saved_profile.get("groups", {}).items()]
-        pairs += [
-            ("Content", checkout_state(home / "dotfiles")),
-            ("Drift", f"present; run {display} diff" if status(home) else "none"),
-            (
-                "Last run",
-                str(last) + " · " + str(record.get("result", "unknown")) if last else "none",
-            ),
-            ("Last backup", str(backups[-1]) if backups else "none"),
-            ("Manager config", str(home / ".config/chezmoi/chezmoi.toml")),
-            (
-                "Converted source",
-                read_toml(home / ".config/chezmoi/chezmoi.toml").get(
-                    "sourceDir", f"missing; run {display} update"
-                ),
-            ),
-        ]
+        pairs = status_rows(home, saved_profile)
     info(name.capitalize(), pairs or [("Selections", "none")], home)
     if name == "status":
         print(updates.summary(home, saved_profile))
     return 0
 
 
+def status_rows(home, saved_profile):
+    display = command_name(saved_profile)
+    backups = records(home)
+    last = next((path for path in reversed(backups) if (path / "RUN.json").exists()), None)
+    record = load_json(last / "RUN.json", {}) if last else {}
+    pairs = [
+        (
+            "Domain",
+            saved_profile.get("domain", "core")
+            + (
+                " · chosen"
+                if saved_profile.get("domain_chosen", False)
+                else f" · UNCHOSEN; run {display} domain"
+            ),
+        ),
+        (
+            "Identity",
+            (saved_profile.get("git_name", "") + " <" + saved_profile.get("git_email", "") + ">")
+            if saved_profile.get("git_name", "").strip()
+            and saved_profile.get("git_email", "").strip()
+            else f"missing; run {display} configure",
+        ),
+    ]
+    pairs += [("Pin " + key, value) for key, value in pin_rows(saved_profile, home)] or [
+        ("Pins", "none")
+    ]
+    pairs += [("Group " + key, value) for key, value in saved_profile.get("groups", {}).items()]
+    pairs += [
+        ("Content", checkout_state(home / "dotfiles")),
+        ("Drift", f"present; run {display} diff" if status(home) else "none"),
+        (
+            "Last run",
+            str(last) + " · " + str(record.get("result", "unknown")) if last else "none",
+        ),
+        ("Last backup", str(backups[-1]) if backups else "none"),
+        ("Manager config", str(home / ".config/chezmoi/chezmoi.toml")),
+        (
+            "Converted source",
+            read_toml(home / ".config/chezmoi/chezmoi.toml").get(
+                "sourceDir", f"missing; run {display} update"
+            ),
+        ),
+    ]
+    return pairs
+
+
 def prepare_manager(home, workspace):
     return updates.stage(home / MANAGER, workspace / "manager")
+
+
+def update(home):
+    with tempfile.TemporaryDirectory(prefix="dotfleet-update-") as folder:
+        staged = prepare_manager(home, Path(folder))
+        environment = dict(os.environ)
+        environment.pop("DOTFLEET_LOCAL_CONTENT", None)
+        arguments = ["bash", str(staged / "install.sh")]
+        if ui_channel.active():
+            # The TUI hands profile changes to Configure, which restores the real terminal.
+            arguments.append("--defaults")
+        return subprocess.call(arguments, env=environment, pass_fds=ui_channel.descriptors())
 
 
 def preview(home, saved_profile, stat=False):
@@ -557,7 +577,9 @@ def managed_paths(home):
     return paths
 
 
-def confirm(word, explanation):
+def confirm(word, explanation, record=None):
+    if ui_channel.active():
+        return ui_channel.review(record, word, explanation)
     if not manager.has_terminal():
         raise ValueError(
             f"This action needs a terminal. Type {word} there after reviewing the changes."
@@ -706,7 +728,7 @@ def transaction(home, operations, label, selected=None, require_word=None, tree_
                 raise ValueError("Refusing to replace a directory: " + str(target))
         if require_word:
             print(render(account.record(), future=True), end="")
-            if not confirm(require_word, label):
+            if not confirm(require_word, label, account.record()):
                 account.finish("CANCELLED")
                 return 0
         if manager.backup_inventory(home, backup_paths) != account.manifest:
@@ -798,6 +820,10 @@ def main(argv=None):
             print("Preview failed: " + str(error), file=sys.stderr)
             return 2
     args = parser().parse_args(argv)
+    if args.command == "tui":
+        from tui_environment import launch
+
+        return launch(home, ROOT)
     try:
         saved_profile = profile(home)
         display = command_name(saved_profile)
@@ -843,11 +869,7 @@ def main(argv=None):
         ):
             return read_view(args, home, saved_profile)
         if args.command == "update":
-            with tempfile.TemporaryDirectory(prefix="dotfleet-update-") as folder:
-                staged = prepare_manager(home, Path(folder))
-                environment = dict(os.environ)
-                environment.pop("DOTFLEET_LOCAL_CONTENT", None)
-                return subprocess.call(["bash", str(staged / "install.sh")], env=environment)
+            return update(home)
         if args.command == "diff":
             return preview(home, saved_profile, args.stat)
         if args.command == "configure":
@@ -895,7 +917,11 @@ def main(argv=None):
                 "Remove the manager and listed managed files. Content and backups stay.",
                 selected,
                 "uninstall",
-                [home / MANAGER, home / ".local/share/fleet/chezmoi-source"],
+                [
+                    home / MANAGER,
+                    home / ".local/share/fleet/chezmoi-source",
+                    home / ".local/share/fleet/tui-venv",
+                ],
             )
         os.environ["DOTFLEET_LOCAL_CONTENT"] = "1"
         if args.command == "domain":
