@@ -118,6 +118,8 @@ class ArgumentErrorTests(unittest.TestCase):
     def test_missing_values_and_bad_choices_are_plain_and_subcommand_specific(self):
         for args, expected in (
             (["tools", "set", "node"], "Supply --version"),
+            (["backups", "delete", "--keep", "many"], "Use a whole number for --keep"),
+            (["backups", "delete", "--keep", "2", "--all"], "Choose either"),
             (["groups", "set", "--name", "helpers", "--state", "maybe"], "Unknown choice"),
             (["backups", "restore", "--backup"], "Give a value for --backup"),
         ):

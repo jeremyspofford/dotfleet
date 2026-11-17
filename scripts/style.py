@@ -95,6 +95,16 @@ class ArgumentParser(argparse.ArgumentParser):
         elif "invalid choice:" in message:
             value = message.split("invalid choice:", 1)[1].split(" (choose from", 1)[0].strip()
             problem = "Unknown choice " + value
+        elif "invalid int value:" in message:
+            name = message.removeprefix("argument ").split(":", 1)[0]
+            problem = "Use a whole number for " + name
+        elif "not allowed with argument" in message:
+            name, other = message.removeprefix("argument ").split(": not allowed with argument ", 1)
+            problem = "Choose either " + name + " or " + other
+        elif message.startswith("one of the arguments "):
+            problem = "Supply one of " + message.removeprefix("one of the arguments ").removesuffix(
+                " is required"
+            )
         elif "expected one argument" in message:
             problem = "Give a value for " + message.removeprefix("argument ").split(":", 1)[0]
         else:
