@@ -57,20 +57,20 @@ Fleet $DOTFILES_VERSION manages home configuration with a saved machine profile.
 Usage: bash install.sh [OPTIONS]
        curl -fsSL $raw/install.sh | bash
 Options:
-  --repo URL       Content Git repository; default: https://github.com/jeremyspofford/dotfiles.
-                   Plain repositories use real names. Chezmoi repositories use native source names.
   --adopt          Create a local repository from existing home files. Exclude secret matches before committing.
-  --configure      Run the enrollment wizard again. Review every choice before applying.
-  --group NAME=on|off Include or exclude a content group. Repeat for more groups.
   --agents NAMES   Configure detected coding assistants, separated by commas; none skips this step.
+  --configure      Run the enrollment wizard again. Review every choice before applying.
   --defaults       Skip prompts only with a complete profile. New groups default to on.
                    This flag cannot bypass missing identity, domain confirmation, or floating pins.
   --domain VALUE   Record a domain choice: core, personal, work, or client (defined below).
-  --git-name NAME  Record the Git author name.
-  --git-email EMAIL Record the Git author email.
-  --pin TOOL=VERSION Record a full tool version, such as node=24.14.1. Repeat for more tools.
   --format FORMAT  plain=real names; chezmoi=native sources. A manifest takes priority.
+  --git-email EMAIL Record the Git author email.
+  --git-name NAME  Record the Git author name.
+  --group NAME=on|off Include or exclude a content group. Repeat for more groups.
   -h, --help       Print full help and exit 0.
+  --pin TOOL=VERSION Record a full tool version, such as node=24.14.1. Repeat for more tools.
+  --repo URL       Content Git repository; default: https://github.com/jeremyspofford/dotfiles.
+                   Plain repositories use real names. Chezmoi repositories use native source names.
 A profile saves the repository, domain, Git author identity, tool pins, and content groups.
 Domains choose optional additions from your content repository. Identity and tools are chosen separately.
   core      Base configuration only.

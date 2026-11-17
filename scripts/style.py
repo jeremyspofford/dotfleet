@@ -5,6 +5,7 @@ Color reinforces text. Redirected output, NO_COLOR, and TERM=dumb disable color.
 """
 
 import argparse
+from contextlib import contextmanager
 import datetime
 import os
 import re
@@ -54,8 +55,37 @@ def line_palette(line, diff=False):
 
 
 class ArgumentParser(argparse.ArgumentParser):
+    @contextmanager
+    def sorted_help(self):
+        def key(action):
+            names = [name for name in action.option_strings if name.startswith("--")]
+            return (
+                not action.option_strings,
+                (names[0] if names else action.dest).lstrip("-").casefold(),
+            )
+
+        lists = [self._actions, *[group._group_actions for group in self._action_groups]]
+        lists += [
+            action._choices_actions
+            for action in self._actions
+            if hasattr(action, "_choices_actions")
+        ]
+        original = [(actions, actions[:]) for actions in lists]
+        try:
+            for actions, _ in original:
+                actions.sort(key=key)
+            yield
+        finally:
+            for actions, saved in original:
+                actions[:] = saved
+
     def format_help(self):
-        return section(self.prog) + "\n" + super().format_help()
+        with self.sorted_help():
+            return section(self.prog) + "\n" + super().format_help()
+
+    def format_usage(self):
+        with self.sorted_help():
+            return super().format_usage()
 
 
 class LoggerStream:

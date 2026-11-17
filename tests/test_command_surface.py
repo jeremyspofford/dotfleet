@@ -6,6 +6,8 @@ Usage: python3 -m unittest discover -s tests -v.
 import contextlib
 import io
 import os
+import re
+import subprocess
 from pathlib import Path
 import tempfile
 import unittest
@@ -56,6 +58,27 @@ class CommandSurfaceTests(unittest.TestCase):
                     self.assertLessEqual(len(line), 100)
         self.assertEqual(self.call(["help", "--help"]), self.call(["--help"]))
         self.assertEqual(list(self.home.rglob("*")), [])
+
+    def test_help_lists_commands_actions_and_flags_alphabetically(self):
+        output = self.call(["help"])
+        names = re.findall(r"^    ([a-z][a-z-]+)\s", output, re.M)
+        self.assertEqual(names, sorted(command.DESCRIPTIONS))
+        paths = [[], *[[name] for name in command.DESCRIPTIONS]]
+        for group, actions in command_arguments.GROUPS.items():
+            output = self.call([group])
+            names = re.findall(r"^    ([a-z][a-z-]+)\s", output, re.M)
+            self.assertEqual(names, sorted(actions))
+            paths.extend([group, action] for action in actions)
+        for path in paths:
+            output = self.call([*path, "--help"])
+            flags = re.findall(r"^  (?:-h, )?--([a-z][a-z-]+)\b", output, re.M)
+            self.assertEqual(flags, sorted(flags), path)
+        for script in ("install.sh", "scripts/generate-agent-configs.sh"):
+            output = subprocess.check_output(
+                ["bash", str(command.ROOT / script), "--help"], text=True
+            )
+            flags = re.findall(r"^  (?:-h, )?--([a-z][a-z-]+)\b", output, re.M)
+            self.assertEqual(flags, sorted(flags), script)
 
     def test_bare_groups_show_actions_without_a_profile(self):
         for group, actions in command_arguments.GROUPS.items():

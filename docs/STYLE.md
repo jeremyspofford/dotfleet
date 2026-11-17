@@ -22,6 +22,7 @@ The single trailing machine in status, check, diff, doctor, and update is the su
 Use --name and --target for SSH registration. One flag supplies both values unless the other flag gives a different value.
 Help and examples show flags. Keep promised positional SSH-registration forms readable, but do not document them as the main interface.
 Command groups require explicit action verbs. A bare group prints its action list.
+Sort command names, action names, and flags alphabetically in help. Sort flags by their long name, ignoring leading hyphens.
 Support help, -h, and --help at each command and action. Support help COMMAND and both version and --version.
 Status reads saved state without network requests. Check fetches updates. Keep their help and output distinct.
 
