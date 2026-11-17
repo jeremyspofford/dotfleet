@@ -38,6 +38,9 @@ The command audit uses these forms:
 | backups delete | Exactly one of --all, --keep, or --name |
 | machines export | --output |
 | domain list / set | set requires --name; --machine selects a registered machine |
+| marketplaces add | --source; optional --features, --name, --packages, --pin |
+| marketplaces delete | --name |
+| marketplaces list | No value parameters |
 | agents list / set | set requires --name and --state; --machine selects a registered machine |
 | groups list / set | set requires --name and --state; --machine selects a registered machine |
 | tools set | TOOL, --version; --machine selects a registered machine |

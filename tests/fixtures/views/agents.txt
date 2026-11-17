@@ -23,4 +23,12 @@ skills.notes
   Domains  every domain
   State    on
 
+mcp.review-docs
+  Kind     MCP server
+  Source   marketplace agent-market/review-kit
+  Adds     Search review guides.
+  Agents   every selected agent that supports it
+  Domains  every domain
+  State    on
+
 Change: fleet agents set --name ITEM --state on, off, or local

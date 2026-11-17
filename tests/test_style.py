@@ -68,6 +68,27 @@ def command_goldens():
             '[agents.mcp.issues]\ndescription = "Read work issues."\ntransport = "http"\n'
             'url = "https://mcp.example.com/issues"\ndomains = ["work"]\n'
         )
+        record = {
+            "source": "https://example.invalid/agent-market",
+            "pin": "v1.0.0",
+            "commit": "abcdef0123456789abcdef0123456789abcdef01",
+            "version": "v1.0.0",
+            "take": {"packages": ["review-kit"]},
+        }
+        (home / ".local/share/fleet").mkdir(parents=True, exist_ok=True)
+        (home / ".local/share/fleet/marketplaces.json").write_text(
+            json.dumps({"schema_version": 1, "marketplaces": {"agent-market": record}})
+        )
+        library = home / ".local/share/fleet/library/agent-market"
+        library.mkdir(parents=True)
+        (library / "fleet-marketplace.toml").write_text(
+            'schema = 1\n[packages.review-kit]\ndescription = "Review commands."\n'
+            '[packages.review-kit.mcp.review-docs]\ndescription = "Search review guides."\n'
+            'transport = "stdio"\ncommand = "npx"\n'
+        )
+        (home / ".local/share/fleet/marketplaces-check.json").write_text(
+            json.dumps({"marketplaces": {"agent-market": {"behind": 2}}})
+        )
         (home / ".config/fleet").mkdir(parents=True)
         (home / ".config/fleet/profile.toml").write_text(toml(profile))
         cache = home / updates.CACHE
@@ -138,6 +159,7 @@ def command_goldens():
         ):
             for name in [
                 "agents",
+                "marketplaces",
                 "status",
                 "doctor",
                 "machines",

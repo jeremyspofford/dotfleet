@@ -17,6 +17,14 @@ GROUPS = {
         "set": "Turn one agent item on or off, or keep this machine's own value.\n"
         "The profile saves the choice; the update applies it.",
     },
+    "marketplaces": {
+        "add": "Add a marketplace and install its packages.\n"
+        "Take every package, named packages, or named features where a package allows it.\n"
+        "The review lists every output before the apply.",
+        "delete": "Delete a marketplace, its library copy, and its installed outputs.",
+        "list": "List marketplaces with their source, version, pin, and installed packages.\n"
+        "Read saved records and the last check only.",
+    },
     "logs": {
         "list": "List the newest change-making attempts first.\nLimit the number with --limit.",
         "show": "Show the latest attempt, or select its saved timestamp or backup with --name.\n"
@@ -58,6 +66,7 @@ GROUPS = {
 }
 
 EXAMPLES = {
+    "marketplaces": "marketplaces list; marketplaces add --source https://github.com/example/agent-market; marketplaces add --source URL --packages review-kit; marketplaces add --source URL --features review-kit/mcp.docs; marketplaces delete --name agent-market",
     "agents": "agents list; agents set --name mcp.docs --state off; agents set --name mcp.docs --state local",
     "logs": "logs list; logs list --limit 10; logs show; logs show --name BACKUP; logs show --json",
     "machines": "machines list; machines set-ssh --target mini-pc; machines set-ssh --name beelink --target mini-pc; machines export --output FILE; machines remove --name NAME",
@@ -169,6 +178,14 @@ def add_action_parameters(parser, name, action):
             parser.add_argument("--name", dest="hostname", required=True, help="saved machine name")
         elif action == "export":
             parser.add_argument("--output", help="new private TOML file; omit to show the record")
+    elif name == "marketplaces" and action == "add":
+        parser.add_argument("--features", help="PACKAGE/KIND.NAME list, separated by commas")
+        parser.add_argument("--name", help="saved name; default: the repository name")
+        parser.add_argument("--packages", help="package names, separated by commas; default: all")
+        parser.add_argument("--pin", help="tag or commit to keep; the pin blocks updates")
+        parser.add_argument("--source", required=True, help="marketplace Git URL or local path")
+    elif name == "marketplaces" and action == "delete":
+        parser.add_argument("--name", required=True, help="marketplace from marketplaces list")
     elif name == "agents" and action == "set":
         parser.add_argument("--name", required=True, help="item from agents list, such as mcp.docs")
         parser.add_argument(

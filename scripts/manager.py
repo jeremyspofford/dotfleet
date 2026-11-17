@@ -677,6 +677,11 @@ def prepare(home, checkout, profile, manifest, folder, preview=False):
     require_domain(manifest, profile.get("domain", "core"), command_name(profile))
     # The agents table must validate as a whole before Fleet plans any agent output.
     agents_table = agent_table.load(checkout, manifest, wizard.agent_manifest())
+    import marketplaces
+
+    agents_table = marketplaces.extend(
+        home, agents_table, agent_table.skills(checkout), wizard.agent_manifest()
+    )
     for warning in agents_table.warnings:
         print("Warning: " + warning)
     if profile.get("format") == "chezmoi" and convert_module.excluded_skills(manifest, profile):
@@ -820,6 +825,7 @@ def prepare(home, checkout, profile, manifest, folder, preview=False):
     }
     changed |= {name for name in stale if fingerprint(home / name) is not None}
     controls = {
+        ".local/share/fleet/marketplaces.json",
         ".local/share/fleet/registry.toml",
         ".config/chezmoi/chezmoi.toml",
         ".config/fleet/profile.toml",
@@ -857,6 +863,8 @@ def prepare(home, checkout, profile, manifest, folder, preview=False):
         or target.stat().st_mode & 0o777 != 0o700
     ):
         changed.add(COMMAND)
+    if marketplaces.PENDING:
+        changed.add(marketplaces.RECORD)
     if agents.all_paths() or plugin_agents or (home / agent_deploy.INVENTORY).exists():
         all_paths.add(agent_deploy.INVENTORY)
         changed.add(agent_deploy.INVENTORY)
@@ -985,6 +993,11 @@ def apply_confirmed_plan(
         # This deletion was requested by the group selection, not a local edit.
         # Retire only this path's remembered entry; preserve all other conflict state.
         run("chezmoi", "state", "delete", "--bucket=entryState", "--key=" + str(path))
+    import marketplaces
+
+    if marketplaces.PENDING:
+        marketplaces.save(home, marketplaces.PENDING, backup_path)
+        marketplaces.PENDING.clear()
     # Agent outputs first: earlier skill links must leave before content installs skill folders.
     agent_deploy.apply(home, plan["agents"], wizard_catalog(), account)
     account.confirm_files(fingerprint)

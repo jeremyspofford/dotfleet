@@ -124,6 +124,32 @@ def agent_item_arguments(home):
     return ["agents", "set", "--name", selected, "--state", state] if state is not None else None
 
 
+def marketplace_add_arguments(home):
+    answer = form(
+        "Add a marketplace",
+        [
+            field("source", "Git URL or local path"),
+            field("name", "Saved name (empty: repository name)", required=False),
+            field("packages", "Packages, separated by commas (empty: all)", required=False),
+        ],
+    )
+    if answer is None:
+        return None
+    arguments = ["marketplaces", "add", "--source", answer["source"].strip()]
+    for key in ("name", "packages"):
+        if answer[key].strip():
+            arguments += ["--" + key, answer[key].strip()]
+    return arguments
+
+
+def marketplace_delete_arguments(home):
+    import marketplaces
+
+    names = sorted(marketplaces.load_records(home)["marketplaces"])
+    selected = choose("Delete a marketplace", "Marketplace", [(name, name) for name in names])
+    return ["marketplaces", "delete", "--name", selected] if selected is not None else None
+
+
 def pin_arguments(home):
     answer = form(
         "Install and select a tool version",
@@ -208,6 +234,8 @@ FORMS = {
     "domain-set": domain_arguments,
     "group-set": group_arguments,
     "agent-set": agent_item_arguments,
+    "marketplace-add": marketplace_add_arguments,
+    "marketplace-delete": marketplace_delete_arguments,
     "pin-set": pin_arguments,
     "pin-remove": unpin_arguments,
     "tool-uninstall": uninstall_tool_arguments,

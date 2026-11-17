@@ -145,6 +145,7 @@ class CommandSurfaceTests(unittest.TestCase):
         # Mutations snapshot their completed reviews; screens and the wizard also test their input views.
         expected = {
             "agents": "views/agents.txt",
+            "marketplaces": "views/marketplaces.txt",
             "logs": "views/logs.txt",
             "topology": "topology.txt",
             "tui": "tui/dashboard-80x24.txt",

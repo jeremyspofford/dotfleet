@@ -224,3 +224,10 @@ Skills are ordinary content at `~/.agents/skills`. Whole instruction files stay 
 The inventory at `~/.local/state/dotfleet/agents.json` lists every owned path and entry. Schema 2 replaced the earlier flat record.
 Fleet compares only keys that it wrote. A conflict stops the run before backup; unattended runs never choose overwrite.
 Stale outputs that still match their record leave. Changed stale outputs stay, with one report line. Turning an agent off keeps its outputs.
+
+## Pull in packages from marketplaces
+
+A marketplace is a Git repository with a `fleet-marketplace.toml` catalog. See [marketplaces](MARKETPLACES.md).
+Pulled-in components live in an untracked library under the manager store. The installation record lives there too.
+No pulled-in file enters the user's tracked content. Updates never rewrite the user's own files.
+A refresh replaces a pulled-in component, keeps any edited copy in the run backup, and prints one line.
