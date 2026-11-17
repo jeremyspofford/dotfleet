@@ -39,7 +39,7 @@
 #
 # Compared with Jeremy's deployment logger, printf replaces echo -e.
 # Messages cannot become printf format flags. Warnings, errors, and debug use stderr.
-# log_warn/log_debug complete the Dotfleet logging interface; timestamps are optional.
+# log_warn/log_debug complete the Fleet logging interface; timestamps are optional.
 # The original header references logger.orig.sh; this checkout does not contain it.
 # Exit codes when executed: 0 help; 2 invalid or missing arguments.
 # Author: Jeremy Spofford / Aria Labs (original), Muse (improvements).
@@ -127,7 +127,7 @@ log_warning() {
 	_log_line "${YELLOW}" "$*" >&2
 }
 
-# Dotfleet interface name; same function as log_warning.
+# Fleet interface name; same function as log_warning.
 log_warn() {
 	log_warning "$@"
 }

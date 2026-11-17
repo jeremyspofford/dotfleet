@@ -9,7 +9,7 @@ Turn each detected agent on or off during enrollment. Press Enter to keep its cu
 For scripted runs, use `--agents claude,codex` for detected agents. Use `--agents none` to skip.
 The wizard previews agent outputs before confirmation. Existing unmanaged settings stop setup before writes.
 
-To generate settings from a separate Dotfleet checkout:
+To generate settings from a separate Fleet checkout:
 
 1. Run `bash scripts/generate-agent-configs.sh --dry-run`. This validates inputs and reports proposed paths without writing.
 2. Review the paths and resolve any conflicts.
@@ -54,6 +54,6 @@ The generator reports this limit; it invents no file or skill loader.
 
 Never recursively delete an agent directory. It can contain credentials or user-created skills.
 
-The generator reads the local Dotfleet profile. Use `dotfleet configure` to turn individual agents on or off.
+The generator reads the local Fleet profile. Use `dotfleet configure` to turn individual agents on or off.
 Turning an agent off skips future generation. Existing outputs remain for review.
 Existing output records from `~/.local/state/dotfiles/agents.json` remain readable during migration.

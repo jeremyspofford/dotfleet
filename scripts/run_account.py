@@ -3,7 +3,7 @@
 This internal module has no command-line interface. Use install.sh --help.
 Diff contents stay in the private backup. Reports contain paths and profile choices only.
 
-Usage: import this module from Dotfleet.
+Usage: import this module from Fleet.
 Help: python3 scripts/run_account.py --help.
 Direct execution without help keeps its existing behavior.
 """
@@ -21,6 +21,7 @@ from render_run import render
 from installation import command_software, MANAGER
 import registry
 import style
+from store_migration import recorded_moves
 
 RECORD = ".local/state/dotfleet/last-run.json"
 
@@ -67,7 +68,7 @@ class RunAccount:
         self.manager_version = (root / "VERSION").read_text().strip()
         saved = home / RECORD
         previous = json.loads(saved.read_text()) if saved.exists() else {}
-        self.old_profile = read_toml(home / ".config/dotfleet/profile.toml")
+        self.old_profile = read_toml(home / ".config/fleet/profile.toml")
         self.software = []
         for name in ("chezmoi", "mise"):
             staged = os.environ.get("DOTFLEET_STAGED_" + name.upper())
@@ -102,12 +103,13 @@ class RunAccount:
         ]
         self.locations = {
             "Content checkout": str(home / "dotfiles"),
-            "Profile file": str(home / ".config/dotfleet/profile.toml"),
+            "Profile file": str(home / ".config/fleet/profile.toml"),
             "Converted source": "None (not prepared)",
             "Backup folder": "None (not created)",
         }
         self.files = []
         self.profile = []
+        self.store_moves = recorded_moves()
         self.applied_files = set()
         self.applied_software = set()
         self.applied_checkouts = set()
@@ -194,6 +196,7 @@ class RunAccount:
             "checkouts": self.checkouts,
             "files": self.files,
             "profile_changes": self.profile,
+            "store_moves": self.store_moves,
             "locations": self.locations,
             "backup_manifest": self.manifest,
             "chezmoi_status_before": self.status,

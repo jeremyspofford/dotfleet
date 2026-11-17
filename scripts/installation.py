@@ -1,6 +1,6 @@
 """Install the versioned command and manager after review and backup.
 
-Usage: import this module from Dotfleet.
+Usage: import this module from Fleet.
 Help: python3 scripts/installation.py --help.
 Direct execution without help keeps its existing behavior.
 """
@@ -8,7 +8,7 @@ Direct execution without help keeps its existing behavior.
 import shutil
 from common import atomic, run
 
-MANAGER = ".local/share/dotfleet/manager"
+MANAGER = ".local/share/fleet/manager"
 COMMAND = ".local/bin/dotfleet"
 
 

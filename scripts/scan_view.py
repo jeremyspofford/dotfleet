@@ -1,6 +1,6 @@
 """Summarize enrollment candidates without printing private or transient paths.
 
-Usage: import this module from Dotfleet.
+Usage: import this module from Fleet.
 Help: python3 scripts/scan_view.py --help.
 Direct execution without help keeps its existing behavior.
 """

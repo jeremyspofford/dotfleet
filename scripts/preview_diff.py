@@ -1,6 +1,6 @@
 """Render pending file patches with isolated chezmoi sources and state.
 
-Usage: import this module from Dotfleet.
+Usage: import this module from Fleet.
 Help: python3 scripts/preview_diff.py --help.
 Direct execution without help keeps its existing behavior.
 """
@@ -17,7 +17,7 @@ def patches(home, profile, plan, folder, root):
     extra.mkdir()
     payloads = {
         ".config/chezmoi/chezmoi.toml": toml(plan["config"]),
-        ".config/dotfleet/profile.toml": toml(profile),
+        ".config/fleet/profile.toml": toml(profile),
         COMMAND: launcher(root),
     }
     if plan["native"]:

@@ -1,6 +1,6 @@
 """Find coding agents from commands, installed Mise packages, or configuration folders.
 
-Usage: import this module from Dotfleet.
+Usage: import this module from Fleet.
 Help: python3 scripts/agent_detection.py --help.
 Direct execution without help keeps its existing behavior.
 """

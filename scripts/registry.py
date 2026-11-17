@@ -5,7 +5,7 @@ Internal module. Use dotfleet machines --help for the command interface.
 The installer refreshes this machine after a backed-up run. Read-only commands
 read the file without refreshing timestamps. Profile identity and secrets stay out.
 
-Usage: import this module from Dotfleet.
+Usage: import this module from Fleet.
 Help: python3 scripts/registry.py --help.
 Direct execution without help keeps its existing behavior.
 """
@@ -18,8 +18,9 @@ import platform
 import socket
 
 from common import atomic, read_toml, run, value
+from store_migration import relocated
 
-REGISTRY = ".local/share/dotfleet/fleet.toml"
+REGISTRY = ".local/share/fleet/registry.toml"
 FIELDS = {
     "hostname": str,
     "home": str,
@@ -40,7 +41,9 @@ FIELDS = {
 def load(home):
     path = home / REGISTRY
     if path.is_symlink():
-        raise ValueError("Fleet registry is a symlink. Keep fleet.toml inside the manager store.")
+        raise ValueError(
+            "Fleet registry is a symlink. Keep registry.toml inside the manager store."
+        )
     data = read_toml(path) if path.exists() else {"schema_version": 1, "machines": {}}
     if (
         type(data.get("schema_version")) is not int
@@ -59,6 +62,10 @@ def load(home):
         for name in ("home", "last_backup", "last_run_record"):
             if record[name] and not Path(record[name]).is_absolute():
                 raise ValueError(f"Fleet record {key}: {name} must be an absolute path.")
+        if key == socket.gethostname() and record["home"] == str(home):
+            for name in ("last_backup", "last_run_record"):
+                if record[name]:
+                    record[name] = str(relocated(record[name], home))
     return data
 
 
@@ -74,7 +81,7 @@ def os_name():
 
 
 def machine(home, manager_version, fallback=None):
-    profile_path = home / ".config/dotfleet/profile.toml"
+    profile_path = home / ".config/fleet/profile.toml"
     profile = read_toml(profile_path) if profile_path.exists() else fallback or {}
     checkout = home / "dotfiles"
     commit = (

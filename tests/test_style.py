@@ -31,13 +31,13 @@ def command_goldens():
         home = Path(temporary)
         for path in [
             "dotfiles/.git",
-            ".local/share/dotfleet/manager/.git",
-            ".local/share/dotfleet/chezmoi-source",
+            ".local/share/fleet/manager/.git",
+            ".local/share/fleet/chezmoi-source",
             ".config/chezmoi",
         ]:
             (home / path).mkdir(parents=True)
         (home / ".config/chezmoi/chezmoi.toml").write_text(
-            toml({"sourceDir": str(home / ".local/share/dotfleet/chezmoi-source")})
+            toml({"sourceDir": str(home / ".local/share/fleet/chezmoi-source")})
         )
         profile = {
             "domain": "personal",
@@ -47,7 +47,7 @@ def command_goldens():
             "pins": {"node": "24.14.1"},
             "groups": {"helpers": True},
         }
-        backup = home / "dotfleet-backups/20261116-120000"
+        backup = home / "fleet-backups/20261116-120000"
         backup.mkdir(parents=True)
         (backup / "RUN.json").write_text('{"result":"SUCCESS"}')
         machine = dict(

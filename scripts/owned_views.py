@@ -15,7 +15,7 @@ import registry
 
 def profile_rows(home, profile):
     rows = [
-        ("Profile file", str(home / ".config/dotfleet/profile.toml")),
+        ("Profile file", str(home / ".config/fleet/profile.toml")),
         ("Domain", profile.get("domain", "core")),
         (
             "Domain choice",
@@ -38,7 +38,7 @@ def profile_rows(home, profile):
 
 
 def backup_rows(home, folders):
-    rows = [("Backups", str(home / "dotfleet-backups"))]
+    rows = [("Backups", str(home / "fleet-backups"))]
     for folder in reversed(folders):
         import json
 

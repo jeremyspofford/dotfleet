@@ -1,19 +1,20 @@
 # Content contract
 
-Dotfleet is the manager. A content repository holds home files. Git stores history; chezmoi applies files; Mise selects tool versions.
+Fleet is the manager. A content repository holds home files. Git stores history; chezmoi applies files; Mise selects tool versions.
 A profile is the machine's saved repository, domain, identity, pins, and group choices.
 A pin selects a tool version. A group selects optional files or marked blocks.
 
 ## Formats
 
-1. Read `format` in the root `dotfleet.toml` first. It must be `plain` or `chezmoi`.
-2. Without that field, detect chezmoi markers such as `.chezmoi*`, `dot_*`, or `private_dot_*`.
-3. Otherwise, detect literal home files, including Stow packages under `packages/<package>/`.
-4. If detection remains unclear, ask. `--format plain` selects real names; `--format chezmoi` selects native source names.
+1. Read the root `fleet.toml`, or `dotfleet.toml` when the new name is absent. If both exist, use only `fleet.toml`.
+2. Read its `format` field first. It must be `plain` or `chezmoi`.
+3. Without that field, detect chezmoi markers such as `.chezmoi*`, `dot_*`, or `private_dot_*`.
+4. Otherwise, detect literal home files, including Stow packages under `packages/<package>/`.
+5. If detection remains unclear, ask. `--format plain` selects real names; `--format chezmoi` selects native source names.
 
 Plain content uses real names, such as `.zshrc` and `.config/starship.toml`. It contains no chezmoi templates or installer.
-Dotfleet converts plain content into `~/.local/share/dotfleet/chezmoi-source`.
-Chezmoi content already uses native source names. Dotfleet uses that checkout directly; it does not rewrite it.
+Fleet converts plain content into `~/.local/share/fleet/chezmoi-source`.
+Chezmoi content already uses native source names. Fleet uses that checkout directly; it does not rewrite it.
 Native templates and hooks can execute commands. Use only trusted repositories.
 
 ## Included files
@@ -34,7 +35,8 @@ Reject absolute destination paths and parent traversal. Git determines file cont
 
 ## Manifest
 
-`dotfleet.toml` is optional for plain content. TOML is a configuration file format.
+`fleet.toml` is optional for plain content. TOML is a configuration file format.
+The old name `dotfleet.toml` remains supported. It never combines with or overrides an existing `fleet.toml`.
 
 ```toml
 format = "plain"
@@ -68,11 +70,11 @@ All groups default to on. Later runs keep choices; new groups prompt with on pre
 
 ## Manager-owned outputs
 
-Dotfleet reserves `~/.config/git/local.gitconfig`, `~/.config/dotfiles/domain`, `~/.config/mise/config.toml`, and `~/.secrets`.
+Fleet reserves `~/.config/git/local.gitconfig`, `~/.config/dotfiles/domain`, `~/.config/mise/config.toml`, and `~/.secrets`.
 Plain content can provide Mise defaults. The manager replaces that output with defaults merged under profile pins.
 Native chezmoi content must leave reserved paths unmanaged. Other native outputs still use the original checkout.
-Dotfleet also owns `~/.config/chezmoi/chezmoi.toml`. Content config templates never write that file.
-After writing it, Dotfleet updates chezmoi's saved template checksum, an identifier for template contents.
+Fleet also owns `~/.config/chezmoi/chezmoi.toml`. Content config templates never write that file.
+After writing it, Fleet updates chezmoi's saved template checksum, an identifier for template contents.
 Without a template, it removes the obsolete checksum. It preserves file history and script history.
 
 The local Git file holds profile identity and retains other existing local settings.
@@ -88,7 +90,7 @@ Secret values never enter Git or the profile. Content declares references and na
 ## Ownership and updates
 
 Back up every target before replacement. Preserve symbolic links and copy external file targets separately.
-Save profile data at `~/.config/dotfleet/profile.toml`. Saved selections win over later defaults.
+Save profile data at `~/.config/fleet/profile.toml`. Saved selections win over later defaults.
 During legacy adoption, merge old chezmoi pins, current Mise tools, and saved installer pins, in that order.
 Carry existing Mise settings into `mise_settings` too. This preserves settings beyond tool versions.
 Validate carried and existing profiles before applying files. Ask about missing identity, unconfirmed domains, and floating tool versions.
@@ -108,7 +110,8 @@ Report nonempty chezmoi status as incomplete enrollment. Keep all changes recove
 ## Enrollment review and adoption
 
 Terminal enrollment stages content, conversion, and generated files outside home. Review lists choices, warnings, full changed paths, and the proposed backup path.
-Confirm before any home writes. Returning to a step rebuilds the plan; quitting discards it without changing home.
+Store migration runs first; see [the migration rules](../README.md#store-migration). Those moves remain if later review is cancelled.
+Confirm before applying managed files. Returning to a step rebuilds the plan; quitting discards those planned changes.
 Scripted flags keep their existing behavior. `--defaults` cannot bypass incomplete identity, domain confirmation, or floating pins.
 
 Adoption scans root dotfiles and `.config` files without following directory links. File links are scanned through their targets.

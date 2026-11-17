@@ -96,7 +96,7 @@ class CommandTests(unittest.TestCase):
         return result.stdout + result.stderr
 
     def record(self):
-        paths = sorted((self.home / "dotfleet-backups").glob("*/RUN.json"))
+        paths = sorted((self.home / "fleet-backups").glob("*/RUN.json"))
         return json.loads(paths[-1].read_text()), paths[-1].parent
 
     def terminal(self, args, answers):
@@ -207,7 +207,7 @@ class CommandTests(unittest.TestCase):
         self.enroll()
         self.assertIn("Personal shortcut", self.cli("domain"))
         self.cli("domain", "personal")
-        p = tomllib.loads((self.home / ".config/dotfleet/profile.toml").read_text())
+        p = tomllib.loads((self.home / ".config/fleet/profile.toml").read_text())
         self.assertEqual(p["domain"], "personal")
         self.assertTrue(p["domain_chosen"])
         output = command("zsh", "-ic", "chosen", env=self.env, cwd=self.home)
@@ -228,7 +228,7 @@ class CommandTests(unittest.TestCase):
         self.enroll()
         self.cli("backup")
         _, saved = self.record()
-        original_profile = (self.home / ".config/dotfleet/profile.toml").read_bytes()
+        original_profile = (self.home / ".config/fleet/profile.toml").read_bytes()
         (self.home / ".file").write_text("local edit\n")
         output = self.cli("rollback", saved.name, expected=1)
         self.assertIn("needs a terminal", output)
@@ -236,15 +236,13 @@ class CommandTests(unittest.TestCase):
         output = self.terminal(["rollback", saved.name], [(b"Confirm [cancel]:", b"restore\n")])
         self.assertIn("~ ~/.file", output)
         self.assertEqual((self.home / ".file").read_text(), "original\n")
-        self.assertEqual(
-            (self.home / ".config/dotfleet/profile.toml").read_bytes(), original_profile
-        )
+        self.assertEqual((self.home / ".config/fleet/profile.toml").read_bytes(), original_profile)
         self.assert_quiet_status()
 
     def test_doctor_names_all_gaps(self):
         self.enroll()
         self.assertNotIn("FAIL", self.cli("doctor"))
-        path = self.home / ".config/dotfleet/profile.toml"
+        path = self.home / ".config/fleet/profile.toml"
         p = tomllib.loads(path.read_text())
         p.update(domain_chosen=False, git_name="", git_email="", pins={"node": "latest"})
         path.write_text(toml(p))
@@ -262,7 +260,7 @@ class CommandTests(unittest.TestCase):
 
     def test_missing_domain_provenance_is_unchosen_until_named_choice(self):
         self.enroll()
-        path = self.home / ".config/dotfleet/profile.toml"
+        path = self.home / ".config/fleet/profile.toml"
         p = tomllib.loads(path.read_text())
         del p["domain_chosen"]
         path.write_text(toml(p))
@@ -313,11 +311,11 @@ else: sys.exit(1)
         self.assertIn("24.14.1", output)
         record, _ = self.record()
         self.assertIn("node", record["completed_software"])
-        p = tomllib.loads((self.home / ".config/dotfleet/profile.toml").read_text())
+        p = tomllib.loads((self.home / ".config/fleet/profile.toml").read_text())
         self.assertEqual(p["pins"]["node"], "24.14.1")
         self.assertIn("installed: 24.14.1", self.cli("pins"))
         self.cli("pins", "remove", "node")
-        p = tomllib.loads((self.home / ".config/dotfleet/profile.toml").read_text())
+        p = tomllib.loads((self.home / ".config/fleet/profile.toml").read_text())
         self.assertNotIn("node", p["pins"])
         self.assertIn("node", p["unpinned_tools"])
         self.assertNotIn(
@@ -374,9 +372,9 @@ else: sys.exit(1)
         )
         self.assertIn("− ~/.local/bin/dotfleet", output)
         self.assertFalse(self.exe.exists())
-        self.assertFalse((self.home / ".local/share/dotfleet/manager").exists())
+        self.assertFalse((self.home / ".local/share/fleet/manager").exists())
         self.assertTrue((self.home / "dotfiles/.git").exists())
-        self.assertTrue((self.home / "dotfleet-backups").exists())
+        self.assertTrue((self.home / "fleet-backups").exists())
         self.assertEqual((self.home / ".file").read_text(), "before enrollment\n")
 
 

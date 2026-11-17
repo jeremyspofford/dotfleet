@@ -8,4 +8,4 @@
   Content checkout  PASS · clean
   Backup            PASS
   Manager config    ~/.config/chezmoi/chezmoi.toml
-  Converted source  PASS · ~/.local/share/dotfleet/chezmoi-source
+  Converted source  PASS · ~/.local/share/fleet/chezmoi-source

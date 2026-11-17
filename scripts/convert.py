@@ -34,6 +34,7 @@ RESERVED = {
     "tests",
     "README.md",
     "LICENSE",
+    "fleet.toml",
     "dotfleet.toml",
     "AGENTS.md",
     "VERSION",
@@ -60,8 +61,17 @@ def tracked(checkout):
     return entries
 
 
+def manifest_path(checkout):
+    preferred = Path(checkout) / "fleet.toml"
+    return preferred if preferred.exists() else Path(checkout) / "dotfleet.toml"
+
+
+def content_manifest(checkout):
+    return read_toml(manifest_path(checkout))
+
+
 def detect(checkout, explicit=None):
-    manifest = read_toml(checkout / "dotfleet.toml")
+    manifest = content_manifest(checkout)
     names = tracked(checkout)
     kind = manifest.get("format") or explicit
     if not kind:

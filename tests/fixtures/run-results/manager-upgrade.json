@@ -19,7 +19,7 @@
   "checkouts": [
     {
       "name": "Manager",
-      "path": "/home/example/.local/share/dotfleet/manager",
+      "path": "/home/example/.local/share/fleet/manager",
       "old": "12345678aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "new": "87654321dddddddddddddddddddddddddddddddd"
     },
@@ -34,9 +34,9 @@
   "profile_changes": [],
   "locations": {
     "Content checkout": "/home/example/dotfiles",
-    "Profile file": "/home/example/.config/dotfleet/profile.toml",
-    "Converted source": "/home/example/.local/share/dotfleet/chezmoi-source",
-    "Backup folder": "/home/example/dotfleet-backups/20261116-140000"
+    "Profile file": "/home/example/.config/fleet/profile.toml",
+    "Converted source": "/home/example/.local/share/fleet/chezmoi-source",
+    "Backup folder": "/home/example/fleet-backups/20261116-140000"
   },
   "backup_manifest": [],
   "chezmoi_status_before": "",
