@@ -245,7 +245,7 @@ class CommandTests(unittest.TestCase):
                 (b"Domain [core]:", b"\n"),
                 (b"Git author name [", b"\n"),
                 (b"Git author email [", b"\n"),
-                (b"Pins [accept]:", b"\n"),
+                (b"Tools [accept]:", b"\n"),
                 (b"extra [on]:", b"\n"),
                 (b"Review [quit]:", b"confirm\n"),
             ],
@@ -284,10 +284,12 @@ class CommandTests(unittest.TestCase):
         _, saved = self.record()
         original_profile = (self.home / ".config/fleet/profile.toml").read_bytes()
         (self.home / ".file").write_text("local edit\n")
-        output = self.cli("rollback", saved.name, expected=1)
+        output = self.cli("backups", "restore", "--backup", saved.name, expected=1)
         self.assertIn("needs a terminal", output)
         self.assertEqual((self.home / ".file").read_text(), "local edit\n")
-        output = self.terminal(["rollback", saved.name], [(b"Confirm [cancel]:", b"restore\n")])
+        output = self.terminal(
+            ["backups", "restore", "--backup", saved.name], [(b"Confirm [cancel]:", b"restore\n")]
+        )
         self.assertIn("~ ~/.file", output)
         self.assert_review_golden("rollback", output)
         self.assertEqual((self.home / ".file").read_text(), "original\n")
@@ -306,13 +308,13 @@ class CommandTests(unittest.TestCase):
             "never explicitly chosen",
             "Git name is empty",
             "Git email is empty",
-            "node pin is floating",
+            "node tool version is floating",
         ]:
             self.assertIn(text, output)
         for fix in [
             "dotfleet domain",
             "dotfleet configure",
-            "dotfleet pins set --tool node --version VERSION",
+            "dotfleet tools set node --version VERSION",
         ]:
             self.assertIn(fix, output)
         self.assertNotIn("Supply --", output)
@@ -366,15 +368,15 @@ elif args[0]=='latest':
 else: sys.exit(1)
 """)
         mise.chmod(0o700)
-        output = self.cli("pins", "set", "--tool", "node", "--version", "24.14.1")
+        output = self.cli("tools", "set", "node", "--version", "24.14.1")
         self.assertIn("24.14.1", output)
         self.assert_review_golden("pins", output)
         record, _ = self.record()
         self.assertIn("node", record["completed_software"])
         p = tomllib.loads((self.home / ".config/fleet/profile.toml").read_text())
         self.assertEqual(p["pins"]["node"], "24.14.1")
-        self.assertIn("Installed  24.14.1", self.cli("pins", "list"))
-        self.cli("pins", "remove", "--tool", "node")
+        self.assertIn("Installed  24.14.1", self.cli("tools", "list"))
+        self.cli("tools", "remove", "node")
         p = tomllib.loads((self.home / ".config/fleet/profile.toml").read_text())
         self.assertNotIn("node", p["pins"])
         self.assertIn("node", p["unpinned_tools"])
@@ -382,7 +384,7 @@ else: sys.exit(1)
             "node", tomllib.loads((self.home / ".config/mise/config.toml").read_text())["tools"]
         )
         self.assertTrue((self.home / ".local/share/mise/installs/node/24.14.1").exists())
-        self.cli("pins", "set", "--tool", "node", "--version", "latest", expected=2)
+        self.cli("tools", "set", "node", "--version", "latest", expected=2)
         self.assert_quiet_status()
 
     def test_external_restore_backs_up_the_current_target(self):
@@ -395,7 +397,9 @@ else: sys.exit(1)
         self.cli("backups", "create")
         _, saved = self.record()
         external.write_text("current external\n")
-        self.terminal(["rollback", saved.name], [(b"Confirm [cancel]:", b"restore\n")])
+        self.terminal(
+            ["backups", "restore", "--backup", saved.name], [(b"Confirm [cancel]:", b"restore\n")]
+        )
         _, newest = self.record()
         self.assertEqual(external.read_text(), "saved external\n")
         self.assertEqual(
@@ -404,7 +408,10 @@ else: sys.exit(1)
         path.unlink()
         path.write_text("regular file now\n")
         external.write_text("untracked external change\n")
-        self.assertIn("original link is missing", self.cli("rollback", saved.name, expected=1))
+        self.assertIn(
+            "original link is missing",
+            self.cli("backups", "restore", "--backup", saved.name, expected=1),
+        )
         self.assertEqual(external.read_text(), "untracked external change\n")
 
     def test_rollback_rejects_changed_backup_and_unsafe_paths(self):
@@ -412,10 +419,12 @@ else: sys.exit(1)
         self.cli("backups", "create")
         _, saved = self.record()
         (saved / "home/.file").write_text("tampered\n")
-        output = self.cli("rollback", saved.name, expected=1)
+        output = self.cli("backups", "restore", "--backup", saved.name, expected=1)
         self.assertIn("failed its recorded fingerprint", output)
         self.assertEqual((self.home / ".file").read_text(), "original\n")
-        self.assertIn("directly inside", self.cli("rollback", "/tmp", expected=1))
+        self.assertIn(
+            "directly inside", self.cli("backups", "restore", "--backup", "/tmp", expected=1)
+        )
 
     def test_uninstall_keeps_content_and_backups_and_can_restore_oldest(self):
         self.enroll()

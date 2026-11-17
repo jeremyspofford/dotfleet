@@ -49,7 +49,6 @@ CONTROLS = {
     COMMAND,
 }
 DESCRIPTIONS = {
-    "help": ("Show command help.\nUse help COMMAND ACTION for a specific action."),
     "addons": (
         "List optional manager extensions.\n"
         "A manifest declares an extension’s actions.\n"
@@ -57,7 +56,7 @@ DESCRIPTIONS = {
         "No add-ons ship with Fleet."
     ),
     "backups": (
-        "Create, list, or delete saved file copies.\n"
+        "Create, list, restore, or delete saved copies.\n"
         "A backup is a saved copy of managed files and the profile.\n"
         "List shows dates, recorded results, sizes, and locations without changing files."
     ),
@@ -70,7 +69,7 @@ DESCRIPTIONS = {
     ),
     "configure": (
         "Reopen the enrollment wizard.\n"
-        "Review source, domain, identity, pins, groups, and agents before applying choices."
+        "Review source, domain, identity, tools, groups, and agents before applying choices."
     ),
     "content": (
         "Show the content checkout and Git state.\n"
@@ -108,23 +107,11 @@ DESCRIPTIONS = {
         "Set-ssh saves a target and tests SSH once.\n"
         "One name supplies both fields; without flags, pick a host in a terminal."
     ),
-    "pins": (
+    "tools": (
         "Show or set exact tool versions.\n"
-        "A pin records an exact tool version.\n"
+        "A selection records an exact tool version.\n"
         "Set installs that exact version.\n"
-        "Remove unpins the tool without uninstalling it."
-    ),
-    "profile": (
-        "Show saved machine choices.\n"
-        "The profile.toml file saves domain, identity, pins, groups, and agents.\n"
-        "An agent is a coding assistant.\n"
-        "Change choices through their commands or configure."
-    ),
-    "rollback": (
-        "List backups or restore one.\n"
-        "A backup contains original files and a manifest listing them.\n"
-        "Restore the profile too.\n"
-        "Type restore to confirm; press Enter after each answer."
+        "Remove clears the selection without uninstalling the tool."
     ),
     "secrets": (
         "List secret names as set or unset.\n"
@@ -135,7 +122,7 @@ DESCRIPTIONS = {
     "status": (
         "Show saved state without network requests.\n"
         "Status reads saved update results; check fetches new results.\n"
-        "Show the profile, installed pins, groups, checkouts, drift, backups, and last update check.\n"
+        "Show the profile, selected tools, groups, checkouts, drift, backups, and last update check.\n"
         "A profile stores machine choices; drift means managed files differ."
     ),
     "topology": (
@@ -315,11 +302,11 @@ def command_profile_gaps(saved_profile):
             )
         elif gap.startswith(("Git name ", "Git email ")):
             gap = gap.split(". Supply ", 1)[0] + f". Run {display} configure."
-        elif " pin is floating " in gap:
-            tool = gap.split(" pin is floating ", 1)[0]
+        elif " tool version is floating " in gap:
+            tool = gap.split(" tool version is floating ", 1)[0]
             gap = (
                 gap.split(". Supply ", 1)[0]
-                + f". Run {display} pins set --tool {tool} --version VERSION with a full version."
+                + f". Run {display} tools set {tool} --version VERSION with a full version."
             )
         gaps.append(gap)
     return gaps
@@ -329,16 +316,14 @@ def read_view(args, home, saved_profile):
     display = command_name(saved_profile)
     name = args.command
     manifest = content_manifest(home / "dotfiles")
-    if name == "profile":
-        pairs = owned_views.profile_rows(home, saved_profile)
-    elif name == "content":
+    if name == "content":
         pairs = owned_views.content_rows(home, saved_profile, checkout_state)
-    elif name in ("backups", "secrets", "machines", "addons", "domain", "groups", "pins"):
+    elif name in ("backups", "secrets", "machines", "addons", "domain", "groups", "tools"):
         entities = command_views.collection(name, home, saved_profile, manifest)
         empty = {
-            "backups": f"No backups yet. Run {display} backup.",
+            "backups": f"No backups yet. Run {display} backups create.",
             "secrets": "No secret variables declared.",
-            "pins": "No tool pins recorded.",
+            "tools": "No tool versions recorded.",
             "groups": "No content groups declared.",
             "addons": "No installed add-ons. None ship with Fleet.",
         }.get(name, "None recorded.")
@@ -401,9 +386,17 @@ def read_view(args, home, saved_profile):
         return int(any("FAIL" in value for _, value in pairs))
     else:
         pairs = status_rows(home, saved_profile)
-    info(name.capitalize(), pairs or [("Selections", "none")], home)
-    if name == "status":
-        print(updates.summary(home, saved_profile))
+    print(
+        render_view(
+            name.capitalize(),
+            pairs or [("Selections", "none")],
+            str(home),
+            inline_keys={key for key, _ in pairs if key.startswith("Tool ")}
+            if name == "status"
+            else (),
+        ),
+        end="",
+    )
     return 0
 
 
@@ -430,12 +423,23 @@ def status_rows(home, saved_profile):
             else f"missing; run {display} configure",
         ),
     ]
-    pairs += [("Pin " + key, value) for key, value in pin_rows(saved_profile, home)] or [
-        ("Pins", "none")
+    pairs += [("Tool " + key, value) for key, value in pin_rows(saved_profile, home)] or [
+        ("Tools", "none")
     ]
     pairs += [("Group " + key, value) for key, value in saved_profile.get("groups", {}).items()]
     pairs += [
+        (
+            "Agents",
+            ", ".join(
+                name + (" on" if enabled else " off")
+                for name, enabled in sorted(saved_profile.get("agents", {}).items())
+            )
+            or "none",
+        ),
+        ("Profile file", str(home / PROFILE)),
+        ("Edit choices", f"Use {display} domain set, tools set, groups set, or configure."),
         ("Content", checkout_state(home / "dotfiles")),
+        ("Updates", updates.summary(home, saved_profile).removeprefix("Updates: ")),
         ("Drift", f"present; run {display} diff" if status(home) else "none"),
         (
             "Last run",
@@ -804,6 +808,11 @@ def main(argv=None):
             print("Preview failed: " + str(error), file=sys.stderr)
             return 2
     argument_parser = parser()
+    original_arguments = list(sys.argv[1:] if argv is None else argv)
+    successor = command_arguments.successor(original_arguments)
+    if successor:
+        print("Error: Use " + current_command(home) + " " + successor + ".", file=sys.stderr)
+        return 2
     try:
         argv = command_arguments.help_arguments(
             sys.argv[1:] if argv is None else argv, DESCRIPTIONS
@@ -869,7 +878,7 @@ def main(argv=None):
                     home,
                 )
                 return 0
-        if args.command in ("status", "doctor") or getattr(args, "action", None) in (
+        if args.command in ("status", "doctor", "content") or getattr(args, "action", None) in (
             "list",
             "show",
         ):
@@ -884,7 +893,7 @@ def main(argv=None):
                     f"Configure needs a terminal. Run {display} configure in an interactive shell."
                 )
             return manager.main(["--configure"])
-        if args.command == "rollback":
+        if args.command == "backups" and args.action == "restore":
             if args.backup in registry.load(home)["machines"]:
                 return remote.refusal(args.backup, "rollback")
             return restore_command(args, home)
@@ -952,9 +961,9 @@ def main(argv=None):
             return manager.main(["--defaults", "--domain", args.name])
         if args.command == "groups":
             return manager.main(["--defaults", "--group", args.name + "=" + args.state])
-        if args.command == "pins":
+        if args.command == "tools":
             if not args.pin:
-                parser().error("pins set needs --tool and --version; pins remove needs --tool")
+                parser().error("tools set needs TOOL and --version; tools remove needs TOOL")
             if args.action == "remove":
 
                 def unpin(value):
@@ -972,7 +981,7 @@ def main(argv=None):
                 or tool.startswith("-")
             ):
                 parser().error(
-                    "pins set needs --tool TOOL --version VERSION with an exact version, such as 24.14.1"
+                    "tools set needs TOOL --version VERSION with an exact version, such as 24.14.1"
                 )
             installed = enrollment.installed(home).get(tool, [])
             present = next((item for item in installed if item.get("version") == version), None)

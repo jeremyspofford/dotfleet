@@ -213,7 +213,7 @@ sys.exit(result.returncode)
             "never explicitly chosen",
             "Git name is empty",
             "Git email is empty",
-            "node pin is floating",
+            "node tool version is floating",
         ):
             self.assertIn(gap, output)
         self.assertIn("Complete these choices on the target", output)
@@ -260,7 +260,7 @@ sys.exit(result.returncode)
     def test_forbidden_commands_and_unsafe_targets_never_start_ssh(self):
         self.connect()
         for action, reason in (
-            ("rollback", "destructive"),
+            ("rollback", "backups restore"),
             ("uninstall", "destructive"),
             ("configure", "terminal"),
         ):

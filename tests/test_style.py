@@ -47,7 +47,7 @@ def command_goldens():
             "domain_chosen": True,
             "git_name": "Example Person",
             "git_email": "example@example.invalid",
-            "pins": {"node": "24.14.1"},
+            "pins": {"node": "26.13.1"},
             "groups": {"helpers": True, "docker": False},
             "agents": {"codex": False},
             "content_repo": "https://example.invalid/dotfiles",
@@ -104,7 +104,9 @@ def command_goldens():
             patch.object(command, "run", return_value=""),
             patch.object(command, "records", return_value=[backup]),
             patch.object(
-                command.enrollment, "installed", return_value={"node": [{"version": "24.14.1"}]}
+                command.enrollment,
+                "installed",
+                return_value={"node": [{"version": "26.3.1"}, {"version": "26.13.1"}]},
             ),
             patch.object(
                 command,
@@ -125,13 +127,12 @@ def command_goldens():
                 "status",
                 "doctor",
                 "machines",
-                "profile",
                 "backups",
                 "secrets",
                 "content",
                 "domain",
                 "groups",
-                "pins",
+                "tools",
                 "addons",
                 "version",
             ]:

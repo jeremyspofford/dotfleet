@@ -6,8 +6,8 @@ The installed command is `dotfleet`. Users can type the `fleet` alias.
 Rancher's Fleet already provides a `fleet` command. We keep `dotfleet` to avoid PATH wars.
 PATH lists the folders your shell searches for commands. The alias stays undefined when a real `fleet` command already exists.
 
-Fleet manages home configuration across machines. A profile saves each machine's repository, domain, Git identity, tool pins, and content groups.
-Git records history. chezmoi applies files. Mise selects developer tool versions. A pin selects a version; a group selects optional content.
+Fleet manages home configuration across machines. A profile saves each machine's repository, domain, Git identity, tool versions, and content groups.
+Git records history. chezmoi applies files. Mise selects developer tool versions. A tool selection records a version; a group selects optional content.
 
 ## Install
 
@@ -29,7 +29,7 @@ Prompts read the terminal, never piped input. Complete profiles update without e
 3. Choose a source. **Adopt** keeps this machine's files; **defaults** uses our examples; **repo** accepts your Git URL.
 4. Choose a domain. The prompt shows manifest descriptions and commands found in each overlay file.
 5. Confirm Git name and email. Enter keeps the displayed value; type `skip` explicitly to leave it empty.
-6. Compare installed tools, content defaults, and saved pins. Accept them or enter exact versions.
+6. Compare installed tools, content defaults, and saved tools. Accept them or enter exact versions.
 7. Choose groups. On includes their content; off excludes it. New groups say NEW.
 8. Select detected agents, which are coding assistants. Set each detected agent on or off. Press Enter to keep its current choice.
 9. Review all choices and the full planned change account. Type `confirm`, `quit`, or a step name to return.
@@ -38,7 +38,7 @@ Prompts read the terminal, never piped input. Complete profiles update without e
 **Start with `core` unless you want a domain's examples.** It includes shared shell, Git, aliases, and prompt settings.
 The bundled `personal`, `work`, and `client` overlays each add two harmless example commands: show your directory and list its entries.
 Replace those examples with your own settings. Empty overlays explicitly say they add nothing yet.
-Choosing a domain installs no software and creates no accounts. Identity and tool pins are separate choices.
+Choosing a domain installs no software and creates no accounts. Identity and tool versions are separate choices.
 A new profile shows `core`; later prompts show your recorded domain. Confirm it by pressing Enter or entering another domain name.
 
 Prompts use headings, spacing, and the shared logger's colors. Text labels keep choices clear without color.
@@ -70,7 +70,7 @@ curl -fsSL https://raw.githubusercontent.com/jeremyspofford/fleet/main/install.s
 ```
 
 `--configure` repeats the wizard with saved choices. `--defaults` uses complete recorded values without prompts; new groups default to on.
-Without a terminal, incomplete profiles stop and list their gaps. No prompt or default silently fills identity, domain confirmation, or floating pins.
+Without a terminal, incomplete profiles stop and list their gaps. No prompt or default silently fills identity, domain confirmation, or floating tool versions.
 
 | Flag | Meaning |
 | --- | --- |
@@ -79,7 +79,7 @@ Without a terminal, incomplete profiles stop and list their gaps. No prompt or d
 | `--domain NAME` | Confirm core, personal, work, or client. Content defines the additions. |
 | `--git-name NAME` | Set the Git commit author name. |
 | `--git-email EMAIL` | Set the Git commit author email. |
-| `--pin TOOL=VERSION` | Record an exact version. Repeat for more tools. |
+| `--tool TOOL=VERSION` | Record an exact version. Repeat for more tools. |
 | `--group NAME=on\|off` | Include or exclude a named group. Repeat for more groups. |
 | `--agents NAMES` | Configure detected agents, separated by commas. Use none to skip. |
 | `--format plain\|chezmoi` | Choose real names or native sources when detection is unclear. The manifest takes priority. |
@@ -97,7 +97,7 @@ Full paths and commit IDs remain in RUN.json. Present software shares one quiet 
 File markers mean added (+), removed (−), or changed (~). Color reinforces these markers when a terminal supports it.
 Set NO_COLOR to disable color. Redirected output stays plain.
 
-File lists include generated settings and agent files. Removing a pin does not uninstall software.
+File lists include generated settings and agent files. Removing a tool selection does not uninstall software.
 Backups, converted sources, and internal state are not counted as setting changes.
 Manager updates compare the running commit with the last confirmed run. Missing earlier values say “not set.”
 
@@ -151,22 +151,22 @@ Fleet converts plain files into a private chezmoi source. Native chezmoi reposit
 Stow layouts under `packages/<package>/` also work; their package prefixes do not reach the home directory.
 
 Your profile lives at `~/.config/fleet/profile.toml`. It saves the domain, Git identity, exact tool versions, and group choices between runs.
-Edit pins there, then rerun the installer. Mise records which versions are installed; Fleet reads that list during setup.
-A saved pin selects a version. It does not mean that version is installed.
-Setup asks when identity is incomplete, the domain choice is unconfirmed, or a pin floats, such as `latest`.
+Use `fleet tools set TOOL --version VERSION` to select and install a version. Mise records which versions are installed; Fleet reads that list during setup.
+A saved tool choice selects a version. It does not mean that version is installed.
+Setup asks when identity is incomplete, the domain choice is unconfirmed, or a tool version floats, such as `latest`.
 Prompts show recorded values. Press Enter to use the stated action, or type `skip` to leave a choice incomplete.
 For identity, Enter keeps a nonempty displayed value. Type `skip` explicitly to leave identity empty.
-Floating pins resolve to matching installed versions. Without a match, enter a full version, such as `24.14.1`, or leave the tool unpinned.
-Exact pins remain unchanged. Complete profiles need no profile prompts.
-The summary lists skipped gaps under Warnings. Without a terminal, incomplete identity, an unconfirmed domain, or a floating pin stops setup. `--defaults` cannot bypass this check.
+Floating tool versions resolve to matching installed versions. Without a match, enter a full version, such as `24.14.1`, or leave the tool without a selection.
+Exact versions remain unchanged. Complete profiles need no profile prompts.
+The summary lists skipped gaps under Warnings. Without a terminal, incomplete identity, an unconfirmed domain, or a floating tool version stops setup. `--defaults` cannot bypass this check.
 For scripted runs, supply missing choices explicitly:
 
 ```sh
-bash install.sh --domain personal --git-name "Example Person" --git-email person@example.invalid --pin node=24.14.1
+bash install.sh --domain personal --git-name "Example Person" --git-email person@example.invalid --tool node=24.14.1
 ```
 
 `--domain` records the domain choice. `--git-name` and `--git-email` record commit identity.
-Repeat `--pin TOOL=VERSION` for each full version. A floating value in a flag still fails unattended validation.
+Repeat `--tool TOOL=VERSION` for each full version. A floating value in a flag still fails unattended validation.
 Complete profiles need no flags on later runs. New group defaults are printed during scripted setup.
 
 `domain_chosen` records a human choice in this wizard, through `--domain`, or through `dotfleet domain set --name NAME`.
@@ -177,11 +177,11 @@ Content defaults fill gaps only when the requested versions are installed. The s
 The manager creates Git identity, domain, Mise settings, and a private secrets file. Keep secret references in the content manifest, never values. Imported profile references remain valid.
 A reference such as `op://Vault/Item/field` names a secret in 1Password. References are disabled unless explicitly enabled.
 
-Old Layer 0 enrollment migrates automatically. Setup reads old chezmoi data, rendered Mise pins, and saved installer data before applying files.
+Old Layer 0 enrollment migrates automatically. Setup reads old chezmoi data, rendered Mise tools, and saved installer data before applying files.
 Migration also saves existing Mise settings in the profile. Existing Fleet profiles remain authoritative. Backups preserve replaced files and prior staged sources.
 Conflict menus explain letter keys and require Enter. Skipping changes can leave differences; the summary reports that as incomplete enrollment.
 
-1. Edit content files in `~/dotfiles`. Change profile choices through `dotfleet domain`, `pins`, `groups`, or `configure`.
+1. Edit content files in `~/dotfiles`. Change profile choices through `dotfleet domain`, `tools`, `groups`, or `configure`.
 2. Commit and push content changes before updating. Setup refuses a checkout with uncommitted edits.
 3. Run `dotfleet update` to convert and apply. The one-liner remains available for manager recovery.
 4. Run `dotfleet status` to check for differences.
@@ -214,32 +214,31 @@ Use `dotfleet` for daily commands. The installer places it in `~/.local/bin` on 
 It keeps the manager checkout at `~/.local/share/fleet/manager`. The command uses that copy and its VERSION file.
 Keep `~/.local/bin` on PATH, the list of folders your shell searches for commands.
 The one-line installer remains the first-install and recovery path.
-Command groups require an action. Bare `machines`, `backups`, `secrets`, `pins`, `groups`, `domain`, `content`, `profile`, and `addons` print their action lists.
+Command groups require an action. Bare `machines`, `backups`, `secrets`, `tools`, `groups`, `domain`, and `addons` print their action lists.
 
 | Command | Action |
 | --- | --- |
 | `dotfleet tui` | Open the full-screen terminal interface. Missing environments show plain command alternatives and exit 0. |
 | `dotfleet update` | Check upstreams and drift first. Apply only when an update or repair is needed. |
-| `dotfleet profile show` | Show saved choices and the profile location. Edit choices through commands or the wizard. |
 | `dotfleet backups list` | List backup dates, results, and sizes without changing files. |
 | `dotfleet backups delete --name BACKUP` | Review and delete one saved backup. |
 | `dotfleet backups delete --keep N` | Review deletion of all but the newest N backups. |
 | `dotfleet backups delete --all` | Review deletion of every saved backup. |
 | `dotfleet secrets list` | List declared secret names as set or unset. Values stay private. |
-| `dotfleet content show` | Show the content checkout, repository, commit, behind state, and short Git status. |
-| `dotfleet status` | Show choices, installed pins, drift, recent runs and backups, and the last update check. |
+| `dotfleet content` | Show the content checkout, repository, commit, behind state, and short Git status. |
+| `dotfleet status` | Show choices, installed tools, drift, recent runs and backups, and the last update check. |
 | `dotfleet topology` | Show this machine’s recorded connection tree. Use --json for structured output. |
 | `dotfleet check` | Fetch both upstreams and save their update counts. An upstream is the remote branch tracked by a checkout. |
 | `dotfleet diff` | Show pending patches. Use `--stat` for paths only. Exit 0 means clean; exit 1 means differences. |
-| `dotfleet rollback` | List backups and choose one in a terminal. Include the saved profile when restoring. |
-| `dotfleet rollback --backup BACKUP` | Review one backup folder, then type restore to confirm. |
+| `dotfleet backups restore` | List backups and choose one in a terminal. Include the saved profile when restoring. |
+| `dotfleet backups restore --backup BACKUP` | Review one backup folder, then type restore to confirm. |
 | `dotfleet domain list` | Show the current domain, its confirmation state, and each domain's description. |
 | `dotfleet domain set --name personal` | Record the personal domain as chosen and apply it. |
 | `dotfleet groups list` | List content groups, their states, and descriptions. |
 | `dotfleet groups set --name docker --state off` | Exclude Docker content. Use on to restore it. |
-| `dotfleet pins list` | List saved exact versions and installed versions. |
-| `dotfleet pins set --tool node --version 24.14.1` | Explicitly install and record that exact version. Content defaults still never install software. |
-| `dotfleet pins remove --tool node` | Remove the pin and prevent content defaults from filling it again. Keep installed software. |
+| `dotfleet tools list` | List saved exact versions and installed versions. |
+| `dotfleet tools set node --version 24.14.1` | Explicitly install and record that exact version. Content defaults still never install software. |
+| `dotfleet tools remove node` | Remove the selection and prevent content defaults from filling it again. Keep installed software. |
 | `dotfleet configure` | Reopen the enrollment wizard. |
 | `dotfleet doctor` | Check profile completeness, drift, checkout edits, and backups. Print a fix for each failed check. |
 | `dotfleet machines list` | List saved machines with known facts and connections. Make no network requests. |
@@ -248,11 +247,25 @@ Command groups require an action. Bare `machines`, `backups`, `secrets`, `pins`,
 | `dotfleet version` | Print the manager version and content commit. |
 | `dotfleet uninstall` | Review removal, then type uninstall. Keep the content checkout and all backups. |
 
+Older command forms now print their successor and exit with code 2:
+
+| Previous form | Current form |
+| --- | --- |
+| `backup` | `backups create` |
+| `rollback` | `backups restore` |
+| `content show` | `content` |
+| `profile show` | `status` |
+| Previous tool-selection group | `tools list`, `tools set TOOL --version VERSION`, or `tools remove TOOL` |
+
+Tool names are positional subjects. A subject names the thing a command acts on; optional values remain flags.
+Status includes saved agents and the profile location. Its update result stays inside the same field block.
+Help remains available as `help`, `-h`, and `--help`; it is a global operation, not a separate command-list entry.
+
 A checkout is a local Git copy. Plain status reports saved update results and never fetches.
 Its Updates line includes the check time, or says not checked yet.
 Its content behind count compares the last fetched remote state. Check prints only update results.
 Drift means that managed files differ from the selected content. Groups select optional files or alias blocks.
-The profile stores machine choices. Pins select exact tool versions.
+The profile stores machine choices. Tools use exact selected versions.
 A domain selects content additions. A commit identifies a saved Git version.
 Use `help`, `-h`, or `--help` at any command or action. `fleet help machines` lists machine actions.
 Top-level help lists commands and global options. Each command’s help keeps its own exit codes and examples.
@@ -289,7 +302,7 @@ Each menu area opens the existing command's view or action:
 | Area | Commands and actions |
 | --- | --- |
 | Machine | Status, Check, Update, Diff, Doctor, and Topology. Diff also offers paths only. |
-| Configuration | Profile show; Domain list/set; Groups list/set; Pins list/set/remove; Secrets list; Content show; Configure. |
+| Configuration | Status contains saved choices. Domain list/set; Groups list/set; Tools list/set/remove; Secrets list; Content; Configure. |
 | Machines | List, pick an SSH host, set a named target, export, and remove a stale record. |
 | Backups | List, create, restore, or delete backups. Checkboxes select backups for deletion. |
 | System | Version, Add-ons list, command help, interface help, and Uninstall. |
@@ -313,7 +326,7 @@ Use the plain update command in a terminal to resolve those conflicts. No interf
 
 The installer and update create `~/.local/share/fleet/tui-venv`, a private Python environment owned by the manager.
 A virtual environment holds separate Python packages. [Textual](https://textual.textualize.io/) supplies the terminal widgets.
-`requirements-tui.txt` pins Textual and its dependencies. The Software category records environment creation or updates.
+`requirements-tui.txt` selects exact versions of Textual and its dependencies. The Software category records environment creation or updates.
 An unchanged environment stays untouched. A replaced environment moves into that run's backup as `previous-tui-venv`.
 Failed environment installation restores the previous environment. A missing environment leaves the complete plain command interface available.
 Run `fleet update`, or the README installer, to restore it. No system packages or sudo are used.
@@ -377,7 +390,7 @@ Each completed apply, update, restore, or backup refreshes this hostname's recor
 The record contains hostname, operating system, domain, domain confirmation, content repository and commit, manager version, last run, and last backup.
 It also records the home folder, RUN.json path, result, and whether this machine remains enrolled. Full commit IDs and paths stay in the file.
 The hostname identifies the record. Choose unique hostnames before combining records from different machines.
-Identity, tool pins, credentials, and secret values stay out of the registry. They remain in their existing private stores.
+Identity, tool versions, credentials, and secret values stay out of the registry. They remain in their existing private stores.
 Read-only commands and cancellation before confirmation never refresh timestamps or create registry files.
 Uninstall records the completed removal without deleting other machine records. Backups include the earlier registry file for manual recovery.
 Automatic rollback does not restore that file. It refreshes this machine instead, preserving other machines recorded since the backup.
@@ -439,7 +452,7 @@ fleet update mini-pc
 ```
 
 Only registered machines can receive commands. An unknown name never starts SSH.
-Targets use their own profiles, pins, repositories, and backups. Your machine sends an action, never a profile or file paths.
+Targets use their own profiles, tools, repositories, and backups. Your machine sends an action, never a profile or file paths.
 Existing machine facts stay intact. Connection targets survive local record refreshes.
 Omit the machine name to keep a command local. There is no all-machines command or background service.
 
@@ -504,7 +517,7 @@ example-dell · domain personal
 Contact observations live in `~/.local/share/fleet/contacts.json`, with private file permissions.
 Topology is the human view of that cache. No profile data enters the content repository.
 
-Use `dotfleet profile` to inspect saved choices. Change them through `domain`, `pins`, `groups`, or `configure`; do not edit profile.toml.
+Use `dotfleet status` to inspect saved choices. Change them through `domain`, `tools`, `groups`, or `configure`; do not edit profile.toml.
 The manager’s chezmoi configuration and converted source are internal files. Inspect their locations through `status` and their health through `doctor`.
 
 ## Terminal output

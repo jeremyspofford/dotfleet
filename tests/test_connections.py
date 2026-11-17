@@ -159,12 +159,14 @@ class RegistrationTests(unittest.TestCase):
         self.cli("backups", "create")
         _, backup = self.record()
         (self.home / ".file").write_text("local edit")
-        self.terminal(["rollback", "--backup", backup.name], [(b"Confirm [cancel]:", b"restore\n")])
+        self.terminal(
+            ["backups", "restore", "--backup", backup.name], [(b"Confirm [cancel]:", b"restore\n")]
+        )
         self.assertEqual((self.home / ".file").read_text(), "original\n")
         for arguments in (
             ["groups", "--state", "off"],
-            ["pins", "set", "--version", "24.14.1"],
-            ["pins", "remove", "--tool", "node", "--version", "1.0.0"],
+            ["tools", "set", "--version", "24.14.1"],
+            ["tools", "remove", "node", "--version", "1.0.0"],
         ):
             self.cli(*arguments, expected=2)
 
@@ -252,21 +254,27 @@ class ConnectionUnitTests(unittest.TestCase):
 
         parser = cli.parser()
         args = command_arguments.normalize(
-            parser.parse_args(["pins", "set", "--tool", "node", "--version", "24.14.1"]), parser
+            parser.parse_args(["tools", "set", "node", "--version", "24.14.1"]), parser
         )
         self.assertEqual(args.pin, "node@24.14.1")
         for name, flags in (
             ("machines", ["--name", "--target"]),
             ("groups", ["--name", "--state"]),
             ("domain", ["--name"]),
-            ("pins", ["--tool", "--version"]),
-            ("rollback", ["--backup"]),
+            ("tools", ["--version"]),
+            ("backups", ["--backup"]),
         ):
             with (
                 contextlib.redirect_stdout(io.StringIO()) as output,
                 self.assertRaises(SystemExit) as exit,
             ):
-                parser.parse_args([name, "--help"])
+                parser.parse_args(
+                    [
+                        name,
+                        *(["set"] if name == "tools" else ["restore"] if name == "backups" else []),
+                        "--help",
+                    ]
+                )
             self.assertEqual(exit.exception.code, 0)
             self.assertNotIn("legacy_", output.getvalue())
             for flag in flags:

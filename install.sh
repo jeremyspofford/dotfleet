@@ -2,7 +2,7 @@
 # Purpose: Install Fleet and enroll or update a content checkout.
 # Usage: bash install.sh [OPTIONS]
 # Parameters: --repo chooses content; --configure asks again; --defaults skips prompts for complete profiles.
-# --domain, --git-name, and --git-email supply profile choices. Repeat --pin TOOL=VERSION for full tool versions.
+# --domain, --git-name, and --git-email supply profile choices. Repeat --tool TOOL=VERSION for full tool versions.
 # --adopt keeps scanned home files. --group NAME=on|off selects groups. --agents chooses coding assistants.
 # --format selects plain (real names) or chezmoi (native sources); -h/--help prints help.
 # Example: bash install.sh --repo https://github.com/jeremyspofford/dotfiles
@@ -61,17 +61,17 @@ Options:
   --agents NAMES   Configure detected coding assistants, separated by commas; none skips this step.
   --configure      Run the enrollment wizard again. Review every choice before applying.
   --defaults       Skip prompts only with a complete profile. New groups default to on.
-                   This flag cannot bypass missing identity, domain confirmation, or floating pins.
+                   This flag cannot bypass missing identity, domain confirmation, or floating tool versions.
   --domain VALUE   Record a domain choice: core, personal, work, or client (defined below).
   --format FORMAT  plain=real names; chezmoi=native sources. A manifest takes priority.
   --git-email EMAIL Record the Git author email.
   --git-name NAME  Record the Git author name.
   --group NAME=on|off Include or exclude a content group. Repeat for more groups.
   -h, --help       Print full help and exit 0.
-  --pin TOOL=VERSION Record a full tool version, such as node=24.14.1. Repeat for more tools.
   --repo URL       Content Git repository; default: https://github.com/jeremyspofford/dotfiles.
                    Plain repositories use real names. Chezmoi repositories use native source names.
-A profile saves the repository, domain, Git author identity, tool pins, and content groups.
+  --tool TOOL=VERSION Record a full tool version, such as node=24.14.1. Repeat for more tools.
+A profile saves the repository, domain, Git author identity, tool versions, and content groups.
 Domains choose optional additions from your content repository. Identity and tools are chosen separately.
   core      Base configuration only.
   personal  Your own settings; bundled examples show your directory and list its entries.
@@ -85,7 +85,7 @@ Press Enter to confirm that domain, or type another domain name and press Enter.
 The profile also saves Git identity, exact tool versions, and group choices. Mise tracks installed versions.
 Groups select optional files or alias blocks. Each prompt defines on and off.
 The wizard runs for new or incomplete profiles, unchosen domains, and --configure.
-Steps: welcome, scan, source, domain, identity, pins, groups, agents, review, apply.
+Steps: welcome, scan, source, domain, identity, tools, groups, agents, review, apply.
 Source choices: adopt keeps existing files; defaults uses our examples; repo uses your Git URL.
 Adoption scans root dotfiles and .config files. It excludes credential and shell-history names, secret patterns, binary files, and files above 2 MiB.
 The scan cannot prove a file contains no secrets. Review the local repository before pushing it.
@@ -94,11 +94,11 @@ Old stores move to the Fleet paths before setup. Profiles and backup folders sta
 The review lists those moves. Cancelling apply keeps them. Other home changes wait for confirmation.
 Temporary tool downloads stay outside your home.
 Adopted file contents stay unchanged, including existing Mise files. Profile choices do not rewrite adopted files.
-Pins use full versions. Enter accepts the prompt's stated action; skip leaves a choice incomplete.
+Tools use full versions. Enter accepts the prompt's stated action; skip leaves a choice incomplete.
 Complete profiles need no profile prompts. Every summary prints all six categories, including scripted runs.
 Empty categories say no changes. Paths start with ~ for your home. RUN.json keeps full paths and commit IDs.
 Skipped gaps appear under Warnings. The last lines show status and the RUN.json location.
-Without a terminal, missing identity, an unconfirmed domain, or floating pins stop setup with exit 1.
+Without a terminal, missing identity, an unconfirmed domain, or floating tool versions stop setup with exit 1.
 Supply the listed flags to complete those values. New group defaults are printed before applying files.
 Prompts read /dev/tty, the terminal device, never piped input.
 Headings, input, and warnings use the shared logger's colors. Choices also have text labels.
@@ -114,7 +114,7 @@ The plain commands work without Textual. The tui subcommand shows plain alternat
 Review MANIFEST.json before restoring backup home/ files and recorded external targets.
 Native chezmoi templates and hooks can execute code. Use only trusted content repositories.
 Examples:
-  bash install.sh --domain personal --git-name "Example Person" --git-email person@example.invalid --pin node=24.14.1
+  bash install.sh --domain personal --git-name "Example Person" --git-email person@example.invalid --tool node=24.14.1
   bash install.sh --repo git@github.com:you/dotfiles.git --configure
 Exit codes: 0 success/help; 1 setup failure; 2 invalid arguments.
 Author: Jeremy Spofford / Aria Labs; Version: $DOTFILES_VERSION (VERSION).
@@ -129,7 +129,7 @@ while [[ $# -gt 0 ]]; do
 		exit 0
 		;;
 	--configure | --defaults | --adopt) shift ;;
-	--repo | --format | --domain | --git-name | --git-email | --pin | --group | --agents)
+	--repo | --format | --domain | --git-name | --git-email | --pin | --tool | --group | --agents)
 		[[ $# -ge 2 && -n $2 && $2 != --* ]] || {
 			usage >&2
 			exit 2

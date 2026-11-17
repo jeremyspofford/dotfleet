@@ -187,7 +187,7 @@ class RunAccountTests(unittest.TestCase):
             (b"Domain [core]:", b"personal\n"),
             (b"Git author name [", b"\n"),
             (b"Git author email [", b"\n"),
-            (b"Pins [accept]:", b"\n"),
+            (b"Tools [accept]:", b"\n"),
             (b"extra [on]:", b"off\n"),
             (b"Review [quit]:", b"quit\n"),
         ]
@@ -242,9 +242,9 @@ class RunAccountTests(unittest.TestCase):
 
     def test_pin_removal_lists_each_rendered_file_changed(self):
         repo = self.fixture()
-        self.enroll(repo, extra=["--pin", "node=24.14.1"])
+        self.enroll(repo, extra=["--tool", "node=24.14.1"])
         answers = [
-            (b"Pins [accept]:", b"edit\n"),
+            (b"Tools [accept]:", b"edit\n"),
             (b"Tool versions [none]:", b"none\n"),
             (b"extra [on]:", b"\n"),
             (b"Review [quit]:", b"confirm\n"),
@@ -265,7 +265,7 @@ class RunAccountTests(unittest.TestCase):
             auto_wizard=False,
         )
         text = summary(output)
-        self.assertIn("Pin node  24.14.1 → not set", text)
+        self.assertIn("Tool node  24.14.1 → not set", text)
         for name in [
             ".config/mise/config.toml",
             ".config/chezmoi/chezmoi.toml",

@@ -64,7 +64,7 @@ def lines(record, pins, agents):
         f"Installed tools: {len(record['tools'])}",
     ]
     selected = ", ".join(f"{name} {human(value)}" for name, value in sorted(pins.items())) or "none"
-    output += wrap("Pinned tools: " + selected)
+    output += wrap("Selected tools: " + selected)
     output += wrap("Detected agents: " + (", ".join(agents) or "none"))
     candidates = record["candidates"]
     output.append(f"Home configuration candidates: {len(candidates)}")

@@ -85,7 +85,7 @@ class UpdateTests(unittest.TestCase):
         self.assertEqual([entry["path"] for entry in record["sources"]], list(map(str, paths)))
         behind_status = self.cli("status")
         self.assertIn(
-            f"Updates: manager +3, content +1 (checked {self.checked_time()}) — run: dotfleet update",
+            f"Updates           manager +3, content +1 (checked {self.checked_time()}) — run: dotfleet update",
             behind_status,
         )
         # Local-only choices must not leak into update and silently suppress content pulls.
@@ -106,7 +106,7 @@ class UpdateTests(unittest.TestCase):
             f"Manager: up to date @ {targets[0][:8]}\n\nContent: up to date @ {targets[1][:8]}\n",
         )
         current_status = self.cli("status")
-        self.assertIn(f"Updates: none (checked {self.checked_time()})", current_status)
+        self.assertIn(f"Updates           none (checked {self.checked_time()})", current_status)
         # Optional proof output never enters the enrolled home or repository.
         if directory := os.environ.get("DOTFLEET_CHECK_EVIDENCE"):
             folder = Path(directory)
@@ -134,7 +134,7 @@ class UpdateTests(unittest.TestCase):
             for path in self.paths()
         ]
         output = self.cli("status")
-        self.assertIn("Updates: not checked yet — run: dotfleet check", output)
+        self.assertIn("Updates           not checked yet — run: dotfleet check", output)
         self.assertFalse((self.home / updates.CACHE).exists())
         self.assertEqual(before, self.snapshot())
         for path, refs, fetched in git_state:
@@ -151,9 +151,10 @@ class UpdateTests(unittest.TestCase):
         self.cli("check", expected=1)
         output = self.cli("status")
         self.assertIn(
-            f"Updates: manager +3 (checked {self.checked_time()}) — run: dotfleet update", output
+            f"Updates           manager +3 (checked {self.checked_time()}) — run: dotfleet update",
+            output,
         )
-        self.assertEqual(output.count("Updates:"), 1)
+        self.assertEqual(output.count("  Updates "), 1)
         self.assertNotIn("Manager: 3 commits behind", output)
         self.assertEqual(before, self.snapshot())
 
@@ -169,7 +170,7 @@ class UpdateTests(unittest.TestCase):
         self.assertIn("Warning: Could not check content: remote fetch failed", output)
         self.assertNotIn("Traceback", output)
         self.assertEqual((cache.read_bytes(), cache.stat().st_mtime_ns, self.snapshot()), before)
-        self.assertIn(f"Updates: none (checked {self.checked_time()})", self.cli("status"))
+        self.assertIn(f"Updates           none (checked {self.checked_time()})", self.cli("status"))
         flagged = self.cli("status", "--check", expected=2)
         self.assertIn("unrecognized arguments", flagged)
         self.assertEqual((cache.read_bytes(), cache.stat().st_mtime_ns, self.snapshot()), before)

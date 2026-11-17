@@ -1,6 +1,6 @@
 """Read manager-owned stores as human rows. Never execute a secrets file.
 
-Usage: use dotfleet profile show, backups list, secrets list, content show, or machines export.
+Usage: use dotfleet status, backups list, secrets list, content, or machines export.
 """
 
 import os
@@ -28,14 +28,14 @@ def profile_rows(home, profile):
         ("Git name", profile.get("git_name") or f"missing; run {display} configure"),
         ("Git email", profile.get("git_email") or f"missing; run {display} configure"),
     ]
-    for field, label in [("pins", "Pin"), ("groups", "Group"), ("agents", "Agent")]:
+    for field, label in [("pins", "Tool"), ("groups", "Group"), ("agents", "Agent")]:
         rows += [
             (label + " " + name, value) for name, value in sorted(profile.get(field, {}).items())
         ] or [(field.capitalize(), "none")]
     rows.append(
         (
             "Edit choices",
-            f"Use {display} domain set, pins set, groups set, or configure. Do not edit profile.toml.",
+            f"Use {display} domain set, tools set, groups set, or configure. Do not edit profile.toml.",
         )
     )
     return rows

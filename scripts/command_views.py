@@ -52,7 +52,7 @@ def collection(name, home, profile, manifest):
             }
             for domain, description in command.domain_choices(home).items()
         ]
-    if name == "pins":
+    if name == "tools":
         installed = enrollment.installed(home)
         return [
             {

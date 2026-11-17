@@ -102,28 +102,24 @@ def group_arguments(home):
 
 def pin_arguments(home):
     answer = form(
-        "Install and pin a tool",
+        "Install and select a tool version",
         [
             field("tool", "Tool name, such as node"),
             field("version", "Exact version, such as 24.14.1"),
         ],
         "This explicit action installs the exact version you choose. Cancel changes nothing.",
     )
-    return (
-        ["pins", "set", "--tool", answer["tool"], "--version", answer["version"]]
-        if answer
-        else None
-    )
+    return ["tools", "set", answer["tool"], "--version", answer["version"]] if answer else None
 
 
 def unpin_arguments(home):
     saved = command.profile(home)
     answer = form(
-        "Remove a pin",
+        "Remove a tool selection",
         [field("tool", "Tool name", next(iter(saved.get("pins", {})), ""))],
-        "Unpin this tool and block its content defaults. Installed software stays. Cancel stops.",
+        "Remove this selection and block its content defaults. Installed software stays. Cancel stops.",
     )
-    return ["pins", "remove", "--tool", answer["tool"]] if answer is not None else None
+    return ["tools", "remove", answer["tool"]] if answer is not None else None
 
 
 def remove_machine_arguments(home):

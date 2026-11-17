@@ -152,7 +152,7 @@ class RenderingTests(unittest.TestCase):
         label = "a_very_long_tool_name_with_additional_words"
         record["profile_changes"].append({"name": "pins." + label, "old": None, "new": "1.2.3"})
         text = render(record)
-        self.assertIn("  Pin " + label + "\n    not set → 1.2.3", text)
+        self.assertIn("  Tool " + label + "\n    not set → 1.2.3", text)
         self.assert_plain_view(text)
 
     def test_summary_color_uses_logger_and_keeps_removals_on_stdout(self):

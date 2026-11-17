@@ -1,8 +1,8 @@
 # Content contract
 
 Fleet is the manager. A content repository holds home files. Git stores history; chezmoi applies files; Mise selects tool versions.
-A profile is the machine's saved repository, domain, identity, pins, and group choices.
-A pin selects a tool version. A group selects optional files or marked blocks.
+A profile is the machine's saved repository, domain, identity, tools, and group choices.
+A tool selection records a version. A group selects optional files or marked blocks.
 
 ## Formats
 
@@ -71,7 +71,7 @@ All groups default to on. Later runs keep choices; new groups prompt with on pre
 ## Manager-owned outputs
 
 Fleet reserves `~/.config/git/local.gitconfig`, `~/.config/dotfiles/domain`, `~/.config/mise/config.toml`, and `~/.secrets`.
-Plain content can provide Mise defaults. The manager replaces that output with defaults merged under profile pins.
+Plain content can provide Mise defaults. The manager replaces that output with defaults merged under profile tool versions.
 Native chezmoi content must leave reserved paths unmanaged. Other native outputs still use the original checkout.
 Fleet also owns `~/.config/chezmoi/chezmoi.toml`. Content config templates never write that file.
 After writing it, Fleet updates chezmoi's saved template checksum, an identifier for template contents.
@@ -79,7 +79,7 @@ Without a template, it removes the obsolete checksum. It preserves file history 
 
 The local Git file holds profile identity and retains other existing local settings.
 The domain file contains one domain name. Shell code reads it at startup.
-Profile pins win over content defaults. A default applies only when its requested tool version already exists in Mise.
+Profile tool versions win over content defaults. A default applies only when its requested tool version already exists in Mise.
 Uninstalled defaults appear as available choices. Enrollment never installs those tools.
 
 A secret reference names a stored value without containing it. Enabled `op://` references use the signed-in 1Password command-line tool.
@@ -91,14 +91,14 @@ Secret values never enter Git or the profile. Content declares references and na
 
 Back up every target before replacement. Preserve symbolic links and copy external file targets separately.
 Save profile data at `~/.config/fleet/profile.toml`. Saved selections win over later defaults.
-During legacy adoption, merge old chezmoi pins, current Mise tools, and saved installer pins, in that order.
+During legacy adoption, merge old chezmoi tool versions, current Mise tools, and saved installer tool versions, in that order.
 Carry existing Mise settings into `mise_settings` too. This preserves settings beyond tool versions.
 Validate carried and existing profiles before applying files. Ask about missing identity, unconfirmed domains, and floating tool versions.
-Store full tool versions, resolving floating requests against installed versions only. Never install a tool to resolve a profile pin.
+Store full tool versions, resolving floating requests against installed versions only. Never install a tool to resolve a profile tool version.
 Record explicit domain choices in `domain_chosen`. Carried and defaulted domains remain unchosen until a human confirms them.
 Record skipped tools in `unpinned_tools`; content defaults must not select them.
-Warn about choices skipped in a terminal. Without a terminal, stop and list every missing identity value, unconfirmed domain, and floating pin.
-Accept explicit `--domain`, `--git-name`, `--git-email`, and repeated `--pin TOOL=VERSION` values before validation.
+Warn about choices skipped in a terminal. Without a terminal, stop and list every missing identity value, unconfirmed domain, and floating tool version.
+Accept explicit `--domain`, `--git-name`, `--git-email`, and repeated `--tool TOOL=VERSION` values before validation.
 The `--defaults` option cannot bypass incomplete values. Print new group defaults during scripted setup.
 Complete saved choices remain authoritative. Carry identity and domain from saved data too.
 
@@ -112,7 +112,7 @@ Report nonempty chezmoi status as incomplete enrollment. Keep all changes recove
 Terminal enrollment stages content, conversion, and generated files outside home. Review lists choices, warnings, full changed paths, and the proposed backup path.
 Store migration runs first; see [the migration rules](../README.md#store-migration). Those moves remain if later review is cancelled.
 Confirm before applying managed files. Returning to a step rebuilds the plan; quitting discards those planned changes.
-Scripted flags keep their existing behavior. `--defaults` cannot bypass incomplete identity, domain confirmation, or floating pins.
+Scripted flags keep their existing behavior. `--defaults` cannot bypass incomplete identity, domain confirmation, or floating tool versions.
 
 Adoption scans root dotfiles and `.config` files without following directory links. File links are scanned through their targets.
 Exclude credential and shell-history filenames, private keys, recognized tokens, and secret assignments. Exclude binary files and files above 2 MiB.
@@ -128,7 +128,7 @@ Back up agent outputs and their inventory before generation. Keep outputs for de
 Capture the chezmoi diff and backup inventory before apply. Use those records for both review and summary.
 The review uses future tense. The summary reports confirmed results in past tense, including failures and scripted runs.
 Print software, checkout changes, file changes, profile changes, locations, and next steps every time. Empty categories say no changes.
-Print home-relative paths for additions, changes, and removals. Keep full paths in RUN.json. Include deselected outputs and settings changed by removed pins.
+Print home-relative paths for additions, changes, and removals. Keep full paths in RUN.json. Include deselected outputs and settings changed by removed tool selections.
 Preserve installed prerequisite versions and unchanged checkout commits in the report.
 
 Save RUN.json and CHEZMOI-DIFF.patch beside the backup MANIFEST.json, with owner-only permissions.

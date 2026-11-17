@@ -74,7 +74,7 @@ class StoreMigrationTests(unittest.TestCase):
         self.assertFalse((self.home / ".local/share/fleet/fleet.toml").exists())
         record, _ = self.record()
         self.assertEqual(len(record["store_moves"]), 3)
-        self.assertIn("20000101-000000", self.cli("rollback"))
+        self.assertIn("20000101-000000", self.cli("backups", "restore"))
         self.assert_quiet_status()
         if directory := os.environ.get("FLEET_MIGRATION_EVIDENCE"):
             Path(directory).mkdir(parents=True, exist_ok=True)
@@ -102,7 +102,9 @@ class StoreMigrationTests(unittest.TestCase):
         data = tomllib.loads(path.read_text())
         data["git_name"] = "Later choice"
         path.write_text(toml(data))
-        output = self.terminal(["rollback", backup.name], [(b"Confirm [cancel]:", b"restore\n")])
+        output = self.terminal(
+            ["backups", "restore", "--backup", backup.name], [(b"Confirm [cancel]:", b"restore\n")]
+        )
         self.assertIn("~/.config/fleet/profile.toml", output)
         self.assertEqual(path.read_bytes(), profile)
         self.assertFalse((self.home / ".config/dotfleet").exists())

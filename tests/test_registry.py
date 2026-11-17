@@ -187,7 +187,10 @@ class RegistryCommandTests(unittest.TestCase):
         other.update(hostname="recorded-later", domain="client")
         data["machines"]["recorded-later"] = other
         atomic(path, registry.serialize(data))
-        self.terminal(["rollback", before_other.name], [(b"Confirm [cancel]:", b"restore\n")])
+        self.terminal(
+            ["backups", "restore", "--backup", before_other.name],
+            [(b"Confirm [cancel]:", b"restore\n")],
+        )
         self.assertEqual(registry.load(self.home)["machines"]["recorded-later"], other)
         self.assertTrue(registry.load(self.home)["machines"][local]["enrolled"])
         self.terminal(
