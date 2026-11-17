@@ -704,7 +704,7 @@ class EnrollmentTests(unittest.TestCase):
             for flag in ["--domain", "--git-name", "--git-email", "--tool", "--group", "--agents"]
         ]
         cases += [
-            ["--domain", "unknown"],
+            ["--domain", "Unknown_Domain"],
             ["--tool", "node"],
             ["--group", "docker=maybe"],
             ["--repo", "example", "--adopt"],
