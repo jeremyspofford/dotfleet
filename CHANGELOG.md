@@ -2,6 +2,12 @@
 
 This file follows Keep a Changelog. Versions use SemVer: major.minor.patch.
 
+## [0.4.0] - 2026-11-17
+
+### Added
+
+- add Fleet terminal interface
+
 ## [0.3.0] - 2026-11-17
 
 ### Added
