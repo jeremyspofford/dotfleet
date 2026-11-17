@@ -21,6 +21,7 @@ from common import LoggerStream, atomic, read_toml, relative, run, toml
 import manager
 import enrollment
 import registry
+import remote
 import owned_views
 import style
 import updates
@@ -45,7 +46,7 @@ CONTROLS = {
 }
 DESCRIPTIONS = {
     "tui": (
-        "Open the terminal interface, a full-screen view of local Fleet commands. "
+        "Open the terminal interface, a full-screen view of Fleet commands. "
         "Arrows and Tab move; Enter selects; Esc goes back; q quits. "
         "Configure returns to the existing wizard. If its environment is missing, "
         "print plain command alternatives and exit 0."
@@ -74,7 +75,8 @@ DESCRIPTIONS = {
     "machines": (
         "Show recorded machine facts from registry.toml. The registry is the manager’s file of"
         " saved machine records. This command makes no live network queries. Export shows "
-        "this machine; remove deletes a stale record."
+        "this machine; remove deletes a stale record. SSH securely connects to another machine. "
+        "Set-ssh records its host name from your SSH config or user@host. It never connects."
     ),
     "addons": (
         "List installed add-ons, optional manager extensions. A manifest declares an "
@@ -155,7 +157,7 @@ def parser():
     display = current_command()
     argument_parser = style.ArgumentParser(
         prog=display,
-        description="Manage this machine after enrollment. A profile saves your choices.",
+        description="Manage enrolled machines. A profile saves each machine’s choices.",
         epilog="Exit codes: 0 success, help, or cancellation; 1 failed operation or check; 2 invalid arguments or check failure; 130 interrupted. Check uses 1 for available updates.\n"
         f"Examples: {display} update; {display} status; {display} domain personal.\n"
         "First install or manager recovery: use the README one-line installer.\n" + TERMS,
@@ -166,6 +168,15 @@ def parser():
     )
     subcommands = argument_parser.add_subparsers(dest="command", required=True, metavar="COMMAND")
     for name, detail in DESCRIPTIONS.items():
+        if name in remote.CAPABLE:
+            detail += (
+                " SSH securely connects to another machine. Add MACHINE to use one recorded "
+                "machine and its own profile. "
+                "Remote runs never prompt. Exit 0 means success; nonzero reports a connection "
+                "or command failure. Check and diff retain exit 1 for updates or differences."
+            )
+        elif name in remote.REASONS:
+            detail += " Remote use is refused: " + remote.REASONS[name] + "."
         command_parser = subcommands.add_parser(
             name,
             prog=display + " " + name,
@@ -182,11 +193,14 @@ def parser():
             command_parser.add_argument(
                 "action",
                 nargs="?",
-                choices=["export", "remove"],
-                help="export shows this machine; remove deletes a stale hostname",
+                choices=["export", "remove", "set-ssh"],
+                help="export shows this machine; remove deletes a stale record; set-ssh saves a connection",
             )
             command_parser.add_argument(
-                "hostname", nargs="?", help="the exact stale hostname to remove"
+                "hostname", nargs="?", help="recorded machine name for remove or set-ssh"
+            )
+            command_parser.add_argument(
+                "ssh_target", nargs="?", help="for set-ssh: SSH config host name or user@host"
             )
             command_parser.add_argument(
                 "--output",
@@ -213,6 +227,11 @@ def parser():
                 "backup",
                 nargs="?",
                 help="backup folder name or path; omit to list and choose in a terminal",
+            )
+            command_parser.add_argument(
+                "machine",
+                nargs="?",
+                help="remote rollback is refused; restore on the target itself",
             )
         elif name == "domain":
             command_parser.add_argument(
@@ -241,6 +260,10 @@ def parser():
                 "pin",
                 nargs="?",
                 help="TOOL@VERSION for set; TOOL for remove. Example: node@24.14.1",
+            )
+        if name in (*remote.CAPABLE, "configure", "uninstall"):
+            command_parser.add_argument(
+                "machine", nargs="?", help="one saved machine name; omit to use this machine"
             )
     return argument_parser
 
@@ -503,8 +526,8 @@ def update(home):
         environment = dict(os.environ)
         environment.pop("DOTFLEET_LOCAL_CONTENT", None)
         arguments = ["bash", str(staged / "install.sh")]
-        if ui_channel.active():
-            # The TUI hands profile changes to Configure, which restores the real terminal.
+        if ui_channel.active() or os.environ.get(remote.CONTEXT) == "1":
+            # TUI and SSH runs leave profile decisions to a real terminal on the target.
             arguments.append("--defaults")
         return subprocess.call(arguments, env=environment, pass_fds=ui_channel.descriptors())
 
@@ -813,6 +836,8 @@ def restore_command(args, home):
 def main(argv=None):
     home = Path.home()
     os.environ["GIT_OPTIONAL_LOCKS"] = "0"
+    if argv == ["_remote"]:
+        return remote.receive()
     if argv in (["_preview"], ["_preview", "--stat"]) and os.environ.get("DOTFLEET_PREVIEW") == "1":
         try:
             return preview_current(home, profile(home), "--stat" in argv)
@@ -820,6 +845,14 @@ def main(argv=None):
             print("Preview failed: " + str(error), file=sys.stderr)
             return 2
     args = parser().parse_args(argv)
+    if getattr(args, "machine", None):
+        return remote.execute(
+            home,
+            args.machine,
+            args.command,
+            check=getattr(args, "check", False),
+            stat=getattr(args, "stat", False),
+        )
     if args.command == "tui":
         from tui_environment import launch
 
@@ -834,6 +867,14 @@ def main(argv=None):
             read_view(args, home, saved_profile)
             return result
         if args.command == "machines":
+            if args.action == "set-ssh":
+                if not args.hostname or not args.ssh_target or args.output:
+                    parser().error(
+                        "machines set-ssh needs NAME SSH_TARGET; --output is not accepted"
+                    )
+                return set_machine_ssh(home, args.hostname, args.ssh_target)
+            if args.ssh_target:
+                parser().error("only machines set-ssh accepts an SSH target")
             if args.action == "remove":
                 if not args.hostname or args.output:
                     parser().error("machines remove needs a hostname and does not accept --output")
@@ -879,6 +920,8 @@ def main(argv=None):
                 )
             return manager.main(["--configure"])
         if args.command == "rollback":
+            if args.backup in registry.load(home)["machines"]:
+                return remote.refusal(args.backup, "rollback")
             return restore_command(args, home)
         if args.command == "backup":
             operations = [
@@ -999,37 +1042,73 @@ def main(argv=None):
 
 
 def remove_machine(home, hostname):
-    import difflib
-    import fcntl
     import socket
 
     if hostname == socket.gethostname():
         raise ValueError(
             "This machine is active. Only another machine’s stale record can be removed."
         )
-    path = home / registry.REGISTRY
-    if not path.exists():
+    if not (home / registry.REGISTRY).exists():
         raise ValueError("No registry exists. Nothing was removed.")
+
+    def remove(data):
+        if hostname not in data["machines"]:
+            raise ValueError("No saved machine named " + hostname + ". Nothing was removed.")
+        del data["machines"][hostname]
+
+    return change_registry(home, remove)
+
+
+def set_machine_ssh(home, hostname, target):
+    import re
+
+    if not re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_.-]{0,254}", hostname):
+        raise ValueError("Machine name must use letters, numbers, dots, underscores, or hyphens.")
+    remote.validate_target(target)
+
+    def connect(data):
+        if hostname not in data["machines"]:
+            # A connection can be saved before any facts have been imported from that machine.
+            data["machines"][hostname] = {
+                name: False if kind is bool else "" for name, kind in registry.FIELDS.items()
+            }
+            data["machines"][hostname].update(hostname=hostname, result="not recorded")
+        data["machines"][hostname]["ssh_target"] = target
+
+    return change_registry(home, connect)
+
+
+def change_registry(home, edit):
+    import difflib
+    import fcntl
+
+    path = home / registry.REGISTRY
+    if not path.parent.resolve().is_relative_to(home.resolve()):
+        raise ValueError("Fleet registry parent leaves HOME.")
+    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     descriptor = os.open(path.parent / ".fleet.lock", os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
     with os.fdopen(descriptor, "a") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
         data = registry.load(home)
-        if hostname not in data["machines"]:
-            raise ValueError("No saved machine named " + hostname + ". Nothing was removed.")
-        del data["machines"][hostname]
+        edit(data)
+        before = path.read_text() if path.exists() else ""
         after = registry.serialize(data)
         account = RunAccount(home, ROOT)
         account.checkouts = []
         account.software = []
         account.manifest = manager.backup_inventory(home, [registry.REGISTRY])
-        account.files = [
-            {
-                "path": str(path),
-                "relative": registry.REGISTRY,
-                "action": "changed",
-                "before": manager.fingerprint(path),
-            }
-        ]
+        account.files = (
+            []
+            if before == after
+            else [
+                {
+                    "path": str(path),
+                    "relative": registry.REGISTRY,
+                    "action": "changed" if path.exists() else "added",
+                    "before": manager.fingerprint(path),
+                }
+            ]
+        )
         folder = manager.backup_location(home)
         account.locations["Backup folder"] = str(folder)
         account.locations["Converted source"] = read_toml(
@@ -1041,7 +1120,7 @@ def remove_machine(home, hostname):
                 account.diff_path,
                 "".join(
                     difflib.unified_diff(
-                        path.read_text().splitlines(True),
+                        before.splitlines(True),
                         after.splitlines(True),
                         fromfile=str(path),
                         tofile=str(path),
