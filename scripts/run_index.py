@@ -14,7 +14,7 @@ import os
 from pathlib import Path
 import re
 import shutil
-import socket
+import registry
 import sys
 import tempfile
 import uuid
@@ -108,7 +108,7 @@ def begin(home, command):
         "id": identifier,
         "time": now.isoformat(timespec="microseconds"),
         "command": command,
-        "machine": socket.gethostname(),
+        "machine": registry.machine_name(),
         "remote": os.environ.get("FLEET_REMOTE_RUN") == "1",
         "result": "RUNNING",
         "stage": "preflight",

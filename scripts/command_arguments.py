@@ -39,6 +39,9 @@ GROUPS = {
         "list": "List saved machines and their connections.\nMake no network requests.",
         "set-ssh": "Save and test an SSH target.\nOmit flags to pick a host in a terminal.",
         "export": "Show this machine's saved record, or save a private copy with --output.",
+        "install": "Deploy Fleet to another machine and enroll it as a fleet member.\n"
+        "Probe it over SSH, bootstrap Python, run its wizard here, and register both ways.\n"
+        "Without NAME, pick a host from your SSH config or saved connections.",
         "remove": "Remove a stale machine record.\nKeep the active machine.",
     },
     "backups": {
@@ -74,7 +77,7 @@ EXAMPLES = {
     "marketplaces": "marketplaces list; marketplaces add --source https://github.com/example/agent-market; marketplaces add --source URL --packages review-kit; marketplaces add --source URL --features review-kit/mcp.docs; marketplaces update; marketplaces update --name agent-market --pin v1.2.0; marketplaces update --name agent-market --unpin; marketplaces delete --name agent-market",
     "agents": "agents import --agent claude; agents list; agents set --name mcp.docs --state off; agents set --name mcp.docs --state local",
     "logs": "logs list; logs list --limit 10; logs show; logs show --name BACKUP; logs show --json",
-    "machines": "machines list; machines set-ssh --target mini-pc; machines set-ssh --name beelink --target mini-pc; machines export --output FILE; machines remove --name NAME",
+    "machines": "machines install mini-pc; machines install lab --target me@10.0.0.7 --return-target me@desk; machines list; machines set-ssh --target mini-pc; machines set-ssh --name beelink --target mini-pc; machines export --output FILE; machines remove --name NAME",
     "domain": "domain list; domain set --name personal",
     "groups": "groups list; groups set --name docker --state off",
     "tools": "tools list; tools set node --version 26.13.1; tools remove node; tools uninstall node --version 26.3.1",
@@ -181,6 +184,28 @@ def add_action_parameters(parser, name, action):
             )
         elif action == "remove":
             parser.add_argument("--name", dest="hostname", required=True, help="saved machine name")
+        elif action == "install":
+            import manager
+
+            parser.add_argument("name", nargs="?", help="SSH config host or new machine name")
+            parser.add_argument("--domain", type=manager.domain_argument, help="scripted domain")
+            parser.add_argument("--git-email", help="scripted Git author email")
+            parser.add_argument("--git-name", help="scripted Git author name")
+            parser.add_argument("--repo", help="content Git URL for the target; default: Fleet's")
+            parser.add_argument(
+                "--return-target", help="SSH target that reaches this machine from NAME"
+            )
+            parser.add_argument(
+                "--target", dest="ssh_target", help="user@host; default: NAME from SSH config"
+            )
+            parser.add_argument(
+                "--tool",
+                action="append",
+                default=[],
+                type=manager.pin_argument,
+                metavar="TOOL=VERSION",
+                help="scripted exact tool version; repeat for more tools",
+            )
         elif action == "export":
             parser.add_argument("--output", help="new private TOML file; omit to show the record")
     elif name == "marketplaces" and action == "add":

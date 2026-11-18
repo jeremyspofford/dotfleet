@@ -11,8 +11,3 @@ example-hub · this machine
   Commit       12345678
   Fleet        0.1.0
   Last result  SUCCESS · recorded 2026-11-16T12:00:00+00:00
-
-mini-pc · recorded only
-  Connection  SSH uses this name
-  Enrollment  not recorded
-  No local data recorded for this machine.

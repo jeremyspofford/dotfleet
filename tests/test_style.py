@@ -231,7 +231,9 @@ class StyleTests(unittest.TestCase):
         self.assertNotIn("RUN.json", machines)
         self.assertNotIn("Scope", machines)
         self.assertNotIn("mini-pc → mini-pc", machines)
-        self.assertEqual(machines.count("No local data recorded for this machine."), 1)
+        # The list holds fleet members only; the connection-only record stays out of it.
+        self.assertEqual(machines.count("No local data recorded for this machine."), 0)
+        self.assertNotIn("mini-pc", machines)
 
     def test_python_and_shell_palette_and_section_rule_match(self):
         env = dict(os.environ, TERM="xterm-256color")

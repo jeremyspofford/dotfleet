@@ -32,7 +32,7 @@ class RemoteProfileRequestTests(unittest.TestCase):
         request = {"version": 1, "action": "status", "check": False, "stat": False}
         self.assertEqual(remote.validate_request(request), request)
         with self.assertRaisesRegex(ValueError, "Unsupported remote request version"):
-            remote.validate_request(dict(request, version=3))
+            remote.validate_request(dict(request, version=9))
 
 
 class RemoteProfileTests(unittest.TestCase):

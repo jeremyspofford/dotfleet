@@ -33,6 +33,7 @@ The command audit uses these forms:
 
 | Command | Parameters |
 | --- | --- |
+| machines install | NAME; --target, --return-target, --domain, --git-name, --git-email, --repo, --tool; no NAME opens the picker |
 | machines set-ssh | --name, --target; no flags opens the terminal picker |
 | machines remove | --name |
 | backups delete | Exactly one of --all, --keep, or --name |

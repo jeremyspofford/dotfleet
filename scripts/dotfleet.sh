@@ -6,6 +6,10 @@
 # Exit codes: 0 success/help/cancel; 1 failed operation or updates available; 2 invalid arguments/check failure.
 # Author: Jeremy Spofford / Aria Labs; Version: read from the manager VERSION file.
 set -euo pipefail
+# A deploy can install Fleet's own Python when the system Python is absent or too old.
+if [[ -x $HOME/.local/share/fleet/python/bin/python3 ]]; then
+	PATH="$HOME/.local/share/fleet/python/bin:$PATH"
+fi
 manager="$HOME/.local/share/fleet/manager"
 if [[ ! -d $manager && -d $HOME/.local/share/dotfleet/manager ]]; then
 	manager="$HOME/.local/share/dotfleet/manager"

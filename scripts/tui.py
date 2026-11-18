@@ -436,8 +436,9 @@ class FleetApp(App[str]):
         self.push_screen(AreaScreen(event.option.id))
 
     def open_command(self, action):
-        if action == "configure":
-            self.exit("configure")
+        if action in ("configure", "machine-install"):
+            # Both need the real terminal: the wizard reads it directly, here or over SSH.
+            self.exit(action)
         else:
             self.push_screen(ActionScreen(action))
 
@@ -574,10 +575,11 @@ def main(argv=None):
         return 0
     app = FleetApp()
     result = app.run()
-    if result == "configure":
+    if result in ("configure", "machine-install"):
         import command
 
-        return style.run_cli(lambda: command.main(["configure"]), ROOT)
+        arguments = ["configure"] if result == "configure" else ["machines", "install"]
+        return style.run_cli(lambda: command.main(arguments), ROOT)
     return app.return_code or 0
 
 

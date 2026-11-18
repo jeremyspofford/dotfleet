@@ -453,34 +453,52 @@ The active machine’s record cannot be removed this way.
 
 ## Remote commands
 
-```sh
-fleet machines set-ssh --target mini-pc
-```
-
-The name defaults to the SSH target. SSH is the secure connection tool used to run commands on another machine.
-These forms do the same job unless you supply different values:
+A machine joins the fleet from another machine. Run one command at your own terminal:
 
 ```sh
-fleet machines set-ssh --target mini-pc
-fleet machines set-ssh --name mini-pc
-fleet machines set-ssh --name beelink --target mini-pc
+fleet machines install mini-pc
 ```
 
-Run `fleet machines set-ssh` without flags to pick a numbered host from your SSH config.
-The picker follows Include files. It omits wildcard patterns, duplicate names, and registered hosts.
-Without a config or available hosts, type a target instead. Press Enter to select or submit; cancel stops without saving.
-The picker requires a terminal. Scripted runs supply --name or --target.
-The TUI Machines screen has an Add SSH connection action with the same choices.
+NAME is a host from your SSH config, or a new name with `--target user@host`. No registration step comes first.
+Run `fleet machines install` without NAME to pick from your SSH config hosts and saved connections. The picker needs a terminal.
+SSH is the secure connection tool. The deploy uses your SSH config and keys, in batch mode, without password prompts.
 
-Registration saves the connection, backs up the registry, and prints its run review. It then tests SSH once with the fixed command `true`.
-The test uses batch mode: no password prompts. It has a ten-second total timeout.
-A passed test exits 0. A failed test exits 2, explains the next step, and keeps the saved connection.
-A saved target may be asleep. Passing this test proves SSH command access, not Fleet enrollment or profile completeness.
+The deploy runs these steps in order:
 
-1. Register a target with one of the commands above.
-2. Run `fleet machines list` to inspect it. Equal names appear once; records without a target show `no connection`.
-3. Confirm the target has an enrolled Fleet manager with a complete profile.
-4. Run one command below. The registered machine name is the final argument.
+1. Probe. Connect once and detect Linux, macOS, or WSL. Check the floor: bash, curl, git, tar, gzip, and a CA certificate bundle.
+2. Bootstrap. When Python 3.11 or newer is missing, install Mise and Python 3.12 in the target user's own folders.
+3. Enroll. Run the Fleet installer on the target with a terminal. Its wizard prompts appear in your terminal.
+4. Register both ways. Your registry gains the target. The target's registry gains your machine and the SSH target that reaches it.
+5. Prove the loop. Run a remote status against the target and print its result after your own run review.
+
+A missing floor item stops the deploy. The report names each item and the one command that installs it.
+Fleet installs no system packages and uses no admin rights. The bootstrap also needs sha256sum or shasum.
+A CA certificate bundle lets curl verify HTTPS; the probe reports `ca-certificates` when verification fails.
+A network failure during the probe is not a floor item. Later steps report it.
+The Python bootstrap keeps its own Mise store at `~/.local/share/fleet/mise`, apart from your tool versions.
+The installer reads the target's facts: its scan, wizard steps, and review describe the target.
+
+A scripted deploy passes `--domain`, `--git-name`, and `--git-email`, and optionally `--repo` and repeated `--tool TOOL=VERSION`.
+Without a terminal and without those three flags, the deploy stops before connecting and names the missing flags.
+
+`--return-target` names the SSH target that the new machine uses to reach yours. Without it, one prompt asks; skip saves no connection.
+The deploy tests that reverse connection once and reports the result. A failed reverse test never blocks the enrollment.
+
+| Failure | Exit | Effect |
+| --- | --- | --- |
+| Unreachable | 2 | SSH failed. The report names the reason and one next step. |
+| Missing floor | 2 | The report names each missing item and its install command. |
+| Wizard aborted | 1 | The target's installer stopped before enrollment completed. |
+| Enrollment failed | 1 | The installer or the Python bootstrap failed. |
+| Reverse test failed | 0 | Report only. The enrollment and both registrations stand. |
+
+A failed deploy registers nothing on either machine. Deploy is a change-making action: both machines record it in their run index.
+
+The machines list holds fleet members only. A machine that was never deployed to does not appear in it.
+`fleet machines set-ssh --target HOST` saves connection data for remote commands and the deploy picker. Connection data stays out of the list.
+Set-ssh tests SSH once with the fixed command `true`, with a ten-second timeout. A failed test exits 2 and keeps the saved connection.
+
+Run a command on a fleet member. The machine name is the final argument:
 
 ```sh
 fleet status mini-pc
@@ -491,9 +509,8 @@ fleet doctor mini-pc
 fleet update mini-pc
 ```
 
-Only registered machines can receive commands. An unknown name never starts SSH.
+Only saved machines can receive commands. An unknown name never starts SSH.
 Targets use their own profiles, tools, repositories, and backups. Your machine sends an action, never a profile or file paths.
-Existing machine facts stay intact. Connection targets survive local record refreshes.
 Omit the machine name to keep a command local. There is no all-machines command or background service.
 
 ### No SSH setup yet?
