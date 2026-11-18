@@ -81,13 +81,21 @@ def validate_deploy_request(request):
     import registry
 
     action = request.get("action")
-    expected = {"facts": set(), "join": {"peer"}, "test-return": {"name"}}
+    expected = {
+        "facts": set(),
+        "join": {"peer"},
+        "test-return": {"name"},
+        "exchange": {"digest"},
+        "unenroll": set(),
+    }
     if action not in expected or set(request) != {"version", "action", *expected[action]}:
         raise ValueError("Invalid deploy request. Update Fleet on both machines.")
     if action == "test-return" and not (
         isinstance(request["name"], str) and MACHINE_NAME.fullmatch(request["name"])
     ):
         raise ValueError("Invalid machine name in the deploy request.")
+    if action == "exchange":
+        validate_digest(request["digest"])
     if action == "join":
         peer = request["peer"]
         allowed = set(registry.FIELDS) | {"ssh_target", "recorded_at"}
@@ -101,6 +109,30 @@ def validate_deploy_request(request):
         if peer.get("ssh_target"):
             validate_target(peer["ssh_target"])
     return request
+
+
+def validate_digest(digest):
+    """Accept member facts and removal markers. Every value is a short, typed fact."""
+    import registry
+
+    if not isinstance(digest, dict) or set(digest) != {"members", "removed"}:
+        raise ValueError("Invalid registry digest.")
+    if not isinstance(digest["members"], list) or not isinstance(digest["removed"], dict):
+        raise ValueError("Invalid registry digest.")
+    for fact in digest["members"]:
+        if not isinstance(fact, dict) or set(fact) != set(registry.DIGEST_FIELDS):
+            raise ValueError("Invalid member in the registry digest.")
+        if type(fact["enrolled"]) is not bool or not MACHINE_NAME.fullmatch(str(fact["hostname"])):
+            raise ValueError("Invalid member in the registry digest.")
+        for field in ("ssh_target", "domain", "os", "recorded_at"):
+            if not isinstance(fact[field], str) or len(fact[field]) > 200:
+                raise ValueError("Invalid member in the registry digest.")
+        if fact["ssh_target"]:
+            validate_target(fact["ssh_target"])
+    for name, when in digest["removed"].items():
+        if not MACHINE_NAME.fullmatch(name) or not isinstance(when, str) or len(when) > 40:
+            raise ValueError("Invalid removal marker in the registry digest.")
+    return digest
 
 
 def validate_request(request):
@@ -233,7 +265,55 @@ def execute(home, machine, action, *, check=False, stat=False, request=None):
         state = action + " failed"
         print(f"Error: {machine}: {state} (exit {result.returncode}).")
     topology.remember(home, machine, target, action, state, result.returncode)
+    exchange(home, machine, target)
     return result.returncode if result.returncode > 0 else int(result.returncode != 0)
+
+
+def exchange(home, machine, target):
+    """Swap registry digests with a member after contact. Lists converge when machines talk."""
+    import registry
+
+    request = {"version": 3, "action": "exchange", "digest": registry.digest(home)}
+    try:
+        result = connections.invoke(target, REMOTE_COMMAND, json.dumps(request) + "\n")
+        lines = result.stdout.strip().splitlines()
+        received = json.loads(lines[-1])["digest"] if result.returncode == 0 and lines else None
+        validate_digest(received)
+    except (OSError, ValueError, KeyError, TypeError, subprocess.TimeoutExpired):
+        # An older or unreachable member keeps its list; the next contact tries again.
+        return {}
+    changes = registry.merge_into(home, received)
+    summary = [f"{kind} {', '.join(names)}" for kind, names in changes.items() if names]
+    if summary:
+        print(f"Fleet members updated from {machine}: " + "; ".join(summary) + ".")
+    return changes
+
+
+def unenroll(home, machine, target):
+    """Dispatch an unenroll to a member. Return 0 only when its manager removed Fleet."""
+    request = {"version": 3, "action": "unenroll"}
+    try:
+        result = connections.invoke(target, REMOTE_COMMAND, json.dumps(request) + "\n")
+    except (OSError, subprocess.TimeoutExpired) as error:
+        connections.report_failure(home, machine, target, error)
+        return 2
+    if result.returncode == 255:
+        connections.report_failure(home, machine, target, ConnectionError(result.stderr))
+        return 2
+    if result.stdout:
+        print(result.stdout.rsplit("\n", 2)[0])
+    lines = result.stdout.strip().splitlines()
+    try:
+        code = json.loads(lines[-1]).get("code", 1) if lines else 1
+    except ValueError:
+        code = 1
+    if result.returncode or code:
+        print(
+            f"Error: {machine}: unenroll failed (exit {result.returncode or code}). Nothing was marked removed."
+        )
+        return 1
+    topology.remember(home, machine, target, "uninstall", "uninstall succeeded", 0)
+    return 0
 
 
 def receive():
@@ -309,6 +389,15 @@ def receive_deploy(home, request):
     import registry
 
     own = registry.machine_name()
+    if request["action"] == "exchange":
+        changes = registry.merge_into(home, request["digest"])
+        return answer({"digest": registry.digest(home), "changes": changes})
+    if request["action"] == "unenroll":
+        # The caller confirmed. Remove Fleet under the uninstall rules, keeping backups.
+        code = run_index.run(
+            home, "uninstall", lambda: command.remove_fleet(home, require_word=None)
+        )
+        return answer({"code": code}) if code == 0 else code
     if request["action"] == "facts":
         version = (command.ROOT / "VERSION").read_text().strip()
         record = registry.load(home)["machines"].get(own) or registry.machine(home, version)

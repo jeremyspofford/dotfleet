@@ -51,6 +51,11 @@ def load(home):
         or not isinstance(data.get("machines"), dict)
     ):
         raise ValueError("Fleet registry needs schema_version = 1 and a machines table.")
+    removed = data.setdefault("removed", {})
+    if not isinstance(removed, dict) or any(
+        not isinstance(name, str) or not isinstance(when, str) for name, when in removed.items()
+    ):
+        raise ValueError("Fleet registry removal markers must map machine names to times.")
     for key, record in data["machines"].items():
         if not isinstance(key, str) or not key or not isinstance(record, dict):
             raise ValueError("Each fleet record needs a nonempty machine key and a table.")
@@ -128,6 +133,13 @@ def serialize(data):
         lines.append("[machines." + value(key) + "]")
         lines += [value(name) + " = " + value(item) for name, item in record.items()]
         lines.append("")
+    if data.get("removed"):
+        # A removal marker keeps a removed machine from returning through an older peer list.
+        lines.append("[removed]")
+        lines += [
+            value(name) + " = " + value(when) for name, when in sorted(data["removed"].items())
+        ]
+        lines.append("")
     return "\n".join(lines)
 
 
@@ -153,6 +165,93 @@ def refresh(home, manager_version, backup, result, fallback=None, *, run_record=
         data["machines"][current["hostname"]] = current
         atomic(path, serialize(data))
     return current
+
+
+DIGEST_FIELDS = ("hostname", "ssh_target", "domain", "os", "enrolled", "recorded_at")
+
+
+def fact_time(record):
+    """Return the time of a record's facts: when they were recorded, or its last run."""
+    return record.get("recorded_at") or record.get("last_run") or ""
+
+
+def digest(home):
+    """Describe fleet members and removal markers compactly for an exchange on contact."""
+    data = load(home)
+    members = []
+    for name, record in sorted(data["machines"].items()):
+        if not record["enrolled"]:
+            continue
+        compact = {field: record.get(field, "") for field in DIGEST_FIELDS}
+        compact["recorded_at"] = fact_time(record)
+        if name == machine_name():
+            compact["ssh_target"] = ""  # How others reach this machine is each viewer's own fact.
+        members.append(compact)
+    return {"members": members, "removed": dict(sorted(data["removed"].items()))}
+
+
+def merge(data, received, own):
+    """Merge a peer digest into registry data. Return the names that were added, changed, or dropped.
+
+    The union of members wins. The newest record time wins each field. A removal marker beats a
+    member fact recorded at or before the removal. A machine stays the only authority on itself.
+    """
+    changes = {"added": [], "updated": [], "dropped": []}
+    removed = data.setdefault("removed", {})
+    for name, when in received.get("removed", {}).items():
+        if name != own and when > removed.get(name, ""):
+            removed[name] = when
+    for fact in received.get("members", []):
+        name = fact["hostname"]
+        if name == own or fact["recorded_at"] <= removed.get(name, ""):
+            continue
+        current = data["machines"].get(name)
+        if current is None:
+            record = {field: False if kind is bool else "" for field, kind in FIELDS.items()}
+            record.update(hostname=name, result="not recorded")
+            data["machines"][name] = record
+            changes["added"].append(name)
+        elif fact["recorded_at"] > fact_time(current):
+            changes["updated"].append(name)
+        else:
+            continue
+        record = data["machines"][name]
+        saved_target = record.get("ssh_target", "")
+        record.update({field: fact[field] for field in DIGEST_FIELDS})
+        # An empty target says nothing; it never erases a connection that this machine saved.
+        if not fact["ssh_target"] and saved_target:
+            record["ssh_target"] = saved_target
+        removed.pop(name, None)
+    for name, when in removed.items():
+        record = data["machines"].get(name)
+        if name != own and record is not None and fact_time(record) <= when:
+            del data["machines"][name]
+            changes["dropped"].append(name)
+    return changes
+
+
+def merge_into(home, received):
+    """Merge a digest into this machine's registry under the shared lock. No backup is taken."""
+    path = home / REGISTRY
+    # A contact that brings nothing new writes nothing, not even the lock file.
+    if not any(merge(load(home), received, machine_name()).values()):
+        return {"added": [], "updated": [], "dropped": []}
+    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    descriptor = os.open(path.parent / ".fleet.lock", os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+    with os.fdopen(descriptor, "a") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        data = load(home)
+        changes = merge(data, received, machine_name())
+        if any(changes.values()):
+            atomic(path, serialize(data))
+    return changes
+
+
+def mark_removed(data, name, when=None):
+    """Record that a machine left the fleet, and drop its record."""
+    when = when or datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")
+    data.setdefault("removed", {})[name] = when
+    data["machines"].pop(name, None)
 
 
 def entities(home, manager_version):

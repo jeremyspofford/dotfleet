@@ -60,7 +60,9 @@ class RemoteProfileTests(unittest.TestCase):
         self.assertEqual(self.target_profile()["domain"], "personal")
         # Saved, not applied: the target's own files still carry the earlier domain.
         self.assertEqual((self.home / ".config/dotfiles/domain").read_text(), "core\n")
-        request = json.loads(self.ssh_log.read_text().splitlines()[-1])["request"]
+        requests = [json.loads(line)["request"] for line in self.ssh_log.read_text().splitlines()]
+        # Each contact ends with a digest exchange; the profile request comes before it.
+        request = next(item for item in reversed(requests) if '"version": 2' in item)
         self.assertEqual(
             json.loads(request),
             {

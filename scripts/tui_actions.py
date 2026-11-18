@@ -204,6 +204,16 @@ def remove_machine_arguments(home):
     return ["machines", "remove", "--name", selected] if selected is not None else None
 
 
+def uninstall_machine_arguments(home):
+    members = [
+        (name, name)
+        for name, record in registry.load(home)["machines"].items()
+        if record["enrolled"] and record.get("ssh_target") and name != registry.machine_name()
+    ]
+    selected = choose("Remove Fleet from a member", "Machine", members)
+    return ["machines", "uninstall", selected] if selected is not None else None
+
+
 def export_arguments(home):
     answer = form(
         "Export this machine",
@@ -250,6 +260,7 @@ FORMS = {
     "pin-remove": unpin_arguments,
     "tool-uninstall": uninstall_tool_arguments,
     "machine-remove": remove_machine_arguments,
+    "machine-uninstall": uninstall_machine_arguments,
     "machine-export": export_arguments,
     "name-connection": connection_arguments,
 }

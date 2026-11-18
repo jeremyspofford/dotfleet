@@ -251,3 +251,12 @@ Enrollment counts only when the target's own record says enrolled with a success
 Both registries gain each other's record only after enrollment succeeds. A failed reverse connection test is reported only.
 The machines list holds enrolled members. Connection records from set-ssh stay data for remote commands and the picker.
 FLEET_MACHINE_NAME overrides a machine's fleet name. Tests and containers use it to run two machines on one host.
+
+## Converge fleet lists on contact
+
+Every remote command exchanges a registry digest after it runs. The digest holds member facts and removal markers.
+The union of members wins. The newest record time wins each field. A machine is the only authority on its own record.
+A removal marker beats any member fact recorded at or before it. A newer deploy clears an older marker.
+A digest sends no SSH target for its sender. An empty incoming target never erases a connection that the receiver saved.
+Contact merges write the registry under its lock without a backup, as the contact cache does. Read-only commands stay read-only in the run index.
+`machines uninstall NAME` confirms on the caller, then sends a version 3 unenroll. The member removes Fleet with backups kept and no restore.

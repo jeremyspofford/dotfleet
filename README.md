@@ -509,6 +509,18 @@ fleet doctor mini-pc
 fleet update mini-pc
 ```
 
+Each remote command, including install, also exchanges a compact registry digest with the target.
+The digest holds member names, SSH targets, domains, OS, enrolled states, record times, and removal markers.
+Both machines merge it: the union of members wins, and the newest record wins each field. Lists converge when machines talk.
+A removal marker beats an older member fact, so a removed machine never returns from an old peer list.
+A machine stays the only authority on its own record. No background service runs.
+How to reach a machine is each viewer's own fact: a digest sends no SSH target for its sender, and an empty target never erases a saved one.
+
+Remove Fleet from another member with `fleet machines uninstall mini-pc`. Type `uninstall` at your terminal to confirm, then press Enter.
+The member removes its manager and managed files under the uninstall rules. Its content, backups, and own files stay.
+Your machine then drops the member and writes a removal marker. Peers drop it at their next contact.
+`fleet machines remove --name NAME` stays local record cleanup. It also writes a removal marker.
+
 Only saved machines can receive commands. An unknown name never starts SSH.
 Targets use their own profiles, tools, repositories, and backups. Your machine sends an action, never a profile or file paths.
 Omit the machine name to keep a command local. There is no all-machines command or background service.
