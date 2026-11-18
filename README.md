@@ -514,7 +514,8 @@ The digest holds member names, SSH targets, domains, OS, enrolled states, record
 Both machines merge it: the union of members wins, and the newest record wins each field. Lists converge when machines talk.
 A removal marker beats an older member fact, so a removed machine never returns from an old peer list.
 A machine stays the only authority on its own record. No background service runs.
-How to reach a machine is each viewer's own fact: a digest sends no SSH target for its sender, and an empty target never erases a saved one.
+How to reach a machine is each viewer's own fact. A digest sends no SSH target for its sender.
+An empty incoming target never erases a connection that you saved.
 
 Remove Fleet from another member with `fleet machines uninstall mini-pc`. Type `uninstall` at your terminal to confirm, then press Enter.
 The member removes its manager and managed files under the uninstall rules. Its content, backups, and own files stay.
