@@ -113,7 +113,7 @@ DESCRIPTIONS = {
         "Backup deletion removes its detailed run record; the index entry remains until pruned."
     ),
     "marketplaces": (
-        "Manage marketplaces of agent packages.\n"
+        "Manage agent packages through Fleet Marketplace.\n"
         "A marketplace is a Git repository with a fleet-marketplace.toml catalog.\n"
         "A package bundles skills, rule sets, servers, connectors, plugins, or hooks.\n"
         "Installed packages live in an untracked library; records stay in the manager store."
@@ -377,7 +377,9 @@ def read_view(args, home, saved_profile):
             "marketplaces": f"No marketplaces. Run {display} marketplaces add --source URL.",
             "addons": "No installed add-ons. None ship with Fleet.",
         }.get(name, "None recorded.")
-        command_views.directory(name.capitalize(), entities, home, empty)
+        # The marketplaces view names the feature, Fleet Marketplace.
+        title = "Fleet Marketplace" if name == "marketplaces" else name.capitalize()
+        command_views.directory(title, entities, home, empty)
         if name == "domain":
             print(f"\nChoose: {display} domain set --name NAME · use a name listed above")
         if name == "agents" and entities:
@@ -495,7 +497,7 @@ def status_rows(home, saved_profile):
         ("Content", checkout_state(home / "dotfiles")),
         ("Updates", updates.summary(home, saved_profile).removeprefix("Updates: ")),
         *(
-            [("Marketplaces", marketplace_summary)]
+            [("Fleet Marketplace", marketplace_summary)]
             if (marketplace_summary := marketplaces_summary(home))
             else []
         ),

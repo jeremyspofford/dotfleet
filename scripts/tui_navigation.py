@@ -38,7 +38,7 @@ ACTIONS = {
     "name-connection": ("Set a name and SSH target", ("machines", "set-ssh")),
     "machine-export": ("Export this machine's record", ("machines", "export")),
     "machine-remove": ("Remove a stale machine record", ("machines", "remove")),
-    "marketplaces": ("Marketplaces — agent packages", ("marketplaces", "list")),
+    "marketplaces": ("Fleet Marketplace — agent packages", ("marketplaces", "list")),
     "marketplace-add": ("Add a marketplace", ("marketplaces", "add")),
     "marketplace-delete": ("Delete a marketplace", ("marketplaces", "delete")),
     "marketplace-update": ("Update every marketplace", ("marketplaces", "update")),

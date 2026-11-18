@@ -1,19 +1,19 @@
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   Status
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  Domain            personal · chosen
-  Identity          Example Person <example@example.invalid>
+  Domain             personal · chosen
+  Identity           Example Person <example@example.invalid>
   Tool node — 26.13.1 · installed: 26.3.1, 26.13.1
-  Group helpers     on
-  Group docker      off
-  Agents            codex off
-  Profile file      ~/.config/fleet/profile.toml
-  Edit choices      Use fleet domain set, tools set, groups set, or configure.
-  Content           12345678 · 0 behind last fetched upstream · clean
-  Updates           none (checked 09:02)
-  Marketplaces      agent-market +2, held at v1.0.0
-  Drift             none
-  Last run          ~/fleet-backups/20261116-120000 · SUCCESS
-  Last backup       ~/fleet-backups/20261116-120000
-  Manager config    ~/.config/chezmoi/chezmoi.toml
-  Converted source  ~/.local/share/fleet/chezmoi-source
+  Group helpers      on
+  Group docker       off
+  Agents             codex off
+  Profile file       ~/.config/fleet/profile.toml
+  Edit choices       Use fleet domain set, tools set, groups set, or configure.
+  Content            12345678 · 0 behind last fetched upstream · clean
+  Updates            none (checked 09:02)
+  Fleet Marketplace  agent-market +2, held at v1.0.0
+  Drift              none
+  Last run           ~/fleet-backups/20261116-120000 · SUCCESS
+  Last backup        ~/fleet-backups/20261116-120000
+  Manager config     ~/.config/chezmoi/chezmoi.toml
+  Converted source   ~/.local/share/fleet/chezmoi-source

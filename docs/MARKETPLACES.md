@@ -1,8 +1,9 @@
-# Marketplaces
+# Fleet Marketplace
 
+Fleet Marketplace is the Fleet feature that installs agent packages from marketplaces.
 A marketplace is a Git repository of agent packages. An agent is an installed coding assistant.
 A package bundles any mix of skills, rule sets, MCP servers, connectors, plugins, and hooks. MCP means Model Context Protocol.
-Fleet consumes every marketplace through the same mechanism, including one that you publish yourself.
+Fleet Marketplace consumes every marketplace through the same mechanism, including one that you publish yourself.
 
 ## Catalog format
 
