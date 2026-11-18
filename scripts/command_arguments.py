@@ -43,6 +43,8 @@ GROUPS = {
         "Probe it over SSH, bootstrap Python, run its wizard here, and register both ways.\n"
         "Without NAME, pick a host from your SSH config or saved connections.",
         "remove": "Remove a stale machine record.\nKeep the active machine.",
+        "uninstall": "Remove Fleet from another fleet member and drop it from the fleet.\n"
+        "Type uninstall to confirm, then press Enter. Its content, backups, and own files stay.",
     },
     "backups": {
         "restore": "List backups or restore one after typing restore to confirm.\n"
@@ -77,7 +79,7 @@ EXAMPLES = {
     "marketplaces": "marketplaces list; marketplaces add --source https://github.com/example/agent-market; marketplaces add --source URL --packages review-kit; marketplaces add --source URL --features review-kit/mcp.docs; marketplaces update; marketplaces update --name agent-market --pin v1.2.0; marketplaces update --name agent-market --unpin; marketplaces delete --name agent-market",
     "agents": "agents import --agent claude; agents list; agents set --name mcp.docs --state off; agents set --name mcp.docs --state local",
     "logs": "logs list; logs list --limit 10; logs show; logs show --name BACKUP; logs show --json",
-    "machines": "machines install mini-pc; machines install lab --target me@10.0.0.7 --return-target me@desk; machines list; machines set-ssh --target mini-pc; machines set-ssh --name beelink --target mini-pc; machines export --output FILE; machines remove --name NAME",
+    "machines": "machines install mini-pc; machines install lab --target me@10.0.0.7 --return-target me@desk; machines list; machines set-ssh --target mini-pc; machines set-ssh --name beelink --target mini-pc; machines export --output FILE; machines remove --name NAME; machines uninstall mini-pc",
     "domain": "domain list; domain set --name personal",
     "groups": "groups list; groups set --name docker --state off",
     "tools": "tools list; tools set node --version 26.13.1; tools remove node; tools uninstall node --version 26.3.1",
@@ -184,6 +186,8 @@ def add_action_parameters(parser, name, action):
             )
         elif action == "remove":
             parser.add_argument("--name", dest="hostname", required=True, help="saved machine name")
+        elif action == "uninstall":
+            parser.add_argument("name", help="fleet member from machines list")
         elif action == "install":
             import manager
 

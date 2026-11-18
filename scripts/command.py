@@ -123,6 +123,7 @@ DESCRIPTIONS = {
         "The registry, registry.toml, stores machine records.\n"
         "List shows fleet members only and makes no live network queries.\n"
         "Install deploys Fleet to another machine and registers both machines.\n"
+        "Uninstall removes Fleet from another member after typed confirmation.\n"
         "Export shows this machine; remove deletes a stale record.\n"
         "SSH securely connects to another machine.\n"
         "Set-ssh saves connection data and tests SSH once.\n"
@@ -1112,6 +1113,8 @@ def dispatch(args, argument_parser, home):
                 return remove_machine(home, args.hostname)
             if args.action == "install":
                 return install_machine(home, args)
+            if args.action == "uninstall":
+                return uninstall_machine(home, args.name)
             if args.action == "export":
                 info(
                     "Machine export",
@@ -1190,26 +1193,7 @@ def dispatch(args, argument_parser, home):
                 )
             if restore == "restore":
                 selected, restored = validate_backup(home, str(backups[0]))
-            import agent_deploy
-
-            operations = dict.fromkeys(managed_paths(home))
-            # Remove Fleet's entries from agent shared files; never delete those files.
-            _, shared = agent_deploy.removal_operations(home, scratch_folder())
-            operations.update(shared)
-            operations.update(dict(restored))
-            return transaction(
-                home,
-                sorted(operations.items()),
-                "Remove the manager and listed managed files. Content and backups stay.",
-                selected,
-                "uninstall",
-                [
-                    home / MANAGER,
-                    home / ".local/share/fleet/chezmoi-source",
-                    home / ".local/share/fleet/tui-venv",
-                    home / ".local/share/fleet/agents",
-                ],
-            )
+            return remove_fleet(home, selected, restored, "uninstall")
         os.environ["DOTFLEET_LOCAL_CONTENT"] = "1"
         if args.command == "domain":
             from convert import require_domain
@@ -1417,9 +1401,71 @@ def remove_machine(home, hostname):
     def remove(data):
         if hostname not in data["machines"]:
             raise ValueError("No saved machine named " + hostname + ". Nothing was removed.")
-        del data["machines"][hostname]
+        registry.mark_removed(data, hostname)
 
     return change_registry(home, remove)
+
+
+def remove_fleet(home, selected=None, restored=(), require_word="uninstall"):
+    """Remove the manager and managed files under the uninstall rules. Content and backups stay.
+
+    A remote unenroll passes no word: the caller already typed the confirmation.
+    """
+    import agent_deploy
+
+    operations = dict.fromkeys(managed_paths(home))
+    # Remove Fleet's entries from agent shared files; never delete those files.
+    _, shared = agent_deploy.removal_operations(home, scratch_folder())
+    operations.update(shared)
+    operations.update(dict(restored))
+    return transaction(
+        home,
+        sorted(operations.items()),
+        "Remove the manager and listed managed files. Content and backups stay.",
+        selected,
+        require_word,
+        [
+            home / MANAGER,
+            home / ".local/share/fleet/chezmoi-source",
+            home / ".local/share/fleet/tui-venv",
+            home / ".local/share/fleet/agents",
+        ],
+    )
+
+
+def uninstall_machine(home, name):
+    """Confirm here, dispatch an unenroll to the member, then mark it removed."""
+    data = registry.load(home)["machines"]
+    record = data.get(name)
+    if name == registry.machine_name():
+        raise ValueError(
+            f"Run {current_command(home)} uninstall to remove Fleet from this machine."
+        )
+    if not record or not record["enrolled"]:
+        raise ValueError(
+            f"{name} is not a fleet member. Run {current_command(home)} machines list."
+        )
+    if not record.get("ssh_target"):
+        raise ValueError(
+            f"{name} has no saved connection. Run machines set-ssh --name {name} first."
+        )
+    explanation = (
+        f"Remove Fleet from {name}: its manager and managed files go; its content, backups, and"
+        " own files stay. Then remove it from this fleet."
+    )
+    if not confirm("uninstall", explanation):
+        print("Cancelled. Nothing removed.")
+        return 0
+    code = remote.unenroll(home, name, record["ssh_target"])
+    if code:
+        return code
+
+    def mark(data):
+        registry.mark_removed(data, name)
+
+    result = change_registry(home, mark)
+    print(f"{name} left the fleet. Peers drop it at their next contact.")
+    return result
 
 
 def install_machine(home, args):

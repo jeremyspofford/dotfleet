@@ -388,7 +388,7 @@ def install(home, options):
             print(
                 f"Note: {name} saved {peer['hostname']} without a connection; no reverse test ran."
             )
-        return remote.execute(home, name, "status")
+        return remote.execute(home, name, "status")  # The status contact also exchanges digests.
     except DeployError as error:
         print(f"Error: deploy failed ({error.kind}).")
         for line in error.lines:

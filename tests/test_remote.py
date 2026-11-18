@@ -157,6 +157,10 @@ sys.exit(result.returncode)
             for option in ("BatchMode=yes", "ConnectTimeout=10", "ConnectionAttempts=1"):
                 self.assertIn(option, item["args"])
             request = json.loads(item["request"])
+            if request.get("action") == "exchange":
+                # Each contact ends with a digest exchange; it carries facts, never commands.
+                self.assertEqual(set(request), {"version", "action", "digest"})
+                continue
             self.assertEqual(set(request), {"version", "action", "check", "stat"})
 
     def test_current_remote_update_returns_statement_without_target_backup(self):
