@@ -19,7 +19,7 @@ commands:
     groups        Show or switch optional content.
     logs          Show saved change-making attempts.
     machines      Manage fleet members and saved connections.
-    marketplaces  Manage marketplaces of agent packages.
+    marketplaces  Manage agent packages through Fleet Marketplace.
     secrets       List secret names as set or unset.
     status        Show saved state without network requests.
     tools         Show or set exact tool versions.

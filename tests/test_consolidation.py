@@ -73,8 +73,8 @@ class ConsolidationTests(unittest.TestCase):
     def test_status_contains_agents_and_cached_updates_inside_its_fields(self):
         status = command_goldens()["status"]
         self.assertIn("  Tool node — 26.13.1 · installed: 26.3.1, 26.13.1\n", status)
-        self.assertIn("  Agents            codex off\n", status)
-        self.assertIn("  Updates           none (checked 09:02)\n", status)
+        self.assertIn("  Agents             codex off\n", status)
+        self.assertIn("  Updates            none (checked 09:02)\n", status)
         self.assertNotIn("\nUpdates:", status)
         self.assertIn("~/.config/fleet/profile.toml", status)
         self.assertFalse(re.search(r"\b(?:pin|pins|pinned|unpin)\b", status, re.I))

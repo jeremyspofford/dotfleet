@@ -225,9 +225,10 @@ The inventory at `~/.local/state/dotfleet/agents.json` lists every owned path an
 Fleet compares only keys that it wrote. A conflict stops the run before backup; unattended runs never choose overwrite.
 Stale outputs that still match their record leave. Changed stale outputs stay, with one report line. Turning an agent off keeps its outputs.
 
-## Pull in packages from marketplaces
+## Pull in packages with Fleet Marketplace
 
-A marketplace is a Git repository with a `fleet-marketplace.toml` catalog. See [marketplaces](MARKETPLACES.md).
+Fleet Marketplace pulls agent packages from marketplaces into the agent tree. See [Fleet Marketplace](MARKETPLACES.md).
+A marketplace is a Git repository with a `fleet-marketplace.toml` catalog.
 Pulled-in components live in an untracked library under the manager store. The installation record lives there too.
 No pulled-in file enters the user's tracked content. Updates never rewrite the user's own files.
 A refresh replaces a pulled-in component, keeps any edited copy in the run backup, and prints one line.

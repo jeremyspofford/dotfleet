@@ -240,7 +240,7 @@ Command groups require an action. Bare `machines`, `backups`, `secrets`, `tools`
 | `dotfleet domain set --name personal` | Record the personal domain as chosen and apply it. |
 | `dotfleet groups list` | List content groups, their states, and descriptions. |
 | `dotfleet groups set --name docker --state off` | Exclude Docker content. Use on to restore it. |
-| `dotfleet marketplaces add --source URL` | Install every package from a marketplace of agent packages. See [marketplaces](docs/MARKETPLACES.md). |
+| `dotfleet marketplaces add --source URL` | Install every package from a marketplace of agent packages. See [Fleet Marketplace](docs/MARKETPLACES.md). |
 | `dotfleet agents set --name mcp.docs --state off` | Remove one agent item on this machine. Use local to keep this machine's own value, or on to restore it. |
 | `dotfleet tools list` | List saved exact versions and installed versions. |
 | `dotfleet tools set node --version 24.14.1` | Explicitly install and record that exact version. Content defaults still never install software. |
