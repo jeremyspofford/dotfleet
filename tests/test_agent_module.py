@@ -122,7 +122,7 @@ class AgentModuleTests(unittest.TestCase):
         self.assertEqual(sorted((self.home / "fleet-backups").iterdir()), backups)
         self.assertIn("mine.example.com", (self.home / ".codex/config.toml").read_text())
 
-    def test_declared_plugins_install_through_the_agent_and_show_as_software(self):
+    def test_declared_plugins_reach_claude_through_its_own_listing(self):
         self.enroll()
         log = self.base / "claude.log"
         fake = self.base / "tools/claude"
@@ -145,11 +145,11 @@ class AgentModuleTests(unittest.TestCase):
             env=self.env,
             cwd=self.home,
         )
-        self.assertIn("1 · Software — 1 installed.", output)
-        self.assertIn("claude plugin review-kit", output)
-        self.assertEqual(log.read_text(), "plugin install review-kit@example --scope user\n")
-        record = json.loads((self.home / agent_deploy.INVENTORY).read_text())
-        self.assertEqual(record["plugins"][0]["id"], "review-kit@example")
+        self.assertIn("~/.claude/settings.json", output)
+        self.assertIn("start Claude Code once in a terminal", " ".join(output.split()))
+        self.assertFalse(log.exists())  # Claude Code installs a listed plugin itself.
+        settings = json.loads((self.home / ".claude/settings.json").read_text())
+        self.assertEqual(settings["enabledPlugins"], {"review-kit@example": True})
 
     def test_exceptions_turn_items_off_or_local_and_drift_is_reported(self):
         self.enroll()

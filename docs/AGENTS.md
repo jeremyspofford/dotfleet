@@ -121,25 +121,32 @@ Outputs of an agent that is off never count as drift.
 ## Plugins
 
 A plugin is a package that an agent installs to add skills, commands, hooks, or servers.
-Fleet fully manages declared plugins. It runs each agent's own installer, driven by the inventory:
+Fleet fully manages declared plugins. Where an agent installs a listed plugin by itself, Fleet writes only the listing.
 
-| Agent | Install | Remove |
+| Agent | Fleet writes or runs | Removal |
 | --- | --- | --- |
-| claude | `claude plugin marketplace add MARKETPLACE`, then `claude plugin install ID --scope user` | `claude plugin uninstall ID --scope user` |
+| claude | `enabledPlugins` and `extraKnownMarketplaces` entries in `~/.claude/settings.json` | Fleet removes the entries. Claude Code stops loading the plugin and keeps its cached copy. |
+| opencode | One `plugin` list entry in `~/.config/opencode/opencode.json` | Fleet removes the entry. OpenCode stops loading the module and keeps its cached copy. |
+| pi | One `packages` list entry in `~/.pi/agent/settings.json` | Fleet removes the entry. Pi stops loading the package. |
 | codex | `codex plugin marketplace add MARKETPLACE`, then `codex plugin add ID` | `codex plugin remove ID` |
 | gemini | `gemini extensions install ID --consent` | `gemini extensions uninstall NAME`, where NAME is the last part of ID |
-| opencode | `opencode plugin ID --global` | Fleet removes ID from the `plugin` list in `opencode.json`; OpenCode has no uninstall command. |
-| pi | `pi install ID` | `pi remove ID` |
 
-Fleet's review is the consent step. Gemini CLI's own confirmation is skipped with `--consent`.
-Claude Code still refuses a marketplace-declared command without a person's approval. That install then fails and names the command.
-The run account lists plugin installs and removals under Software. Backups copy each agent's settings file first.
+Listing entries follow the owned-entry rules below, including drift, conflicts, and the exception list.
+Claude Code installs a listed plugin during an interactive start, in the background. The plugin loads from the next session.
+A headless `claude -p` run does not install it. OpenCode and Pi install a listed plugin at their next start.
+Next steps names each agent's step in the run that first writes the listing.
+A Claude Code marketplace that names `owner/repo` becomes a GitHub source. A URL becomes a Git source; an absolute path becomes a folder source.
+
+Codex and Gemini CLI still run their installers. Fleet's review is the consent step; Gemini CLI's own confirmation is skipped with `--consent`.
+Gemini CLI still asks to trust a local-path source, so an unattended install from a local path fails.
+The run account lists installer runs under Software. Backups copy each agent's settings file first.
 Fleet runs no other agent command to write settings.
 
-An install runs when a plugin is declared for an agent that is on. Changing a plugin's `id` or `marketplace` removes the old install first.
-A removed declaration or a domain change uninstalls the plugin. Turning an agent off keeps its plugins.
+An installer runs when a plugin is declared for Codex or Gemini CLI while that agent is on. Changing a plugin's `id` or `marketplace` removes the old install first.
+A removed declaration or a domain change removes the plugin. Turning an agent off keeps its plugins.
 The `local` exception releases a plugin: it stays installed, and Fleet stops managing it.
 A failed installer stops the run. The inventory records only completed installs and removals.
+Earlier releases ran installers for Claude Code, OpenCode, and Pi. The next update releases those records without uninstalling, then writes the listing.
 
 ## Ownership, drift, and removal
 

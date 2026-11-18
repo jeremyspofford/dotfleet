@@ -76,6 +76,22 @@ GATEWAY = "fleet"  # The one server entry that each agent receives for every dec
 MANAGER = ".local/share/fleet/manager"
 
 
+# These agents install a listed plugin by themselves at start (tested 2026-11-18).
+# Fleet writes their listing; Gemini CLI and Codex still use their installers.
+LISTED = ("claude", "opencode", "pi")
+
+
+def marketplace_source(marketplace):
+    """Describe a marketplace address in Claude Code's extraKnownMarketplaces form."""
+    if marketplace.startswith(("https://", "http://", "git@", "ssh://", "file://")):
+        return {"source": "git", "url": marketplace}
+    if marketplace.startswith("/"):
+        return {"source": "directory", "path": marketplace}
+    if re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", marketplace):
+        return {"source": "github", "repo": marketplace}
+    return {"source": "git", "url": marketplace}
+
+
 def extension_name(source):
     """Gemini CLI uninstalls by extension name: the last part of its source address."""
     return source.rstrip("/").removesuffix(".git").rsplit("/", 1)[-1]
@@ -587,6 +603,9 @@ class Planner:
     def plugins(self, agent):
         for item in self.items(agent, "plugins"):
             source = item.spec["sources"][agent]
+            if agent in LISTED:
+                self.plugin_listing(agent, item, source)
+                continue
             self.plan.plugins.append(
                 {
                     "agent": agent,
@@ -595,6 +614,29 @@ class Planner:
                     "marketplace": source.get("marketplace", ""),
                 }
             )
+
+    def plugin_listing(self, agent, item, source):
+        """Write the agent's own plugin listing. The agent installs the plugin at its next start."""
+        relative = self.catalog[agent]["plugin_listing_file"]
+        identifier = source["id"]
+        if agent == "claude":
+            self.entry(agent, relative, "json", ("enabledPlugins",), identifier, True, item.key)
+            marketplace = source.get("marketplace")
+            if marketplace and "@" in identifier:
+                name = identifier.split("@", 1)[1]
+                listing = {"source": marketplace_source(marketplace)}
+                self.entry(
+                    agent, relative, "json", ("extraKnownMarketplaces",), name, listing, item.key
+                )
+            self.plan.steps.append(
+                f"claude: start Claude Code once in a terminal; it installs {identifier}"
+                " in the background and loads it from the next session."
+            )
+            return
+        container = ("plugin",) if agent == "opencode" else ("packages",)
+        self.entry(agent, relative, "json", container, identifier, identifier, item.key, "self")
+        label = "OpenCode" if agent == "opencode" else "Pi"
+        self.plan.steps.append(f"{agent}: the next {label} start installs {identifier}.")
 
     def library_skills(self):
         """Copy pulled-in skills into the tree and link each one into ~/.agents/skills."""
@@ -967,6 +1009,13 @@ def plan_plugins(result, inventory, profile, off_agents):
             result.plugin_removals.append(old)
         result.plugin_installs.append(record)
     for key, old in recorded.items():
+        if old["agent"] in LISTED:
+            # Earlier releases ran this agent's installer. Keep that install; the listing owns it now.
+            result.released_plugins.append(old)
+            result.notes.append(
+                f"{old['agent']}: {old['item']} now follows the agent's own plugin listing."
+            )
+            continue
         if key in desired or old["agent"] in off_agents:
             continue  # Turning an agent off keeps its plugins.
         if exceptions.get(old["item"]) == "local":
