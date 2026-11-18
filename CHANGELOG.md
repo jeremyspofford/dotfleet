@@ -2,6 +2,21 @@
 
 This file follows Keep a Changelog. Versions use SemVer: major.minor.patch.
 
+## [0.7.0] - 2026-11-18
+
+### Added
+
+- exchange registry digests on contact and uninstall members remotely (#52)
+- deploy Fleet to another machine and register both ways (#51)
+- write plugin listings where agents install plugins themselves (#50)
+
+### Changed
+
+- Claude Opus 5.5 <noreply@anthropic.com>
+- https://claude.ai/code/session_01VHXAyZNQYaE3KaWYVP4sXo
+- Claude Fable 5.2 <noreply@anthropic.com>
+- design the Layer 2 agent-configuration module (#35)
+
 ## [0.6.0] - 2026-11-17
 
 ### Added
