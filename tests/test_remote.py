@@ -310,7 +310,9 @@ sys.exit(result.returncode)
         self.assertEqual(after["content_commit"], before["content_commit"])
         self.cli("update")
         self.assertEqual(registry.load(self.home)["machines"][local]["ssh_target"], "example@host")
-        self.assertIn("mini-pc", self.cli("machines", "list"))
+        # The connection survives the refresh as data; the members-only list omits it.
+        self.assertEqual(registry.load(self.home)["machines"]["beelink"]["ssh_target"], "mini-pc")
+        self.assertNotIn("beelink", self.cli("machines", "list"))
         self.assertEqual((self.home / registry.REGISTRY).stat().st_mode & 0o777, 0o600)
 
 

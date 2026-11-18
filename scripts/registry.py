@@ -59,16 +59,25 @@ def load(home):
         for name, kind in FIELDS.items():
             if name not in record or type(record[name]) is not kind:
                 raise ValueError(f"Fleet record {key}: {name} must be {kind.__name__}.")
-        if "ssh_target" in record and not isinstance(record["ssh_target"], str):
-            raise ValueError(f"Fleet record {key}: ssh_target must be str.")
+        for name in ("ssh_target", "recorded_at"):
+            if name in record and not isinstance(record[name], str):
+                raise ValueError(f"Fleet record {key}: {name} must be str.")
         for name in ("home", "last_backup", "last_run_record"):
             if record[name] and not Path(record[name]).is_absolute():
                 raise ValueError(f"Fleet record {key}: {name} must be an absolute path.")
-        if key == socket.gethostname() and record["home"] == str(home):
+        if key == machine_name() and record["home"] == str(home):
             for name in ("last_backup", "last_run_record"):
                 if record[name]:
                     record[name] = str(relocated(record[name], home))
     return data
+
+
+def machine_name():
+    """Return this machine's fleet name: its host name, unless FLEET_MACHINE_NAME names it.
+
+    The override lets two homes on one host act as two machines in tests and containers.
+    """
+    return os.environ.get("FLEET_MACHINE_NAME") or socket.gethostname()
 
 
 def os_name():
@@ -92,7 +101,7 @@ def machine(home, manager_version, fallback=None):
         else ""
     )
     return {
-        "hostname": socket.gethostname(),
+        "hostname": machine_name(),
         "home": str(home),
         "os": os_name(),
         "domain": profile.get("domain", ""),
@@ -149,13 +158,17 @@ def refresh(home, manager_version, backup, result, fallback=None, *, run_record=
 def entities(home, manager_version):
     """List known facts, with one compact block per machine."""
     data = load(home)
-    local = socket.gethostname()
+    local = machine_name()
     if local not in data["machines"]:
         data["machines"][local] = machine(home, manager_version)
     output = []
-    for key, record in sorted(
-        data["machines"].items(), key=lambda item: (item[0] != local, item[0])
-    ):
+    # The list holds fleet members. Connection-only records stay data for remote commands.
+    members = {
+        key: record
+        for key, record in data["machines"].items()
+        if record["enrolled"] or key == local
+    }
+    for key, record in sorted(members.items(), key=lambda item: (item[0] != local, item[0])):
         known = any(
             record.get(field)
             for field in ("home", "os", "domain", "content_repo", "manager_version", "last_run")

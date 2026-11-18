@@ -73,12 +73,41 @@ def validate_profile_request(request):
     return request
 
 
-def validate_request(request):
-    if (
-        isinstance(request, dict)
-        and type(request.get("version")) is int
-        and request["version"] == 2
+MACHINE_NAME = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_.-]*")
+
+
+def validate_deploy_request(request):
+    """Accept one deploy step: facts, join with the caller's record, or a reverse test."""
+    import registry
+
+    action = request.get("action")
+    expected = {"facts": set(), "join": {"peer"}, "test-return": {"name"}}
+    if action not in expected or set(request) != {"version", "action", *expected[action]}:
+        raise ValueError("Invalid deploy request. Update Fleet on both machines.")
+    if action == "test-return" and not (
+        isinstance(request["name"], str) and MACHINE_NAME.fullmatch(request["name"])
     ):
+        raise ValueError("Invalid machine name in the deploy request.")
+    if action == "join":
+        peer = request["peer"]
+        allowed = set(registry.FIELDS) | {"ssh_target", "recorded_at"}
+        if not isinstance(peer, dict) or set(peer) - allowed or set(registry.FIELDS) - set(peer):
+            raise ValueError("Invalid machine record in the deploy request.")
+        for key, kind in registry.FIELDS.items():
+            if type(peer[key]) is not kind:
+                raise ValueError(f"Invalid {key} in the deploy request.")
+        if not MACHINE_NAME.fullmatch(peer["hostname"]):
+            raise ValueError("Invalid machine name in the deploy request.")
+        if peer.get("ssh_target"):
+            validate_target(peer["ssh_target"])
+    return request
+
+
+def validate_request(request):
+    version = request.get("version") if isinstance(request, dict) else None
+    if type(version) is int and version == 3:
+        return validate_deploy_request(request)
+    if type(version) is int and version == 2:
         return validate_profile_request(request)
     if not isinstance(request, dict) or set(request) != {"version", "action", "check", "stat"}:
         raise ValueError("Invalid remote request. Update Fleet on both machines.")
@@ -217,6 +246,9 @@ def receive():
         if request["version"] == 2:
             prepare_environment()
             return receive_profile(Path.home(), request)
+        if request["version"] == 3:
+            prepare_environment()
+            return receive_deploy(Path.home(), request)
         os.environ.pop(ui_channel.CHANNEL, None)
         os.environ.update(
             {
@@ -261,6 +293,50 @@ def receive_profile(home, request):
         return command.main([request["command"], "list"])
     label = request["command"] + " " + request["action"]
     return run_index.run(home, label, lambda: command.save_remote_choice(home, request))
+
+
+def answer(data):
+    """Print one JSON line for the caller. Human output may come before it."""
+    stream = getattr(sys.stdout, "stream", sys.stdout)
+    stream.write(json.dumps(data) + "\n")
+    stream.flush()
+    return 0
+
+
+def receive_deploy(home, request):
+    """Answer one deploy step on the target. The target's manager writes its own registry."""
+    import command
+    import registry
+
+    own = registry.machine_name()
+    if request["action"] == "facts":
+        version = (command.ROOT / "VERSION").read_text().strip()
+        record = registry.load(home)["machines"].get(own) or registry.machine(home, version)
+        return answer({"machine": record})
+    if request["action"] == "join":
+        peer = request["peer"]
+        if peer["hostname"] == own:
+            raise ValueError("The caller has this machine's own name. Nothing was saved.")
+
+        def add(data):
+            data["machines"][peer["hostname"]] = dict(peer)
+
+        code = run_index.run(home, "machines join", lambda: command.change_registry(home, add))
+        return answer({"code": code}) if code == 0 else code
+    record = registry.load(home)["machines"].get(request["name"], {})
+    target = record.get("ssh_target", "")
+    if not target:
+        return answer({"code": 2, "reason": "no saved connection to " + request["name"]})
+    try:
+        result = connections.invoke(target, "true", probe=True)
+        if result.returncode:
+            raise ConnectionError(result.stderr or f"SSH test failed (exit {result.returncode})")
+    except (OSError, subprocess.TimeoutExpired) as error:
+        reason, _ = connections.failure(home, request["name"], target, error)
+        topology.remember(home, request["name"], target, "connection test", reason, 2)
+        return answer({"code": 2, "reason": reason})
+    topology.remember(home, request["name"], target, "connection test", "SSH test passed", 0)
+    return answer({"code": 0, "reason": "SSH test passed"})
 
 
 def receive_action(home, request):

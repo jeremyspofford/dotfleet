@@ -10,12 +10,12 @@ import fcntl
 import json
 import os
 from pathlib import Path
-import socket
 import sys
 import textwrap
 
 from common import atomic
 import registry
+import socket
 import style
 import updates
 
@@ -78,7 +78,7 @@ def remember(home, name, target, action, state, code):
 
 
 def view(home):
-    name = socket.gethostname()
+    name = registry.machine_name()
     records = registry.load(home)["machines"]
     local = records.get(name) or registry.machine(home, "not recorded")
     root = {

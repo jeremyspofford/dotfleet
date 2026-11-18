@@ -31,7 +31,8 @@ ACTIONS = {
     "secrets": ("Secrets — names and set/unset", ("secrets", "list")),
     "content": ("Content — checkout and Git state", ("content",)),
     "configure": ("Configure — reopen the terminal wizard", ("configure",)),
-    "machines": ("List saved machines", ("machines", "list")),
+    "machines": ("List fleet members", ("machines", "list")),
+    "machine-install": ("Deploy Fleet to a machine", ("machines", "install")),
     "add-connection": ("Pick an SSH host", ("machines", "set-ssh")),
     "name-connection": ("Set a name and SSH target", ("machines", "set-ssh")),
     "machine-export": ("Export this machine's record", ("machines", "export")),
@@ -69,6 +70,7 @@ AREAS = {
     ),
     "Machines": (
         "machines",
+        "machine-install",
         "add-connection",
         "name-connection",
         "machine-export",
@@ -87,7 +89,13 @@ RELATED = {
     "marketplaces": ("marketplace-add", "marketplace-update", "marketplace-delete"),
     "pins": ("pin-set", "pin-remove", "tool-uninstall"),
     "diff": ("diff-stat",),
-    "machines": ("add-connection", "name-connection", "machine-export", "machine-remove"),
+    "machines": (
+        "machine-install",
+        "add-connection",
+        "name-connection",
+        "machine-export",
+        "machine-remove",
+    ),
     "backups": ("backup", "backup-delete-selected", "backup-delete-all"),
 }
 
@@ -103,6 +111,7 @@ CHANGING = {
     "pin-remove",
     "tool-uninstall",
     "add-connection",
+    "machine-install",
     "name-connection",
     "machine-export",
     "machine-remove",

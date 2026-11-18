@@ -8,11 +8,11 @@ The private channel carries screen data and confirmations. stdout carries human 
 import argparse
 import datetime
 from pathlib import Path
-import socket
 import sys
 
 import command
 import registry
+import socket
 import remote
 import style
 import ui_channel
@@ -36,7 +36,7 @@ def dashboard(home):
         except ValueError:
             pass
     return [
-        ("Machine", socket.gethostname()),
+        ("Machine", registry.machine_name()),
         ("Domain", rows["Domain"]),
         ("Content", profile["content_repo"]),
         ("Commit", commit(home / "dotfiles") or "not recorded"),
@@ -54,7 +54,8 @@ def send_connections(home):
             "items": [
                 name
                 for name, record in sorted(registry.load(home)["machines"].items())
-                if record.get("ssh_target")
+                # Remote actions reach fleet members; a connection alone has no Fleet to answer.
+                if record.get("ssh_target") and record["enrolled"]
             ],
         }
     )

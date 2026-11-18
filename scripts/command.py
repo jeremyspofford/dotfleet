@@ -119,12 +119,13 @@ DESCRIPTIONS = {
         "Installed packages live in an untracked library; records stay in the manager store."
     ),
     "machines": (
-        "Manage saved machine connections.\n"
+        "Manage fleet members and saved connections.\n"
         "The registry, registry.toml, stores machine records.\n"
-        "Listing makes no live network queries.\n"
+        "List shows fleet members only and makes no live network queries.\n"
+        "Install deploys Fleet to another machine and registers both machines.\n"
         "Export shows this machine; remove deletes a stale record.\n"
         "SSH securely connects to another machine.\n"
-        "Set-ssh saves a target and tests SSH once.\n"
+        "Set-ssh saves connection data and tests SSH once.\n"
         "One name supplies both fields; without flags, pick a host in a terminal."
     ),
     "tools": (
@@ -1072,6 +1073,7 @@ def changes_state(args):
         return bool(args.output)
     return action in (
         "add",
+        "install",
         "set",
         "remove",
         "set-ssh",
@@ -1108,6 +1110,8 @@ def dispatch(args, argument_parser, home):
                 return set_machine_ssh(home, name or target, target or name)
             if args.action == "remove":
                 return remove_machine(home, args.hostname)
+            if args.action == "install":
+                return install_machine(home, args)
             if args.action == "export":
                 info(
                     "Machine export",
@@ -1403,9 +1407,7 @@ def update_marketplaces(home, args, display, saved, workspace):
 
 
 def remove_machine(home, hostname):
-    import socket
-
-    if hostname == socket.gethostname():
+    if hostname == registry.machine_name():
         raise ValueError(
             "This machine is active. Only another machine’s stale record can be removed."
         )
@@ -1418,6 +1420,36 @@ def remove_machine(home, hostname):
         del data["machines"][hostname]
 
     return change_registry(home, remove)
+
+
+def install_machine(home, args):
+    """Resolve NAME to an SSH target, then run the deploy steps."""
+    import deploy
+
+    data = registry.load(home)["machines"]
+    if args.name is None and args.ssh_target is None:
+        chosen = connections.pick(home, purpose="install")
+        if not chosen:
+            print("Cancelled. Nothing was deployed.")
+            return 0
+        args.name = chosen
+    args.name = args.name or args.ssh_target
+    record = data.get(args.name, {})
+    if record.get("enrolled") and args.name != registry.machine_name():
+        raise ValueError(
+            f"{args.name} is already a fleet member. Run {current_command(home)} update {args.name}."
+        )
+    if args.name == registry.machine_name():
+        raise ValueError("This machine is already enrolled. Choose another machine.")
+    supplied = args.ssh_target is not None
+    args.ssh_target = args.ssh_target or record.get("ssh_target") or args.name
+    remote.validate_target(args.name)
+    remote.validate_target(args.ssh_target)
+    if args.return_target:
+        remote.validate_target(args.return_target)
+    if not supplied and not record and args.name not in connections.hosts(home):
+        raise ValueError(f"{args.name} is not a host in your SSH config. Add --target user@host.")
+    return deploy.install(home, args)
 
 
 def set_machine_ssh(home, hostname, target):

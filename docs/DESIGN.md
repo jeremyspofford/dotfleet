@@ -238,3 +238,16 @@ The Fleet gateway is a stdio MCP server in the manager. Each agent receives one 
 The gateway serves every declared downstream server's tools, prompts, and read-only resources.
 Served is a render kind beside the file kinds. Connectors, hooks, plugins, settings, and skill folders stay on files.
 The gateway reads its downstream list from the tree. Updates change that list, never the agent's entry.
+
+## Deploy Fleet to another machine
+
+`fleet machines install NAME` takes a machine from no record to fleet member in one command at the caller's terminal.
+It probes over SSH, checks the floor, bootstraps Python when needed, and runs the installer with a terminal on the target.
+The floor is bash, curl, git, tar, gzip, and a CA certificate bundle. The Python bootstrap also needs sha256sum or shasum.
+Fleet installs no system packages and uses no admin rights. Fleet's own Python lives at `~/.local/share/fleet/python`.
+
+Every remote command is fixed. Staged files and version 3 requests carry all values through standard input.
+Enrollment counts only when the target's own record says enrolled with a successful result. A process exit alone proves nothing.
+Both registries gain each other's record only after enrollment succeeds. A failed reverse connection test is reported only.
+The machines list holds enrolled members. Connection records from set-ssh stay data for remote commands and the picker.
+FLEET_MACHINE_NAME overrides a machine's fleet name. Tests and containers use it to run two machines on one host.

@@ -84,19 +84,38 @@ def choices(home):
     return available, notice
 
 
-def pick(home):
+def install_choices(home):
+    """Offer saved connections and SSH config hosts that are not fleet members yet."""
+    records = registry.load(home)["machines"]
+    members = {name for name, record in records.items() if record["enrolled"]}
+    members |= {records[name].get("ssh_target", "") for name in members}
+    saved = [
+        name
+        for name, record in records.items()
+        if not record["enrolled"] and record.get("ssh_target")
+    ]
+    concrete = [host for host in hosts(home) if host not in members and host not in saved]
+    available = sorted(saved) + concrete
+    notice = (
+        "" if available else "No saved connections or SSH config hosts are left. Type a target."
+    )
+    return available, notice
+
+
+def pick(home, purpose="connect"):
     import manager
     import ui_channel
 
     if not ui_channel.active() and not manager.has_terminal():
         raise ValueError("No terminal attached. Use machines set-ssh --target HOST or --name NAME.")
-    available, notice = choices(home)
+    available, notice = install_choices(home) if purpose == "install" else choices(home)
+    title = "Deploy Fleet to a machine" if purpose == "install" else "Add an SSH connection"
     detail = "Choose a listed host, or type user@host or user@IP. Cancel makes no changes."
     if ui_channel.active():
         return ui_channel.send(
             {
                 "kind": "choose",
-                "title": "Add an SSH connection",
+                "title": title,
                 "items": available,
                 "notice": notice,
                 "detail": detail,
@@ -105,7 +124,7 @@ def pick(home):
         )
     from style import section
 
-    print(section("Add an SSH connection"))
+    print(section(title))
     if notice:
         print(notice)
     if available:

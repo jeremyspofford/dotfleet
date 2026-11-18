@@ -94,9 +94,11 @@ class RegistrationTests(unittest.TestCase):
         self.assertIn("Next: use --target user@host or user@IP", output)
         self.assertIn("Saved connection kept", output)
         self.assertEqual(registry.load(self.home)["machines"]["mini-pc"]["ssh_target"], "mini-pc")
-        listing = self.cli("machines", "list")
-        self.assertEqual(listing.count("mini-pc"), 1)
-        self.assertIn("SSH uses this name", listing)
+        # A connection is data, not a fleet member: the list omits it and topology shows it once.
+        self.assertNotIn("mini-pc", self.cli("machines", "list"))
+        tree = self.cli("topology")
+        self.assertEqual(tree.count("mini-pc"), 1)
+        self.assertIn("SSH uses this name", tree)
         self.assertEqual(self.record()[0]["result"], "SUCCESS")
 
     def test_picker_reads_includes_excludes_registered_and_tests_choice(self):

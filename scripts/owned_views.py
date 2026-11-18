@@ -7,7 +7,6 @@ import os
 from pathlib import Path
 import re
 import shlex
-import socket
 
 from common import atomic, read_toml, run
 import registry
@@ -102,7 +101,7 @@ def content_rows(home, profile, checkout_state):
 
 
 def export_rows(home, version, output=None):
-    name = socket.gethostname()
+    name = registry.machine_name()
     data = registry.load(home)
     record = data["machines"].get(name) or registry.machine(home, version)
     rows = [("Machine", name + " · this machine")]

@@ -7,7 +7,6 @@ Help: python3 scripts/tui_actions.py --help.
 
 import argparse
 from pathlib import Path
-import socket
 import sys
 
 import command
@@ -196,7 +195,11 @@ def remove_machine_arguments(home):
     selected = choose(
         "Remove a stale record",
         "Machine",
-        [(name, name) for name in registry.load(home)["machines"] if name != socket.gethostname()],
+        [
+            (name, name)
+            for name in registry.load(home)["machines"]
+            if name != registry.machine_name()
+        ],
     )
     return ["machines", "remove", "--name", selected] if selected is not None else None
 
