@@ -7,6 +7,8 @@ skills_source = "agents/skills"
 
 [agents.claude]
 render = true
+# Fleet writes the plugin listing here; the agent installs the plugin at start.
+plugin_listing_file = ".claude/settings.json"
 # The agent's own plugin installer writes these files; backups keep a copy.
 plugin_files = [".claude/settings.json"]
 command = "claude"
@@ -95,6 +97,8 @@ wsl = ".grok/skills"
 
 [agents.pi]
 render = true
+# Fleet writes the plugin listing here; the agent installs the plugin at start.
+plugin_listing_file = ".pi/agent/settings.json"
 # The agent's own plugin installer writes these files; backups keep a copy.
 plugin_files = [".pi/agent/settings.json"]
 mcp_file = ".pi/agent/mcp.json"
@@ -117,6 +121,8 @@ wsl = ".pi/agent/skills"
 
 [agents.opencode]
 render = true
+# Fleet writes the plugin listing here; the agent installs the plugin at start.
+plugin_listing_file = ".config/opencode/opencode.json"
 # The agent's own plugin installer writes these files; backups keep a copy.
 plugin_files = [".config/opencode/opencode.json"]
 mcp_file = ".config/opencode/opencode.json"

@@ -380,6 +380,7 @@ schema = 1
 description = "Review commands."
 [agents.plugins.review-kit.sources]
 claude = { id = "review-kit@example", marketplace = "example/plugins" }
+codex = { id = "review-kit@example" }
 gemini = { id = "https://github.com/example/review-kit" }
 opencode = { id = "opencode-review" }
 pi = { id = "npm:@example/review" }
@@ -387,7 +388,7 @@ pi = { id = "npm:@example/review" }
 
 
 class PluginTests(Fixture):
-    """Plugins install and uninstall through each agent's own installer."""
+    """Listing agents receive plugin entries; Codex and Gemini CLI run their installers."""
 
     def setUp(self):
         super().setUp()
@@ -418,45 +419,55 @@ class PluginTests(Fixture):
     def plugins(self):
         return json.loads((self.home / agent_deploy.INVENTORY).read_text())["plugins"]
 
-    def test_declared_plugins_install_through_each_agent_installer(self):
+    def test_listing_agents_receive_entries_and_others_run_installers(self):
         result = self.deploy()
         self.assertEqual(
             self.calls(),
             [
-                "claude plugin marketplace add example/plugins",
-                "claude plugin install review-kit@example --scope user",
+                "codex plugin add review-kit@example",
                 "gemini extensions install https://github.com/example/review-kit --consent",
-                "pi install npm:@example/review",
-                "opencode plugin opencode-review --global",
             ],
         )
-        self.assertEqual(len(self.plugins()), 4)
+        claude = self.read_json(".claude/settings.json")
+        self.assertEqual(claude["enabledPlugins"], {"review-kit@example": True})
+        self.assertEqual(
+            claude["extraKnownMarketplaces"],
+            {"example": {"source": {"source": "github", "repo": "example/plugins"}}},
+        )
+        self.assertEqual(
+            self.read_json(".config/opencode/opencode.json")["plugin"], ["opencode-review"]
+        )
+        self.assertEqual(
+            self.read_json(".pi/agent/settings.json")["packages"], ["npm:@example/review"]
+        )
+        self.assertIn("pi: the next Pi start installs npm:@example/review.", result.steps)
+        self.assertTrue(
+            any(step.startswith("claude: start Claude Code once") for step in result.steps)
+        )
+        self.assertEqual({record["agent"] for record in self.plugins()}, {"codex", "gemini"})
         rows = agent_deploy.plugin_software(result)
-        self.assertEqual(rows[0]["name"], "claude plugin review-kit")
-        self.assertEqual({row["action"] for row in rows}, {"installed"})
+        self.assertEqual(
+            {row["name"] for row in rows}, {"codex plugin review-kit", "gemini plugin review-kit"}
+        )
         self.deploy()
         self.assertEqual(self.calls(), [])
 
-    def test_removed_declarations_uninstall_and_changed_sources_reinstall(self):
-        self.deploy()
-        self.calls()
+    def test_listing_changes_follow_the_declaration_and_keep_other_values(self):
         settings = self.home / ".config/opencode/opencode.json"
-        settings.parent.mkdir(parents=True, exist_ok=True)
-        settings.write_text(json.dumps({"plugin": ["opencode-review@1.2.0", "mine"]}))
+        settings.parent.mkdir(parents=True)
+        settings.write_text(json.dumps({"plugin": ["mine"]}))
+        self.deploy()
+        self.assertEqual(json.loads(settings.read_text())["plugin"], ["mine", "opencode-review"])
+        self.calls()
         changed = PLUGINS.replace("npm:@example/review", "npm:@example/review-two")
         changed = changed.replace('opencode = { id = "opencode-review" }\n', "")
         changed = changed.replace('gemini = { id = "https://github.com/example/review-kit" }\n', "")
         self.deploy(changed)
-        self.assertEqual(
-            self.calls(),
-            [
-                "pi remove npm:@example/review",
-                "gemini extensions uninstall review-kit",
-                "pi install npm:@example/review-two",
-            ],
-        )
+        self.assertEqual(self.calls(), ["gemini extensions uninstall review-kit"])
         self.assertEqual(json.loads(settings.read_text())["plugin"], ["mine"])
-        self.assertEqual({record["agent"] for record in self.plugins()}, {"claude", "pi"})
+        self.assertEqual(
+            self.read_json(".pi/agent/settings.json")["packages"], ["npm:@example/review-two"]
+        )
 
     def test_agent_off_keeps_plugins_and_local_exceptions_release_them(self):
         self.deploy()
@@ -465,17 +476,52 @@ class PluginTests(Fixture):
         self.profile["agent_items"] = {"plugins.review-kit": "local"}
         result = self.deploy()
         self.assertEqual(self.calls(), [])
+        self.assertIn("codex: plugins.review-kit stays installed; Fleet released it.", result.notes)
         self.assertIn(
-            "claude: plugins.review-kit stays installed; Fleet released it.", result.notes
+            "claude: plugins.review-kit released to this machine's own value.", result.notes
         )
-        self.assertEqual([record["agent"] for record in self.plugins()], ["pi"])
+        self.assertEqual(self.plugins(), [])
+        self.assertEqual(
+            self.read_json(".pi/agent/settings.json")["packages"], ["npm:@example/review"]
+        )
 
     def test_failed_installs_stop_and_record_only_completed_work(self):
         (Path(self.folder.name) / "fail-gemini").touch()
         with self.assertRaises(RuntimeError) as caught:
             self.deploy()
         self.assertIn("gemini extensions install", str(caught.exception))
-        self.assertEqual([record["agent"] for record in self.plugins()], ["claude"])
+        self.assertEqual([record["agent"] for record in self.plugins()], ["codex"])
+
+    def test_earlier_installer_records_for_listing_agents_are_released_not_uninstalled(self):
+        state = self.home / agent_deploy.INVENTORY
+        state.parent.mkdir(parents=True)
+        record = {
+            "agent": "claude",
+            "item": "plugins.review-kit",
+            "id": "review-kit@example",
+            "marketplace": "",
+        }
+        state.write_text(
+            json.dumps({"schema_version": 2, "paths": {}, "entries": [], "plugins": [record]})
+        )
+        result = self.deploy()
+        self.assertNotIn("claude plugin uninstall", " ".join(self.calls()))
+        self.assertIn(
+            "claude: plugins.review-kit now follows the agent's own plugin listing.", result.notes
+        )
+        self.assertNotIn("claude", {item["agent"] for item in self.plugins()})
+
+    def test_marketplace_addresses_map_to_claude_source_kinds(self):
+        self.assertEqual(
+            agent_deploy.marketplace_source("a/b"), {"source": "github", "repo": "a/b"}
+        )
+        self.assertEqual(
+            agent_deploy.marketplace_source("https://example.com/m.git"),
+            {"source": "git", "url": "https://example.com/m.git"},
+        )
+        self.assertEqual(
+            agent_deploy.marketplace_source("/srv/m"), {"source": "directory", "path": "/srv/m"}
+        )
 
 
 if __name__ == "__main__":
