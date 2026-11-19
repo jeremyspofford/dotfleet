@@ -254,11 +254,13 @@ Command groups require an action. Bare `machines`, `backups`, `secrets`, `tools`
 | `dotfleet version` | Print the manager version and content commit. |
 | `dotfleet uninstall` | Review removal, then type uninstall. Keep the content checkout and all backups. |
 
+Each command group also answers to its other number. For example, `machine` works exactly as `machines`.
+The pairs cover addons, agents, backups, domain, groups, logs, machines, marketplaces, secrets, and tools. Help shows one name.
+
 Older command forms now print their successor and exit with code 2:
 
 | Previous form | Current form |
 | --- | --- |
-| `backup` | `backups create` |
 | `rollback` | `backups restore` |
 | `content show` | `content` |
 | `profile show` | `status` |

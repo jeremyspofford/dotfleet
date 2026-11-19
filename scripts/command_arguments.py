@@ -291,12 +291,35 @@ def normalize(args, parser):
     return args
 
 
+# Each command group answers to its other number too. Help shows only the canonical name.
+OTHER_FORMS = {
+    "addon": "addons",
+    "agent": "agents",
+    "backup": "backups",
+    "domains": "domain",
+    "group": "groups",
+    "log": "logs",
+    "machine": "machines",
+    "marketplace": "marketplaces",
+    "secret": "secrets",
+    "tool": "tools",
+}
+
+
+def canonical(arguments):
+    """Replace a command's other singular or plural form with its canonical name."""
+    arguments = list(arguments)
+    position = 1 if arguments[:1] == ["help"] else 0
+    if len(arguments) > position and arguments[position] in OTHER_FORMS:
+        arguments[position] = OTHER_FORMS[arguments[position]]
+    return arguments
+
+
 def successor(arguments):
     path = arguments[1:] if arguments[:1] == ["help"] else arguments
     if not path:
         return None
     renamed = {
-        "backup": "backups create",
         "rollback": "backups restore",
         "pins": "tools",
         "profile": "status",
