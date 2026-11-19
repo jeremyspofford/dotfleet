@@ -7,13 +7,14 @@
 # Author: Jeremy Spofford / Aria Labs; Version: read from the manager VERSION file.
 set -euo pipefail
 # A deploy can install Fleet's own Python when the system Python is absent or too old.
-if [[ -x $HOME/.local/share/fleet/python/bin/python3 ]]; then
-	PATH="$HOME/.local/share/fleet/python/bin:$PATH"
+# Store migration may move that Python from an older store into ~/.fleet, so list both.
+if [[ -x $HOME/.fleet/python/bin/python3 || -x $HOME/.local/share/fleet/python/bin/python3 ]]; then
+	PATH="$HOME/.fleet/python/bin:$HOME/.local/share/fleet/python/bin:$PATH"
 fi
-manager="$HOME/.local/share/fleet/manager"
-if [[ ! -d $manager && -d $HOME/.local/share/dotfleet/manager ]]; then
-	manager="$HOME/.local/share/dotfleet/manager"
-fi
+manager="$HOME/.fleet/manager"
+for old in .local/share/fleet .local/share/dotfleet; do
+	if [[ ! -d $manager && -d $HOME/$old/manager ]]; then manager="$HOME/$old/manager"; fi
+done
 local_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 if [[ -f $local_root/scripts/command.py ]]; then manager=$local_root; fi
 # shellcheck source=scripts/logger.sh
@@ -36,9 +37,11 @@ help) python3 -B "$manager/scripts/command.py" "$@" ;;
 	trap 'rm -rf -- "$work_dir"' EXIT
 	python3 -B "$manager/scripts/store_migration.py" --record "$work_dir/store-moves.json"
 	export DOTFLEET_STORE_MOVES_FILE="$work_dir/store-moves.json"
-	if [[ $manager == "$HOME/.local/share/dotfleet/"* ]]; then
-		manager="$HOME/.local/share/fleet/${manager#"$HOME/.local/share/dotfleet/"}"
-	fi
+	# Commands run from the manager's new place; forget Python paths cached before the move.
+	hash -r
+	for old in .local/share/fleet .local/share/dotfleet; do
+		if [[ $manager == "$HOME/$old/"* ]]; then manager="$HOME/.fleet/${manager#"$HOME/$old/"}"; fi
+	done
 	python3 -B "$manager/scripts/command.py" "$@"
 	;;
 esac

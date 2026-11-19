@@ -149,7 +149,7 @@ class MarketplaceCommandTests(unittest.TestCase):
             "marketplaces", "add", "--source", str(self.market), "--packages", "review-kit"
         )
         tree = self.home / agent_deploy.TREE
-        self.assertIn("~/.local/share/fleet/marketplaces.json", output)
+        self.assertIn("~/.fleet/marketplaces.json", output)
         self.assertTrue((tree / "skills/pr-review/SKILL.md").is_file())
         self.assertEqual(
             os.readlink(self.home / ".agents/skills/pr-review"), str(tree / "skills/pr-review")
@@ -172,11 +172,11 @@ class MarketplaceCommandTests(unittest.TestCase):
         edited.write_text("my edit\n")
         output = self.cli("agents", "set", "--name", "mcp.review-docs", "--state", "on")
         self.assertIn(
-            "Replaced edited ~/.local/share/fleet/agents/skills/pr-review/SKILL.md",
+            "Replaced edited ~/.fleet/agents/skills/pr-review/SKILL.md",
             " ".join(output.split()),
         )
         self.assertIn("Body", edited.read_text())
-        backups = sorted((self.home / "fleet-backups").iterdir())
+        backups = sorted((self.home / ".fleet/backups").iterdir())
         saved_copy = backups[-1] / "home" / agent_deploy.TREE / "skills/pr-review/SKILL.md"
         self.assertEqual(saved_copy.read_text(), "my edit\n")
 

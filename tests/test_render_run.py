@@ -112,11 +112,11 @@ class RenderingTests(unittest.TestCase):
         self.assertEqual(len(text.splitlines()), 18)
         self.assertIn("5 · Locations — recorded in RUN.json.", text)
         self.assertEqual(record, original)
-        self.assertIn("~/fleet-backups/20261116-140000/MANIFEST.json", text)
+        self.assertIn("~/.fleet/backups/20261116-140000/MANIFEST.json", text)
         # The preview must still show every location before any apply.
         review = render(record, future=True)
-        self.assertIn("~/.config/fleet/profile.toml", review)
-        self.assertIn("~/.local/share/fleet/chezmoi-source", review)
+        self.assertIn("~/.fleet/profile.toml", review)
+        self.assertIn("~/.fleet/chezmoi-source", review)
 
     def test_long_status_and_pointer_obey_the_footer_rules(self):
         record = self.record()

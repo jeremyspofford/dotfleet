@@ -15,7 +15,7 @@ The terminal interface's Logs screen uses these same readers.
 
 ## Index storage
 
-The index keeps one private JSON file per attempt under `~/.local/share/fleet/runs/`.
+The index keeps one private JSON file per attempt under `~/.fleet/runs/`.
 Entries contain time, command, machine, remote status, result, stage, error line, backup path, and detailed record path.
 Each new entry prunes entries older than the newest 100. Entries never copy file contents or full command arguments.
 Files use mode 0600; the index directory uses 0700. Only the owner can read these files.
@@ -32,14 +32,14 @@ The installer has a shell fallback when Python cannot start. If storage itself i
 
 | Store | Retention rule |
 | --- | --- |
-| `~/fleet-backups/*/RUN.json` | Stays with its backup. Backups delete removes both. |
+| `~/.fleet/backups/*/RUN.json` | Stays with its backup. Backups delete removes both. |
 | Backup MANIFEST.json and CHEZMOI-DIFF.patch | Stay with the same backup. The patch can contain private values. |
-| `~/.local/share/fleet/cleanup-runs/*/RUN.json` | New cleanup records prune all but the newest 100. |
-| `~/.local/share/fleet/remote-runs/*/RUN.json` | New diagnostics prune all but the newest 100. Each output stream keeps at most 65,536 characters. |
-| `~/.local/share/fleet/check.json` | One current cache; each successful check replaces it. |
-| `~/.local/share/fleet/contacts.json` | One latest observation for each of the 100 most recently contacted machines; no contact history. |
-| `~/.local/state/dotfleet/last-run.json` | One confirmed manager commit; each successful publication replaces it. |
-| `~/.local/share/fleet/registry.toml` | One current record per saved machine; machines remove deletes stale records. |
+| `~/.fleet/cleanup-runs/*/RUN.json` | New cleanup records prune all but the newest 100. |
+| `~/.fleet/remote-runs/*/RUN.json` | New diagnostics prune all but the newest 100. Each output stream keeps at most 65,536 characters. |
+| `~/.fleet/check.json` | One current cache; each successful check replaces it. |
+| `~/.fleet/contacts.json` | One latest observation for each of the 100 most recently contacted machines; no contact history. |
+| `~/.fleet/last-run.json` | One confirmed manager commit; each successful publication replaces it. |
+| `~/.fleet/registry.toml` | One current record per saved machine; machines remove deletes stale records. |
 
 Remote diagnostics keep raw shell failures off the terminal. They may be written for failed queries, without creating run-index entries.
 Cleanup records stay outside backups, so deleting every backup still preserves the latest deletion review.

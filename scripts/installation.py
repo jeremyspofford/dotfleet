@@ -8,7 +8,7 @@ Direct execution without help keeps its existing behavior.
 import shutil
 from common import atomic, run
 
-MANAGER = ".local/share/fleet/manager"
+MANAGER = ".fleet/manager"
 COMMAND = ".local/bin/dotfleet"
 
 

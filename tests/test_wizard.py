@@ -11,6 +11,8 @@ import subprocess
 import tomllib
 import unittest
 
+import dotfiles_library
+
 import test_manager as helpers
 from convert import manifest_path
 from test_manager import ROOT, command, repository
@@ -58,11 +60,11 @@ class WizardTests(unittest.TestCase):
         result = {}
         for path in self.home.rglob("*"):
             name = str(path.relative_to(self.home))
-            if name in (".local", ".local/share", ".local/share/fleet") and name not in getattr(
+            if name in (".local", ".local/share", ".fleet") and name not in getattr(
                 self, "prior_directories", set()
             ):
                 continue
-            if name == ".local/share/fleet/runs" or name.startswith(".local/share/fleet/runs/"):
+            if name == ".fleet/runs" or name.startswith(".fleet/runs/"):
                 continue
             value = (
                 ("link", os.readlink(path))
@@ -87,10 +89,16 @@ class WizardTests(unittest.TestCase):
         self.assertIn("will be", output)
         self.assertIn("chezmoi status: clean", output)
         self.assert_quiet_status()
-        profile = (self.home / ".config/fleet/profile.toml").read_bytes()
+        # The example source downloads the starter pack as default and activates it.
+        self.assertEqual(
+            [path.name for path in (self.home / ".fleet/dotfiles").iterdir()], ["default"]
+        )
+        saved = tomllib.loads((self.home / ".fleet/profile.toml").read_text())
+        self.assertEqual(saved["dotfiles"], "default")
+        profile = (self.home / ".fleet/profile.toml").read_bytes()
         output = self.terminal([], flags=[], auto_wizard=False)
         self.assertNotIn("9. Review", output)
-        self.assertEqual((self.home / ".config/fleet/profile.toml").read_bytes(), profile)
+        self.assertEqual((self.home / ".fleet/profile.toml").read_bytes(), profile)
         self.assert_quiet_status()
 
     def test_adopt_excludes_secret_and_preserves_every_adopted_byte(self):
@@ -108,7 +116,8 @@ class WizardTests(unittest.TestCase):
         self.assertIn("Press Enter alone to choose adopt.", output)
         self.assertIn("Sensitive files are excluded.", output)
         self.assertNotIn("fake-secret-for-this-test", output)
-        checkout = self.home / "dotfiles"
+        checkout = dotfiles_library.active(self.home)
+        self.assertEqual(checkout.name, "adopted")
         names = command("git", "-C", str(checkout), "ls-files").splitlines()
         self.assertNotIn(".service-config", names)
         self.assertEqual(set(names), set(before) - {".service-config"} | {"fleet.toml"})
@@ -155,7 +164,7 @@ class WizardTests(unittest.TestCase):
         self.assertIn("Press Enter alone to choose confirm.", output)
         self.assertEqual(output.count("5. Git commit identity"), 1)
         self.assertIn("chezmoi status: clean", output)
-        self.assertTrue((self.home / ".config/fleet/profile.toml").is_file())
+        self.assertTrue((self.home / ".fleet/profile.toml").is_file())
         self.assert_quiet_status()
 
     def test_review_go_back_changes_identity_before_apply(self):
@@ -177,7 +186,7 @@ class WizardTests(unittest.TestCase):
         ]
         answers += [(b"Review [confirm]:", b"confirm\n")]
         self.terminal(answers, flags=[], auto_wizard=False)
-        profile = tomllib.loads((self.home / ".config/fleet/profile.toml").read_text())
+        profile = tomllib.loads((self.home / ".fleet/profile.toml").read_text())
         self.assertEqual(profile["git_name"], "Changed Person")
         self.assert_quiet_status()
 
@@ -199,7 +208,7 @@ class WizardTests(unittest.TestCase):
         self.assertIn(
             "Domain was never explicitly chosen (recorded: personal)", failed.stdout + failed.stderr
         )
-        self.assertFalse((self.home / "dotfiles").exists())
+        self.assertFalse((self.home / ".fleet/dotfiles").exists())
         self.terminal(
             [
                 (b"Domain [personal]:", b"personal\n"),
@@ -208,7 +217,7 @@ class WizardTests(unittest.TestCase):
             ],
             flags=[],
         )
-        recorded = tomllib.loads((self.home / ".config/fleet/profile.toml").read_text())
+        recorded = tomllib.loads((self.home / ".fleet/profile.toml").read_text())
         self.assertTrue(recorded["domain_chosen"])
         self.terminal([], flags=[], auto_wizard=False)
 
@@ -234,7 +243,7 @@ class WizardTests(unittest.TestCase):
         ]
         output = command(*args, env=self.env, cwd=self.home)
         self.assertNotIn("Review [", output)
-        profile = tomllib.loads((self.home / ".config/fleet/profile.toml").read_text())
+        profile = tomllib.loads((self.home / ".fleet/profile.toml").read_text())
         self.assertFalse(profile["groups"]["docker"])
         self.assertFalse(any(profile["agents"].values()))
         self.assertNotIn(
@@ -296,7 +305,7 @@ class WizardTests(unittest.TestCase):
         settings = json.loads((self.home / ".config/opencode/opencode.json").read_text())
         self.assertIn("mcp", settings)
         self.assertTrue((self.home / ".agents/skills/review-change/SKILL.md").is_file())
-        backup = next((self.home / "fleet-backups").iterdir())
+        backup = next((self.home / ".fleet/backups").iterdir())
         inventory = json.loads((backup / "MANIFEST.json").read_text())
         self.assertIn(".config/opencode/opencode.json", {item["path"] for item in inventory})
         self.assert_quiet_status()
@@ -315,7 +324,7 @@ class WizardTests(unittest.TestCase):
             (b"Review [confirm]:", b"confirm\n"),
         ]
         self.terminal(answers, flags=[], auto_wizard=False)
-        profile = tomllib.loads((self.home / ".config/fleet/profile.toml").read_text())
+        profile = tomllib.loads((self.home / ".fleet/profile.toml").read_text())
         self.assertEqual(profile["format"], "plain")
         self.terminal([], flags=[], auto_wizard=False)
         self.assert_quiet_status()
@@ -324,18 +333,21 @@ class WizardTests(unittest.TestCase):
         self.defaults_origin()
         self.terminal(self.answers(), flags=[], auto_wizard=False)
         previous_commit = command(
-            "git", "-C", str(self.home / "dotfiles"), "rev-parse", "HEAD"
+            "git", "-C", str(dotfiles_library.active(self.home)), "rev-parse", "HEAD"
         ).strip()
         before = (self.home / ".zshrc").read_bytes()
         answers = self.answers("adopt")
         answers[1] = (b"Domain [core]:", b"\n")
         self.terminal(answers, flags=["--configure"], auto_wizard=False)
         self.assertEqual((self.home / ".zshrc").read_bytes(), before)
-        old = list((self.home / "fleet-backups").glob("*/previous-content"))
-        self.assertEqual(len(old), 1)
+        # The earlier download stays in the library at its commit; adoption adds its own.
+        library = self.home / ".fleet/dotfiles"
+        self.assertEqual(sorted(path.name for path in library.iterdir()), ["adopted", "default"])
         self.assertEqual(
-            command("git", "-C", str(old[0]), "rev-parse", "HEAD").strip(), previous_commit
+            command("git", "-C", str(library / "default"), "rev-parse", "HEAD").strip(),
+            previous_commit,
         )
+        self.assertEqual(dotfiles_library.active(self.home).name, "adopted")
         self.assert_quiet_status()
 
     def test_secret_scan_checks_names_assignments_and_links(self):

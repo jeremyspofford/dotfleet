@@ -19,8 +19,9 @@ import platform
 from common import atomic, read_toml, run, value
 import run_index
 from store_migration import relocated
+import dotfiles_library
 
-REGISTRY = ".local/share/fleet/registry.toml"
+REGISTRY = ".fleet/registry.toml"
 FIELDS = {
     "hostname": str,
     "home": str,
@@ -94,9 +95,9 @@ def os_name():
 
 
 def machine(home, manager_version, fallback=None):
-    profile_path = home / ".config/fleet/profile.toml"
+    profile_path = home / ".fleet/profile.toml"
     profile = read_toml(profile_path) if profile_path.exists() else fallback or {}
-    checkout = home / "dotfiles"
+    checkout = dotfiles_library.active(home)
     commit = (
         run("git", "-C", str(checkout), "rev-parse", "HEAD").strip()
         if (checkout / ".git").exists()

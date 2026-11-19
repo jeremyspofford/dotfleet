@@ -36,18 +36,19 @@ from command_display import command_name, current_command
 from installation import COMMAND, MANAGER
 from render_run import render, render_view
 from run_account import RunAccount, commit, profile_changes
+import dotfiles_library
 
 ROOT = Path(__file__).resolve().parents[1]
-PROFILE = ".config/fleet/profile.toml"
+PROFILE = ".fleet/profile.toml"
 TOOL_UPDATES = "Tool updates"
 CONTROLS = {
     registry.REGISTRY,
     updates.CACHE,
     PROFILE,
     ".config/chezmoi/chezmoi.toml",
-    ".local/state/dotfleet/outputs.json",
-    ".local/state/dotfleet/agents.json",
-    ".local/state/dotfleet/last-run.json",
+    ".fleet/outputs.json",
+    ".fleet/agents.json",
+    ".fleet/last-run.json",
     COMMAND,
 }
 DESCRIPTIONS = {
@@ -96,6 +97,12 @@ DESCRIPTIONS = {
         "Check this machine and name any fixes.\n"
         "Check profile completeness, managed file differences, clean checkouts, and backups.\n"
         "A profile stores machine choices; a clean checkout has no local edits."
+    ),
+    "dotfiles": (
+        "Download dotfiles repositories and choose the active one.\n"
+        "Each download is a Git clone in ~/.fleet/dotfiles.\n"
+        "Only the active repository is applied, updated, checked, and compared.\n"
+        "Downloading never activates a repository; use does, after a review."
     ),
     "domain": (
         "Show or choose content additions.\n"
@@ -257,7 +264,11 @@ def profile(home):
 
 def records(home):
     return sorted(
-        (path for path in (home / "fleet-backups").glob("*") if (path / "MANIFEST.json").is_file()),
+        (
+            path
+            for path in (home / ".fleet/backups").glob("*")
+            if (path / "MANIFEST.json").is_file()
+        ),
         key=lambda path: (path.name[:15], int(path.name[16:] or "0")),
     )
 
@@ -322,7 +333,7 @@ def format_pin(value):
 def domain_choices(home):
     from convert import content_domains
 
-    manifest = content_manifest(home / "dotfiles")
+    manifest = content_manifest(dotfiles_library.active(home))
     descriptions = manifest.get("domains", {})
     return {
         name: descriptions.get(
@@ -360,7 +371,7 @@ def command_profile_gaps(saved_profile):
 def read_view(args, home, saved_profile):
     display = command_name(saved_profile)
     name = args.command
-    manifest = content_manifest(home / "dotfiles")
+    manifest = content_manifest(dotfiles_library.active(home))
     if name == "content":
         pairs = owned_views.content_rows(home, saved_profile, checkout_state)
     elif name in (
@@ -395,7 +406,7 @@ def read_view(args, home, saved_profile):
     elif name == "version":
         pairs = [
             ("Manager", (ROOT / "VERSION").read_text().strip()),
-            ("Content commit", commit(home / "dotfiles")),
+            ("Content commit", commit(dotfiles_library.active(home))),
         ]
     elif name == "doctor":
         gaps = command_profile_gaps(saved_profile)
@@ -418,7 +429,7 @@ def read_view(args, home, saved_profile):
         ]
         for label, path in [
             ("Manager checkout", home / MANAGER),
-            ("Content checkout", home / "dotfiles"),
+            ("Content checkout", dotfiles_library.active(home)),
         ]:
             clean = (path / ".git").exists() and not (
                 updates.managed_edits(path)
@@ -501,7 +512,7 @@ def status_rows(home, saved_profile):
         ),
         ("Profile file", str(home / PROFILE)),
         ("Edit choices", f"Use {display} domain set, tools set, groups set, or configure."),
-        ("Content", checkout_state(home / "dotfiles")),
+        ("Content", checkout_state(dotfiles_library.active(home))),
         ("Updates", updates.summary(home, saved_profile).removeprefix("Updates: ")),
         *(
             [("Fleet Marketplace", marketplace_summary)]
@@ -642,7 +653,7 @@ def preview_current(home, saved_profile, stat=False):
 def managed_paths(home):
     import agent_deploy
 
-    paths = set(load_json(home / ".local/state/dotfleet/outputs.json", {})) | CONTROLS
+    paths = set(load_json(home / ".fleet/outputs.json", {})) | CONTROLS
     # Agent shared files are not managed paths. Only Fleet's entries inside them belong to Fleet.
     paths |= set(agent_deploy.load_inventory(home).get("paths", {}))
     if (home / ".config/chezmoi/chezmoi.toml").exists():
@@ -689,10 +700,10 @@ def confirm(word, explanation, record=None):
 def validate_backup(home, selected):
     folder = Path(selected).expanduser()
     if not folder.is_absolute():
-        folder = home / "fleet-backups" / folder
+        folder = home / ".fleet/backups" / folder
     folder = folder.resolve()
-    if folder.parent != (home / "fleet-backups").resolve():
-        raise ValueError("Select a backup directly inside ~/fleet-backups.")
+    if folder.parent != (home / ".fleet/backups").resolve():
+        raise ValueError("Select a backup directly inside ~/.fleet/backups.")
     entries = load_json(folder / "MANIFEST.json", None)
     if not isinstance(entries, list):
         raise ValueError("Backup MANIFEST.json is missing or invalid.")
@@ -861,7 +872,7 @@ def transaction(home, operations, label, selected=None, require_word=None, tree_
         run_index.stage("backup")
         manager.backup(home, backup_paths, folder)
         account.bind_backup(folder)
-        source = home / ".local/share/fleet/chezmoi-source"
+        source = home / ".fleet/chezmoi-source"
         if source.is_dir():
             shutil.copytree(source, folder / "previous-chezmoi-source", symlinks=True)
         try:
@@ -1040,6 +1051,56 @@ def update_all(home, args, argument_parser):
     return max(member_code for _, member_code, _ in results)
 
 
+def dotfiles_command(home, args, display):
+    """Download, list, activate, or remove dotfiles repositories in ~/.fleet/dotfiles."""
+    library = dotfiles_library
+    if args.action == "download":
+        name = library.download(home, args.url, args.name, manager.has_terminal())
+        print(
+            f"Downloaded {name} into ~/{library.LIBRARY}/{name}. It is not active."
+            f" Run {display} dotfiles use {name} to activate it."
+        )
+        return 0
+    if args.action == "list":
+        current = library.active_name(home)
+        rows = [
+            (
+                name,
+                library.source(library.path(home, name)) + (" · active" if name == current else ""),
+            )
+            for name in library.names(home)
+        ]
+        info("Dotfiles", rows or [("Downloads", "none")], home)
+        return 0
+    target = library.path(home, args.name)
+    if not target.is_dir():
+        raise ValueError(f"No download named {args.name}. Run {display} dotfiles list.")
+    if args.action == "remove":
+        if args.name == library.active_name(home):
+            raise ValueError(
+                f"{args.name} is the active repository. Use another repository first,"
+                f" then remove {args.name}."
+            )
+        if not confirm(
+            "remove",
+            f"Delete ~/{library.LIBRARY}/{args.name} and its local Git history."
+            " Applied files do not change.",
+        ):
+            print("Cancelled. Nothing removed.")
+            return 0
+        library.remove(home, args.name)
+        print(f"Removed {args.name}.")
+        return 0
+    if args.name == library.active_name(home):
+        print(f"{args.name} is already active. Nothing changed.")
+        return 0
+    origin = library.source(target)
+    repo = str(target) if origin == "local" else origin
+    # Activate exactly the downloaded commit; a later update fetches newer ones.
+    os.environ["DOTFLEET_LOCAL_CONTENT"] = "1"
+    return manager.main(["--defaults", "--repo", repo, "--dotfiles", args.name], switch="use")
+
+
 def remote_profile(home, args):
     """Send one profile choice to a registered machine. Its manager validates and saves it."""
     names = remote.PROFILE_ACTIONS[args.command][args.action]
@@ -1071,7 +1132,7 @@ def save_remote_choice(home, request):
     command, action, values = request["command"], request["action"], request["arguments"]
     changed = copy.deepcopy(saved)
     failed = 0
-    manifest = content_manifest(home / "dotfiles")
+    manifest = content_manifest(dotfiles_library.active(home))
     if command == "domain":
         require_domain(manifest, values["name"], display)
         changed.update(domain=values["name"], domain_chosen=True)
@@ -1169,6 +1230,8 @@ def changes_state(args):
         "delete",
         "uninstall",
         "update",
+        "download",
+        "use",
     )
 
 
@@ -1215,6 +1278,8 @@ def dispatch(args, argument_parser, home):
 
             print(agent_import.run(home, args.agent), end="")
             return 0
+        if args.command == "dotfiles":
+            return dotfiles_command(home, args, display)
         if args.command in ("status", "doctor", "content") or getattr(args, "action", None) in (
             "list",
             "show",
@@ -1292,7 +1357,7 @@ def dispatch(args, argument_parser, home):
         if args.command == "domain":
             from convert import require_domain
 
-            require_domain(content_manifest(home / "dotfiles"), args.name, display)
+            require_domain(content_manifest(dotfiles_library.active(home)), args.name, display)
             return manager.main(["--defaults", "--domain", args.name])
         if args.command == "groups":
             return manager.main(["--defaults", "--group", args.name + "=" + args.state])
@@ -1397,7 +1462,7 @@ def agent_items(home):
     """Return validated items plus skill folders, keyed by KIND.NAME."""
     import agent_table
 
-    checkout = home / "dotfiles"
+    checkout = dotfiles_library.active(home)
     table = agent_table.load(checkout, content_manifest(checkout), enrollment.agent_manifest())
     import marketplaces
 
@@ -1542,9 +1607,9 @@ def remove_fleet(home, selected=None, restored=(), require_word="uninstall"):
         require_word,
         [
             home / MANAGER,
-            home / ".local/share/fleet/chezmoi-source",
-            home / ".local/share/fleet/tui-venv",
-            home / ".local/share/fleet/agents",
+            home / ".fleet/chezmoi-source",
+            home / ".fleet/tui",
+            home / ".fleet/agents",
         ],
     )
 
@@ -1718,7 +1783,7 @@ def snapshot(home, operations):
         run_index.stage("backup")
         manager.backup(home, [name for name, _ in operations], folder)
         account.bind_backup(folder)
-        source = home / ".local/share/fleet/chezmoi-source"
+        source = home / ".fleet/chezmoi-source"
         if source.exists():
             shutil.copytree(source, folder / "previous-chezmoi-source", symlinks=True)
         return account.finish(

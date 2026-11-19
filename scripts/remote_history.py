@@ -16,7 +16,7 @@ import run_index
 
 from common import atomic
 
-STORE = ".local/share/fleet/remote-runs"
+STORE = ".fleet/remote-runs"
 
 
 def output_text(result, name):

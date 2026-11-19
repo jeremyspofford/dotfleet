@@ -23,9 +23,10 @@ from installation import command_software, MANAGER
 import registry
 import style
 import run_index
-from store_migration import recorded_moves, restore
+from store_migration import STATE_RECORDS, recorded_moves, restore
+import dotfiles_library
 
-RECORD = ".local/state/dotfleet/last-run.json"
+RECORD = ".fleet/last-run.json"
 
 
 def commit(path):
@@ -70,7 +71,7 @@ class RunAccount:
         self.manager_version = (root / "VERSION").read_text().strip()
         saved = home / RECORD
         previous = json.loads(saved.read_text()) if saved.exists() else {}
-        self.old_profile = read_toml(home / ".config/fleet/profile.toml")
+        self.old_profile = read_toml(home / ".fleet/profile.toml")
         self.instruction_commands = dict.fromkeys(
             ("before", "after"), command_name(self.old_profile)
         )
@@ -101,14 +102,14 @@ class RunAccount:
             },
             {
                 "name": "Content",
-                "path": str(home / "dotfiles"),
-                "old": commit(home / "dotfiles"),
+                "path": str(dotfiles_library.active(home)),
+                "old": commit(dotfiles_library.active(home)),
                 "new": None,
             },
         ]
         self.locations = {
-            "Content checkout": str(home / "dotfiles"),
-            "Profile file": str(home / ".config/fleet/profile.toml"),
+            "Content checkout": str(dotfiles_library.active(home)),
+            "Profile file": str(home / ".fleet/profile.toml"),
             "Converted source": "None (not prepared)",
             "Backup folder": "None (not created)",
         }
@@ -167,7 +168,7 @@ class RunAccount:
         for name in sorted(plan["changed"]):
             if (
                 name == registry.REGISTRY
-                or name.startswith(".local/state/dotfleet/")
+                or name in STATE_RECORDS
                 or any(
                     str(self.home / name) == item["path"] and item["action"] != "present"
                     for item in self.software

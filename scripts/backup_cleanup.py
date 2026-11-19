@@ -20,8 +20,9 @@ import run_index
 from common import atomic, read_toml
 from command_display import current_command
 from render_run import render
+import dotfiles_library
 
-STORE = ".local/share/fleet/cleanup-runs"
+STORE = ".fleet/cleanup-runs"
 WARNING = "Deleted backups cannot be rolled back to."
 
 
@@ -59,7 +60,7 @@ def details(folder):
 def candidates(home):
     import command
 
-    root = home / "fleet-backups"
+    root = home / ".fleet/backups"
     if root.is_symlink() or not root.resolve().is_relative_to(home.resolve()):
         raise ValueError("Keep the backup store inside HOME, without a directory link.")
     folders = command.records(home)
@@ -106,8 +107,8 @@ def planned_record(home, names):
         "result": "PLANNED",
         "warnings": [WARNING],
         "locations": {
-            "Content checkout": str(home / "dotfiles"),
-            "Profile file": str(home / ".config/fleet/profile.toml"),
+            "Content checkout": str(dotfiles_library.active(home)),
+            "Profile file": str(home / ".fleet/profile.toml"),
             "Converted source": read_toml(home / ".config/chezmoi/chezmoi.toml").get("sourceDir"),
         },
         "instruction_commands": dict.fromkeys(("before", "after"), current_command(home)),

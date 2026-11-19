@@ -20,12 +20,12 @@ class UpdateGateTests(unittest.TestCase):
     assert_quiet_status = helpers.CommandTests.assert_quiet_status
 
     def backups(self):
-        return sorted((self.home / "fleet-backups").glob("*/RUN.json"))
+        return sorted((self.home / ".fleet/backups").glob("*/RUN.json"))
 
     def test_three_current_updates_refresh_checks_without_events(self):
         self.enroll()
         before = {path: path.read_bytes() for path in self.backups()}
-        profile = (self.home / ".config/fleet/profile.toml").read_bytes()
+        profile = (self.home / ".fleet/profile.toml").read_bytes()
         previous_check_time = 0
         for _ in range(3):
             self.assertEqual(self.cli("update"), updates.CURRENT_MESSAGE + "\n")
@@ -36,7 +36,7 @@ class UpdateGateTests(unittest.TestCase):
             self.assertGreater(checked_time, previous_check_time)
             previous_check_time = checked_time
             self.assertTrue(all(source["behind"] == 0 for source in cache["sources"]))
-        self.assertEqual((self.home / ".config/fleet/profile.toml").read_bytes(), profile)
+        self.assertEqual((self.home / ".fleet/profile.toml").read_bytes(), profile)
 
     def test_content_and_drift_trigger_one_backed_up_run_each(self):
         self.enroll()

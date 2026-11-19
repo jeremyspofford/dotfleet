@@ -14,6 +14,8 @@ import subprocess
 import time
 import tomllib
 import unittest
+
+import dotfiles_library
 from unittest.mock import patch
 
 import test_command as commands
@@ -50,14 +52,14 @@ class UpdateTests(unittest.TestCase):
     assert_quiet_status = commands.CommandTests.assert_quiet_status
 
     def paths(self):
-        return self.home / MANAGER, self.home / "dotfiles"
+        return self.home / MANAGER, dotfiles_library.active(self.home)
 
     def snapshot(self):
         return (
-            (self.home / ".config/fleet/profile.toml").read_bytes(),
-            sorted((self.home / "fleet-backups").iterdir()),
-            (self.home / ".local/share/fleet/registry.toml").read_bytes(),
-            [(path, path.read_bytes()) for path in self.home.glob("fleet-backups/*/RUN.json")],
+            (self.home / ".fleet/profile.toml").read_bytes(),
+            sorted((self.home / ".fleet/backups").iterdir()),
+            (self.home / ".fleet/registry.toml").read_bytes(),
+            [(path, path.read_bytes()) for path in self.home.glob(".fleet/backups/*/RUN.json")],
         )
 
     def checked_time(self):
@@ -217,7 +219,7 @@ class UpdateTests(unittest.TestCase):
             self.env[f"GIT_CONFIG_VALUE_{number}"] = url
             command("git", "-C", str(local), "remote", "set-url", "origin", url)
             targets.append(advance(remote, 1))
-        profile_path = self.home / ".config/fleet/profile.toml"
+        profile_path = self.home / ".fleet/profile.toml"
         profile = tomllib.loads(profile_path.read_text())
         profile["content_repo"] = urls[1]
         profile_path.write_text(toml(profile))
@@ -265,9 +267,9 @@ class UpdateTests(unittest.TestCase):
 
     def test_local_adopted_content_without_remote_matches_update(self):
         self.enroll()
-        content = self.home / "dotfiles"
+        content = dotfiles_library.active(self.home)
         command("git", "-C", str(content), "remote", "remove", "origin")
-        path = self.home / ".config/fleet/profile.toml"
+        path = self.home / ".fleet/profile.toml"
         profile = tomllib.loads(path.read_text())
         profile.update(content_repo=str(content), adopted=True, source_door="adopt")
         path.write_text(toml(profile))
@@ -292,7 +294,7 @@ class UpdateTests(unittest.TestCase):
         sleeper = self.base / "slow-ssh"
         sleeper.write_text("#!/bin/sh\nsleep 30\n")
         sleeper.chmod(0o700)
-        profile = tomllib.loads((self.home / ".config/fleet/profile.toml").read_text())
+        profile = tomllib.loads((self.home / ".fleet/profile.toml").read_text())
         output = io.StringIO()
         started = time.monotonic()
         with (

@@ -121,7 +121,7 @@ class IndexTests(unittest.TestCase):
     def test_json_matches_entry_and_backup_record_even_with_timestamp_logging(self):
         entries = fixture_entries(self.home)
         entry = entries[-1]
-        backup = self.home / "fleet-backups/20261117-090200"
+        backup = self.home / ".fleet/backups/20261117-090200"
         record = {"result": "FAILED", "files": [], "home": str(self.home)}
         atomic(backup / "RUN.json", json.dumps(record))
         run_index.update(
@@ -226,7 +226,7 @@ class IndexIntegrationTests(unittest.TestCase):
         )
         self.assertIn("Git", entry["error"])
         self.assertIsNone(entry["backup"])
-        self.assertFalse((self.home / "fleet-backups").exists())
+        self.assertFalse((self.home / ".fleet/backups").exists())
         result = subprocess.run(
             ["python3", str(ROOT / "scripts/command.py"), "logs", "show", "--json"],
             env=dict(self.env, LOG_TIMESTAMP="1"),
@@ -245,10 +245,10 @@ class IndexIntegrationTests(unittest.TestCase):
         for arguments in (("status",), ("check",), ("diff",), ("logs", "list"), ("logs", "show")):
             self.cli(*arguments)
         self.assertEqual({path: path.read_bytes() for path in run_index.files(self.home)}, before)
-        backups = set((self.home / "fleet-backups").iterdir())
+        backups = set((self.home / ".fleet/backups").iterdir())
         self.cli("update")
         self.assertEqual(run_index.entries(self.home)[0]["result"], "NO_CHANGE")
-        self.assertEqual(set((self.home / "fleet-backups").iterdir()), backups)
+        self.assertEqual(set((self.home / ".fleet/backups").iterdir()), backups)
         advance(self.content, 1, ".file", "update content")
         self.cli("update")
         self.assertEqual(len(run_index.entries(self.home)), 3)

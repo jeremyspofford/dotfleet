@@ -19,7 +19,7 @@ import socket
 import style
 import updates
 
-CONTACTS = ".local/share/fleet/contacts.json"
+CONTACTS = ".fleet/contacts.json"
 
 
 def load(home):

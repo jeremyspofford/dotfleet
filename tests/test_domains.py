@@ -101,7 +101,7 @@ class ContentDomainCommandTests(unittest.TestCase):
         self.cli("update")
         self.assertIn("Lab bench shortcuts", self.cli("domain", "list"))
         self.cli("domain", "set", "--name", "lab")
-        profile = tomllib.loads((self.home / ".config/fleet/profile.toml").read_text())
+        profile = tomllib.loads((self.home / ".fleet/profile.toml").read_text())
         self.assertEqual(profile["domain"], "lab")
         self.assertEqual((self.home / ".config/dotfiles/domain").read_text(), "lab\n")
 

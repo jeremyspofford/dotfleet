@@ -45,7 +45,7 @@ class RemoteProfileTests(unittest.TestCase):
     record = test_remote.RemoteTests.record
 
     def target_profile(self):
-        return tomllib.loads((self.home / ".config/fleet/profile.toml").read_text())
+        return tomllib.loads((self.home / ".fleet/profile.toml").read_text())
 
     def test_remote_domain_assignment_saves_then_the_next_update_applies_it(self):
         self.connect()

@@ -57,9 +57,7 @@ class ImportTests(unittest.TestCase):
                         "url": "https://mcp.example.com/issues",
                         "headers": {"Authorization": "Bearer ${ISSUES_TOKEN}", "X-Team": "core"},
                     },
-                    "fleet": {
-                        "command": "/home/example/.local/share/fleet/agents/gateway/run-claude"
-                    },
+                    "fleet": {"command": "/home/example/.fleet/agents/gateway/run-claude"},
                 }
             },
         )

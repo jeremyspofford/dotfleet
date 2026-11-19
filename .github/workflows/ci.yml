@@ -73,7 +73,7 @@ jobs:
               assert f'{number} · {name} — no changes.' in second
           assert 'chezmoi status: clean · warnings: none' in second
           import json
-          records = sorted(Path(os.environ['HOME']).glob('fleet-backups/*/RUN.json'))
+          records = sorted(Path(os.environ['HOME']).glob('.fleet/backups/*/RUN.json'))
           for path, action in zip(records, ['installed', 'present']):
               record = json.loads(path.read_text())
               runtime = next(item for item in record['software'] if item['name'] == 'Fleet TUI (Textual)')
@@ -81,7 +81,7 @@ jobs:
               assert Path(runtime['path'], 'bin/python').is_file()
           PY
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-          echo "FLEET_TEST_TUI_ENV=$HOME/.local/share/fleet/tui-venv" >> "$GITHUB_ENV"
+          echo "FLEET_TEST_TUI_ENV=$HOME/.fleet/tui" >> "$GITHUB_ENV"
       - name: Keep the CLI free of Textual
         run: python3 -c "import importlib.util; assert importlib.util.find_spec('textual') is None"
       - name: Test real content, archive, native source, prompts, and repeat runs

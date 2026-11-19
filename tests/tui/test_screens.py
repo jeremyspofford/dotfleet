@@ -87,10 +87,10 @@ class ScreenTests(unittest.IsolatedAsyncioTestCase):
             "groups": {"helpers": True},
             "content_repo": "https://github.com/example/dotfiles",
         }
-        profile = self.home / ".config/fleet/profile.toml"
+        profile = self.home / ".fleet/profile.toml"
         profile.parent.mkdir(parents=True)
         profile.write_text(toml(self.profile))
-        backup = self.home / "fleet-backups/20261116-140000"
+        backup = self.home / ".fleet/backups/20261116-140000"
         backup.mkdir(parents=True)
         (backup / "MANIFEST.json").write_text("[]")
         (backup / "RUN.json").write_text('{"result":"SUCCESS"}')
@@ -346,7 +346,7 @@ class ScreenTests(unittest.IsolatedAsyncioTestCase):
             record.update(hostname=name, ssh_target=target)
             data["machines"][name] = record
         path = self.home / registry.REGISTRY
-        path.parent.mkdir(parents=True)
+        path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(registry.serialize(data))
 
         def execute(home, machine, action, **options):
@@ -421,9 +421,9 @@ class ScreenTests(unittest.IsolatedAsyncioTestCase):
     async def test_backup_checkboxes_delete_only_two_selected_after_typed_confirm(self):
         from common import atomic
 
-        folders = [self.home / "fleet-backups/20261116-140000"]
+        folders = [self.home / ".fleet/backups/20261116-140000"]
         for day in (17, 18):
-            folder = self.home / "fleet-backups" / f"202611{day}-140000"
+            folder = self.home / ".fleet/backups" / f"202611{day}-140000"
             atomic(folder / "MANIFEST.json", "[]")
             atomic(folder / "RUN.json", '{"result":"SUCCESS"}')
             atomic(folder / "home/.file", "original")
@@ -467,7 +467,7 @@ class ScreenTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(
                     app.screen.query_one("#backup-selection", SelectionList).option_count, 1
                 )
-                self.assertTrue(list(self.home.glob(".local/share/fleet/cleanup-runs/*/RUN.json")))
+                self.assertTrue(list(self.home.glob(".fleet/cleanup-runs/*/RUN.json")))
 
     async def test_phone_width_keyboard_and_plain_themes(self):
         for environment in ({"NO_COLOR": ""}, {"TERM": "dumb"}):
@@ -501,7 +501,7 @@ class ScreenTests(unittest.IsolatedAsyncioTestCase):
             record.update(hostname=name, ssh_target=target)
             records[name] = record
         path = self.home / registry.REGISTRY
-        path.parent.mkdir(parents=True)
+        path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(registry.serialize({"schema_version": 1, "machines": records}))
         app = FleetApp(FixtureSession())
         with patch.object(remote, "execute", return_value=0) as execute:

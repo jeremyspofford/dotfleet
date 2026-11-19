@@ -16,7 +16,7 @@ Review planned changes before interactive apply. Read decisions from the termina
 
 ## 2. Keep the registry in the manager store
 
-The registry is `~/.local/share/fleet/registry.toml`. A registry holds saved machine records; TOML is its structured file format.
+The registry is `~/.fleet/registry.toml`. A registry holds saved machine records; TOML is its structured file format.
 Schema 1 uses a `machines` table keyed by saved machine name. Its legacy `hostname` field equals that key.
 Each record stores hostname, operating system, domain, content repository and commit, manager version, last run, and last backup.
 A commit identifies a saved Git version. The registry retains full commit identifiers and absolute backup paths.
@@ -51,8 +51,8 @@ content_repo = "https://github.com/jeremyspofford/dotfiles"
 content_commit = "0123456789abcdef0123456789abcdef01234567"
 manager_version = "0.2.0"
 last_run = "2026-11-16T12:00:00+00:00"
-last_backup = "/home/example/fleet-backups/20261116-070000"
-last_run_record = "/home/example/fleet-backups/20261116-070000/RUN.json"
+last_backup = "/home/example/.fleet/backups/20261116-070000"
+last_run_record = "/home/example/.fleet/backups/20261116-070000/RUN.json"
 result = "SUCCESS"
 enrolled = true
 ```
@@ -91,7 +91,7 @@ Update records manager update, content update, drift repair, and profile change 
 The terminal interface and remote targets call this same update core. Installer enrollment and repair keep their existing behavior.
 Neither substitutes the remote's default branch for the selected upstream. New commits after a check can change the next update's result.
 
-The manager owns `~/.local/share/fleet/check.json`. Content cannot manage this file.
+The manager owns `~/.fleet/check.json`. Content cannot manage this file.
 Schema 1 stores `checked_at` and `sources`. Each source records its name, path, branch, remote, current and upstream commits, target commit, and ahead/behind counts.
 The time includes its time zone. The cache keeps full paths and commit identifiers; command output shortens commits.
 Check replaces the private cache atomically only after both sources succeed. A failed check leaves the previous cache unchanged.
@@ -116,7 +116,7 @@ Bash provides the installer and thin command entry. Python handles profiles, con
 Use the existing manager path for changes. One renderer prints plans and completed run records.
 The renderer shows readable paths and commit identifiers; machine records retain full values.
 
-The terminal interface uses Textual in `~/.local/share/fleet/tui-venv`, a manager-owned virtual environment with separate Python packages.
+The terminal interface uses Textual in `~/.fleet/tui`, a manager-owned virtual environment with separate Python packages.
 The installer and update maintain it after review and backup. Exact requirements define its contents; Software records each change.
 The plain command core uses only the standard library. Missing interface packages never prevent plain commands.
 
@@ -156,7 +156,7 @@ The wizard stays local. Remote profile choices travel as validated values, never
 
 The target's shared renderer supplies human output. The caller adds the machine name and result, without recording a local install run.
 Target shell errors never reach the terminal interface or CLI. CLI means the plain command interface.
-Private diagnostic RUN.json files under ~/.local/share/fleet/remote-runs preserve raw output and failures.
+Private diagnostic RUN.json files under ~/.fleet/remote-runs preserve raw output and failures.
 Check and diff preserve their meaningful exit 1 results. SSH failures return nonzero with one diagnostic line and one next step.
 An interrupted connection leaves the update outcome unknown; the owner must inspect the target's last run.
 
@@ -171,7 +171,7 @@ No available names means typed input. No terminal means explicit flags are requi
 Registration runs the fixed SSH command true, with a ten-second total timeout. Remote operations still use the target's own manager.
 Fleet never configures networks, relays, SSH keys, or SSH settings. Missing access produces guidance, not an automatic setup attempt.
 
-The local contact cache is ~/.local/share/fleet/contacts.json. Schema 1 records target, action, outcome, exit code, and observation time per saved name.
+The local contact cache is ~/.fleet/contacts.json. Schema 1 records target, action, outcome, exit code, and observation time per saved name.
 Writes are private, atomic, and locked. Cache failures warn without changing the remote operation's outcome.
 Topology reads this cache and the local check cache. It never fetches or copies another machine's store.
 A changed target cannot inherit an old target's observation. Missing observations say never contacted.
@@ -182,12 +182,12 @@ Only the explicit topology --json option prints structured output. The normal CL
 
 The command remains `dotfleet`; the guarded `fleet` alias avoids an existing Rancher Fleet command.
 The content manifest is `fleet.toml`; the older `dotfleet.toml` name remains readable. The new name wins when both exist.
-The machine registry is `~/.local/share/fleet/registry.toml`.
+The machine registry is `~/.fleet/registry.toml`.
 
-Enrollment and update move old stores before other work. The [migration rules](../README.md#store-migration) define all three folder moves.
+Enrollment and update move old stores into `~/.fleet` before other work. The [migration rules](../README.md#store-migration) list every move.
 Profiles and backup payloads stay intact. Rollback maps their old paths during restoration and repairs chezmoi's source pointer.
 Migration appears under Profile changes in the run record and review. Cancelling the run undoes those moves.
-Internal module names, environment variables, and `.local/state/dotfleet` records keep their existing names.
+Internal module names, environment variables, and `.fleet` records keep their existing names.
 
 ## Backup cleanup
 
@@ -197,9 +197,9 @@ The CLI and terminal interface show the same review. Both require typing delete 
 The terminal interface uses checkboxes for selected backups and also offers Delete all.
 A changed backup cancels deletion before any folder is removed. Deletion never follows symlinks to their targets.
 
-Cleanup records live at `~/.local/share/fleet/cleanup-runs/<run>/RUN.json` with owner-only permissions.
+Cleanup records live at `~/.fleet/cleanup-runs/<run>/RUN.json` with owner-only permissions.
 They record completed removals and refresh this machine’s registry entry. Other machine records stay intact.
-The cleanup store sits outside fleet-backups, so deleting all backups leaves that store empty.
+The cleanup store sits outside .fleet/backups, so deleting all backups leaves that store empty.
 Deleted backups cannot be restored. Cancellation creates no cleanup record and removes nothing.
 
 ## Keep bounded run attempts
@@ -215,13 +215,13 @@ See [RUNS.md](RUNS.md) for storage, cleanup, and diagnostic limits.
 ## Deploy agent configuration through one tree
 
 The agents table in content declares agent configuration. The catalog in the manager names native paths. The profile saves this machine's choices.
-Fleet renders one payload per machine into `~/.local/share/fleet/agents`, a Fleet-owned tree.
+Fleet renders one payload per machine into `~/.fleet/agents`, a Fleet-owned tree.
 Updates change the tree. Each agent gets one pointer to it, set once. See [agent configuration](AGENTS.md).
 Agents that accept no pointer receive owned entries in their shared settings files.
 
 The foundation is the tracked content that Fleet installs. Updates and diffs apply only there.
 Skills are ordinary content at `~/.agents/skills`. Whole instruction files stay ordinary content.
-The inventory at `~/.local/state/dotfleet/agents.json` lists every owned path and entry. Schema 2 replaced the earlier flat record.
+The inventory at `~/.fleet/agents.json` lists every owned path and entry. Schema 2 replaced the earlier flat record.
 Fleet compares only keys that it wrote. A conflict stops the run before backup; unattended runs never choose overwrite.
 Stale outputs that still match their record leave. Changed stale outputs stay, with one report line. Turning an agent off keeps its outputs.
 
@@ -245,7 +245,7 @@ The gateway reads its downstream list from the tree. Updates change that list, n
 `fleet machines install NAME` takes a machine from no record to fleet member in one command at the caller's terminal.
 It probes over SSH, checks the floor, bootstraps Python when needed, and runs the installer with a terminal on the target.
 The floor is bash, curl, git, tar, gzip, and a CA certificate bundle. The Python bootstrap also needs sha256sum or shasum.
-Fleet installs no system packages and uses no admin rights. Fleet's own Python lives at `~/.local/share/fleet/python`.
+Fleet installs no system packages and uses no admin rights. Fleet's own Python lives at `~/.fleet/python`.
 
 Every remote command is fixed. Staged files and version 3 requests carry all values through standard input.
 Enrollment counts only when the target's own record says enrolled with a successful result. A process exit alone proves nothing.

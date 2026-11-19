@@ -2,22 +2,22 @@
   Already present: chezmoi 2.74.1, Mise 2026.8.5
 
 2 · Manager and content — 1 updated.
-  Manager  12345678 → 87654321 · ~/.local/share/fleet/manager
+  Manager  12345678 → 87654321 · ~/.fleet/manager
 
 3 · Files — no changes.
 
 4 · Profile changes — no changes.
 
 5 · Locations
-  Content  ~/dotfiles
-  Profile  ~/.config/fleet/profile.toml
-  Source   ~/.local/share/fleet/chezmoi-source
-  Backup   ~/fleet-backups/20261116-140000
+  Content  ~/.fleet/dotfiles/default
+  Profile  ~/.fleet/profile.toml
+  Source   ~/.fleet/chezmoi-source
+  Backup   ~/.fleet/backups/20261116-140000
 
 6 · Next steps
   Update    dotfleet update
-  Rollback  ~/fleet-backups/20261116-140000/MANIFEST.json
+  Rollback  ~/.fleet/backups/20261116-140000/MANIFEST.json
   Wizard    dotfleet configure
 
 chezmoi status: clean · warnings: none
-Run record: ~/fleet-backups/20261116-140000/RUN.json
+Run record: ~/.fleet/backups/20261116-140000/RUN.json

@@ -66,7 +66,7 @@ def saved_review(home, entry):
     if not name:
         return None
     path = Path(name)
-    permitted = [home / "fleet-backups", home / ".local/share/fleet/cleanup-runs"]
+    permitted = [home / ".fleet/backups", home / ".fleet/cleanup-runs"]
     if (
         path.name != "RUN.json"
         or path.is_symlink()

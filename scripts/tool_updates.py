@@ -18,7 +18,7 @@ import sys
 import run_index
 from common import atomic, run
 
-CACHE = ".local/share/fleet/tools-check.json"
+CACHE = ".fleet/tools-check.json"
 SCHEMA = 1
 
 

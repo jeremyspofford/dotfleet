@@ -3,15 +3,15 @@
 2 · Manager and content — no changes.
 
 3 · Files — will be 1 removed.
-  − ~/fleet-backups/20261101-120000
+  − ~/.fleet/backups/20261101-120000
     2026-11-01 12:00:00 · 34 bytes
   Total: 1 backup · 34 bytes will be freed.
 
 4 · Profile changes — no changes.
 
 5 · Locations
-  Content  ~/dotfiles
-  Profile  ~/.config/fleet/profile.toml
+  Content  ~/.fleet/dotfiles/default
+  Profile  ~/.fleet/profile.toml
   Source   not set
   Backup   not created
 
@@ -24,4 +24,4 @@ Warnings:
   Deleted backups cannot be rolled back to.
 
 chezmoi status: not applied (review) · warnings: 1
-Run record: ~/.local/share/fleet/cleanup-runs/example/RUN.json
+Run record: ~/.fleet/cleanup-runs/example/RUN.json

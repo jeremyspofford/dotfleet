@@ -67,12 +67,12 @@ class ToolUpdateTests(unittest.TestCase):
     assert_quiet_status = commands.CommandTests.assert_quiet_status
 
     def pins(self):
-        return tomllib.loads((self.home / ".config/fleet/profile.toml").read_text())["pins"]
+        return tomllib.loads((self.home / ".fleet/profile.toml").read_text())["pins"]
 
     def snapshot(self):
         return (
-            (self.home / ".config/fleet/profile.toml").read_bytes(),
-            sorted((self.home / "fleet-backups").iterdir()),
+            (self.home / ".fleet/profile.toml").read_bytes(),
+            sorted((self.home / ".fleet/backups").iterdir()),
         )
 
     def test_update_records_the_exact_resolved_version_and_installs_it(self):
@@ -179,7 +179,7 @@ class RemoteToolUpdateTests(unittest.TestCase):
         self.assertIn("Saved. The next update applies this change: run dotfleet update.", output)
         self.assertIn("beelink: tools update succeeded (exit 0).", output)
         self.assertEqual(self.caller_files(), before)
-        profile = tomllib.loads((self.home / ".config/fleet/profile.toml").read_text())
+        profile = tomllib.loads((self.home / ".fleet/profile.toml").read_text())
         self.assertEqual(profile["pins"]["node"], "24.15.0")
         self.assertTrue((self.home / ".local/share/mise/installs/node/24.15.0").is_dir())
         requests = [json.loads(line)["request"] for line in self.ssh_log.read_text().splitlines()]

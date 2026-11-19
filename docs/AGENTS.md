@@ -14,7 +14,7 @@ Turning an agent off writes nothing new for it. Its earlier outputs stay for rev
 
 ## Deployment tree
 
-Fleet deploys one payload per machine: the agent configuration in a Fleet-owned tree, `~/.local/share/fleet/agents`.
+Fleet deploys one payload per machine: the agent configuration in a Fleet-owned tree, `~/.fleet/agents`.
 Updates change the tree. Each agent gets one pointer to the tree, set once:
 
 | Agent | Pointer | Contents |
@@ -54,7 +54,7 @@ Earlier releases linked each skill into each agent's folder. The update removes 
 
 MCP means Model Context Protocol. An MCP server offers tools, prompts, and resources to an agent.
 Fleet serves every declared MCP server through its gateway. Served is a render kind beside the file kinds.
-Each agent receives one server entry, named `fleet`. It runs `~/.local/share/fleet/agents/gateway/run-AGENT`.
+Each agent receives one server entry, named `fleet`. It runs `~/.fleet/agents/gateway/run-AGENT`.
 That wrapper starts `scripts/gateway.py` in the manager with the agent's gateway file from the tree.
 
 The gateway starts each downstream server on demand. It serves their tools and prompts as `SERVER__NAME`.
@@ -152,7 +152,7 @@ Earlier releases ran installers for Claude Code, OpenCode, and Pi. The next upda
 
 ## Ownership, drift, and removal
 
-`~/.local/state/dotfleet/agents.json` is the inventory. It lists each owned path, each owned entry, and the keys Fleet wrote.
+`~/.fleet/agents.json` is the inventory. It lists each owned path, each owned entry, and the keys Fleet wrote.
 Fleet compares only the keys that it wrote. Keys that an agent adds inside an entry never count as drift.
 
 | Finding | Action |

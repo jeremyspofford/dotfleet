@@ -15,9 +15,9 @@ Git records history. chezmoi applies files. Mise selects developer tool versions
 curl -fsSL https://raw.githubusercontent.com/jeremyspofford/fleet/main/install.sh | bash
 ```
 
-- Setup backs up existing files and keeps your editable content at `~/dotfiles`.
+- Setup backs up existing files and keeps your editable content in `~/.fleet/dotfiles/NAME`.
 - Re-run the same command to update. Saved selections remain unchanged.
-- Backups live in `~/fleet-backups/<timestamp>/`. Review `MANIFEST.json` before restoring `home/` files and external targets.
+- Backups live in `~/.fleet/backups/<timestamp>/`. Review `MANIFEST.json` before restoring `home/` files and external targets.
 
 Requires Bash, git, curl, tar, and Python 3.11+. Use Linux, macOS, or WSL (Windows Subsystem for Linux).
 Missing chezmoi and Mise install into `~/.local/bin`. Setup never uses sudo.
@@ -54,15 +54,15 @@ The scan cannot prove that remaining files contain no secrets. Review your local
 Adopted files keep their exact contents, including existing Mise files. Profile choices do not rewrite adopted files.
 Only accepted files enter the first local Git commit. Nothing is uploaded.
 
-1. Review `~/dotfiles` and its Git history.
+1. Review `~/.fleet/dotfiles/adopted` and its Git history.
 2. Create an empty repository on your chosen Git host.
-3. Run `cd ~/dotfiles && git remote add origin URL`, replacing URL with that repository's address.
+3. Run `cd ~/.fleet/dotfiles/adopted && git remote add origin URL`, replacing URL with that repository's address.
 4. Run `git push -u origin main` when ready.
 
 Each prompt lists its choices one per line: the word to type, then its effect.
 Each prompt marks the recommended or current choice and states what Enter alone does.
 
-An unrelated `~/dotfiles` stops setup. Preserve it before choosing another repository or adopting files.
+Setup never reads or changes a `~/dotfiles` folder of your own. Content lives in `~/.fleet/dotfiles`.
 Native chezmoi templates and hooks can execute code. Use trusted content only.
 Quitting review cancels planned file changes. A small attempt entry records the cancellation. Fleet also moves this run's [store moves](README.md#store-migration) back.
 Preparation uses temporary files outside home; missing tools move into `~/.local/bin` only after confirmation.
@@ -133,18 +133,18 @@ This example is checked against the renderer's recorded test fixture:
   Group docker  on → off
 
 5 · Locations
-  Content  ~/dotfiles
-  Profile  ~/.config/fleet/profile.toml
-  Source   ~/.local/share/fleet/chezmoi-source
-  Backup   ~/fleet-backups/20261116-140000
+  Content  ~/.fleet/dotfiles/default
+  Profile  ~/.fleet/profile.toml
+  Source   ~/.fleet/chezmoi-source
+  Backup   ~/.fleet/backups/20261116-140000
 
 6 · Next steps
   Update    fleet update
-  Rollback  ~/fleet-backups/20261116-140000/MANIFEST.json
+  Rollback  ~/.fleet/backups/20261116-140000/MANIFEST.json
   Wizard    fleet configure
 
 chezmoi status: clean · warnings: none
-Run record: ~/fleet-backups/20261116-140000/RUN.json
+Run record: ~/.fleet/backups/20261116-140000/RUN.json
 ```
 
 ## How it works
@@ -154,7 +154,7 @@ The [content contract](docs/CONTENT-CONTRACT.md) defines files, formats, groups,
 Fleet converts plain files into a private chezmoi source. Native chezmoi repositories use their checkout directly.
 Stow layouts under `packages/<package>/` also work; their package prefixes do not reach the home directory.
 
-Your profile lives at `~/.config/fleet/profile.toml`. It saves the domain, Git identity, exact tool versions, and group choices between runs.
+Your profile lives at `~/.fleet/profile.toml`. It saves the domain, Git identity, exact tool versions, and group choices between runs.
 Use `fleet tools set TOOL --version VERSION` to select and install a version. Mise records which versions are installed; Fleet reads that list during setup.
 Use `fleet tools update TOOL` to select and install the newest version that Mise finds. The profile still records that exact version.
 A saved tool choice selects a version. It does not mean that version is installed.
@@ -186,7 +186,7 @@ Old Layer 0 enrollment migrates automatically. Setup reads old chezmoi data, ren
 Migration also saves existing Mise settings in the profile. Existing Fleet profiles remain authoritative. Backups preserve replaced files and prior staged sources.
 Conflict menus explain letter keys and require Enter. Skipping changes can leave differences; the summary reports that as incomplete enrollment.
 
-1. Edit content files in `~/dotfiles`. Change profile choices through `dotfleet domain`, `tools`, `groups`, or `configure`.
+1. Edit content files in the active download under `~/.fleet/dotfiles`. Change profile choices through `dotfleet domain`, `tools`, `groups`, or `configure`.
 2. Commit and push content changes before updating. Setup refuses uncommitted edits to managed files.
    Unmanaged files, such as untracked notes, never block setup.
 3. Run `dotfleet update` to convert and apply. The one-liner remains available for manager recovery.
@@ -218,7 +218,7 @@ Run that environment's Python with `-m unittest discover -s tests/tui -v` for sc
 ## After enrollment
 
 Use `dotfleet` for daily commands. The installer places it in `~/.local/bin` on every run.
-It keeps the manager checkout at `~/.local/share/fleet/manager`. The command uses that copy and its VERSION file.
+It keeps the manager checkout at `~/.fleet/manager`. The command uses that copy and its VERSION file.
 Keep `~/.local/bin` on PATH, the list of folders your shell searches for commands.
 The one-line installer remains the first-install and recovery path.
 Command groups require an action. Bare `machines`, `backups`, `secrets`, `tools`, `groups`, `domain`, and `addons` print their action lists.
@@ -303,7 +303,7 @@ Backup deletion accepts exactly one selector: --name, --keep, or --all. A select
 Use --keep 0 to remove all backups; negative counts are invalid.
 Review every selected backup’s date and size, plus the total size. Type delete and press Enter to proceed; cancel keeps everything.
 Deleted backups cannot be rolled back to. Content and the current managed files stay intact.
-Deletion writes its review to `~/.local/share/fleet/cleanup-runs/<run>/RUN.json`, outside the backup store.
+Deletion writes its review to `~/.fleet/cleanup-runs/<run>/RUN.json`, outside the backup store.
 This keeps --all from creating a replacement backup. Dates identify backups; sizes count file and link bytes without following links.
 
 ## Terminal interface
@@ -341,7 +341,7 @@ Remote Update runs unattended on the selected machine. It shows that machine's c
 Incomplete profiles stop updates; choose Configure to finish them. Local file conflicts also stop unattended apply.
 Use the plain update command in a terminal to resolve those conflicts. No interface action guesses an overwrite choice.
 
-The installer and update create `~/.local/share/fleet/tui-venv`, a private Python environment owned by the manager.
+The installer and update create `~/.fleet/tui`, a private Python environment owned by the manager.
 A virtual environment holds separate Python packages. [Textual](https://textual.textualize.io/) supplies the terminal widgets.
 `requirements-tui.txt` selects exact versions of Textual and its dependencies. The Software category records environment creation or updates.
 An unchanged environment stays untouched. A replaced environment moves into that run's backup as `previous-tui-venv`.
@@ -349,21 +349,79 @@ Failed environment installation restores the previous environment. A missing env
 Run `fleet update`, or the README installer, to restore it. No system packages or sudo are used.
 The command core needs only Python's standard library. Textual loads only in the interface process.
 
+## Where Fleet keeps its state
+
+Fleet keeps its own state in one folder, `~/.fleet`:
+
+| Path | Holds |
+| --- | --- |
+| `~/.fleet/manager/` | The manager checkout that runs Fleet. |
+| `~/.fleet/profile.toml` | This machine's saved choices. |
+| `~/.fleet/registry.toml` | Recorded facts about fleet members. |
+| `~/.fleet/backups/` | Backups, one folder per run. |
+| `~/.fleet/runs/` | The run index, which lists recent change-making attempts. |
+| `~/.fleet/cleanup-runs/` | Records of backup deletions. |
+| `~/.fleet/remote-runs/` | Private diagnostics from remote commands. |
+| `~/.fleet/check.json` | The last update check. |
+| `~/.fleet/tools-check.json` | The last check for newer tool versions. |
+| `~/.fleet/contacts.json` | Recorded connections to other machines. |
+| `~/.fleet/chezmoi-source/` | The converted source that chezmoi applies. |
+| `~/.fleet/agents/` | The agent deployment tree. |
+| `~/.fleet/agents.json` | The inventory of agent outputs that Fleet wrote. |
+| `~/.fleet/marketplaces.json` | Saved Fleet Marketplace records. |
+| `~/.fleet/marketplaces-check.json` | The last marketplace check. |
+| `~/.fleet/library/` | Installed marketplace packages. |
+| `~/.fleet/addons/` | Add-on records. |
+| `~/.fleet/outputs.json` | Fingerprints of managed files from the last apply. |
+| `~/.fleet/last-run.json` | A short record of the last apply. |
+| `~/.fleet/tui/` | The private Python environment for the terminal interface. |
+| `~/.fleet/python` and `~/.fleet/mise/` | Fleet's own Python, when a deploy installed one. |
+| `~/.fleet/deploy/` | Files that a deploy staged on this machine. |
+| `~/.fleet/dotfiles/NAME/` | Downloaded dotfiles repositories, one Git clone each. The profile names the active one. |
+
+Some files stay where other tools read them. The command stays at `~/.local/bin/dotfleet`.
+Generated files such as `~/.secrets` and the chezmoi and Mise configs also stay where those tools read them.
+
+## Dotfiles repositories
+
+Fleet keeps each dotfiles repository you download in `~/.fleet/dotfiles/NAME`. One of them is active.
+Update, check, diff, and the wizard use only the active repository. They never touch the others.
+
+1. Run `fleet dotfiles download URL` to clone a repository into the library. Downloading changes no applied file.
+2. Run `fleet dotfiles list` to see each download, its source, and the active one.
+3. Run `fleet dotfiles use NAME` to activate a download. Review the changes, then type `use` and press Enter.
+4. Run `fleet dotfiles remove NAME` to delete a download. You cannot remove the active one.
+
+Names:
+- **Default:** the name comes from the repository name. The starter pack is named `default`, and adopted files go in `adopted`.
+- **Your own:** `--name NAME` chooses the name up front. A name uses only letters, numbers, dashes, and underscores.
+- **Taken names:** if a name is taken, a terminal asks for another one. Without a terminal, the download stops and names the collision.
+- **No silent changes:** Fleet never renames a download silently or overwrites one.
+
+Using a repository takes a backup and applies its files.
+Files that only the previous repository managed are removed, unless you edited them. Fleet keeps edited files and reports each one.
+Domain, groups, tools, and agents carry over. If the new repository does not declare your domain, Fleet applies core and says so.
+Your saved domain stays, so switching back applies it again.
+
 ## Store migration
 
-The installer and installed command move old stores before enrollment or update work:
+The installer and installed command move older stores into `~/.fleet` before other work:
 
-- `~/.config/dotfleet/` moves to `~/.config/fleet/`.
-- `~/dotfleet-backups/` moves to `~/fleet-backups/`.
-- `~/.local/share/dotfleet/` moves to `~/.local/share/fleet/`.
+- `~/.local/share/fleet/` and `~/.local/share/dotfleet/` move into `~/.fleet/`.
+- `~/.config/fleet/` and `~/.config/dotfleet/` move into `~/.fleet/`.
+- `~/.local/state/dotfleet/` moves into `~/.fleet/`.
+- `~/fleet-backups/` and `~/dotfleet-backups/` move to `~/.fleet/backups/`.
+- `~/.cache/fleet-deploy/` moves to `~/.fleet/deploy/`.
+- A `~/dotfiles` checkout of the saved content moves to `~/.fleet/dotfiles/NAME` and stays active. An unrelated `~/dotfiles` stays.
 
-Folders move intact; profiles keep their bytes, and old backups come along.
-The registry becomes `~/.local/share/fleet/registry.toml`. The content manifest is `fleet.toml` in the content checkout.
-Older `dotfleet.toml` content manifests still work. When both names exist, `fleet.toml` wins.
+Each item moves intact. Files keep their bytes, and old backups come along. Emptied old folders are removed.
+The registry becomes `~/.fleet/registry.toml`, and the terminal interface environment becomes `~/.fleet/tui/`.
+The content manifest is `fleet.toml` in the content checkout. Older `dotfleet.toml` manifests still work; `fleet.toml` wins when both exist.
 
-Fleet updates chezmoi's source pointer during migration. Rollback translates old backup paths to the new locations.
-The review lists each store move under Profile changes. Cancelling the run moves those stores back to their old names.
-If both old and new stores exist, migration stops before moving folders. Resolve that conflict before retrying; Fleet never merges them silently.
+Fleet updates chezmoi's source pointer and links inside `~/.fleet` during migration. Rollback translates old backup paths to the new locations.
+A second run finds nothing to move and changes nothing.
+The review lists each store move under Profile changes. Cancelling the run moves everything back to its old place.
+If a name already exists in `~/.fleet`, migration stops before moving anything and reports one line. Fleet never merges two copies silently.
 
 ## Remove an extra tool version
 
@@ -382,7 +440,7 @@ Its backup copies managed files, not installed software. Reinstall software with
 3. Use `fleet logs show --name TIMESTAMP` to select a listed timestamp. A backup folder name also works.
 4. Use `fleet logs show --json` to export the index entry and its saved review for scripts.
 
-An index is a small list of records. Fleet keeps its newest 100 entries in `~/.local/share/fleet/runs/`.
+An index is a small list of records. Fleet keeps its newest 100 entries in `~/.fleet/runs/`.
 Each attempt records its time, command, machine, result, stage, error, and backup when present.
 Installation, configuration, updates, and other change-making actions create entries. Target-side remote updates write the target's entry.
 An update with no work records `NO_CHANGE`, without a backup or review. Cancellation records `CANCELLED`, without applying files.
@@ -424,14 +482,14 @@ A profile change is a saved choice that no update has applied yet, such as a rem
 Existing conflict rules still apply. Local edits require a terminal decision; unattended conflicts stop safely.
 The same gate applies to terminal-interface and remote updates. The one-line installer still handles enrollment and repair.
 
-Successful checks save both results in `~/.local/share/fleet/check.json` with owner-only permissions.
+Successful checks save both results in `~/.fleet/check.json` with owner-only permissions.
 This cache is saved check data. It contains the check time, full commit identifiers, and source paths.
 Check creates no backup or run record and never writes the profile or managed files.
 Status shows “not checked yet” until a valid result exists. Plain status keeps working offline.
 
 ## Recorded machines
 
-The fleet registry records machines in `~/.local/share/fleet/registry.toml`, inside the manager store. It is not content and never enters your dotfiles checkout.
+The fleet registry records machines in `~/.fleet/registry.toml`, inside the manager store. It is not content and never enters your dotfiles checkout.
 Run `dotfleet machines list` to read this machine's record and any other records in that file.
 Each machine has its own block. The list hides empty fields and keeps run-record and backup paths in their dedicated commands.
 A connection-only record says no local data is recorded. These are saved facts, not live results. Named remote commands query one machine on demand. Automatic registry transfer remains deferred.
@@ -485,7 +543,7 @@ A missing floor item stops the deploy. The report names each item and the one co
 Fleet installs no system packages and uses no admin rights. The bootstrap also needs sha256sum or shasum.
 A CA certificate bundle lets curl verify HTTPS; the probe reports `ca-certificates` when verification fails.
 A network failure during the probe is not a floor item. Later steps report it.
-The Python bootstrap keeps its own Mise store at `~/.local/share/fleet/mise`, apart from your tool versions.
+The Python bootstrap keeps its own Mise store at `~/.fleet/mise`, apart from your tool versions.
 The installer reads the target's facts: its scan, wizard steps, and review describe the target.
 
 A scripted deploy passes `--domain`, `--git-name`, and `--git-email`, and optionally `--repo` and repeated `--tool TOOL=VERSION`.
@@ -579,7 +637,7 @@ An invalid or undeclared value fails on the target with exit 2; nothing is saved
 
 The target renders results under its machine header. Updates that change files write RUN.json in its backup folder, using the local run renderer.
 The caller creates no backup or install run record for remote execution. It saves the contact's outcome and time locally.
-Raw target errors stay out of both interfaces. The newest 100 private diagnostic records live under `~/.local/share/fleet/remote-runs/<run>/RUN.json`.
+Raw target errors stay out of both interfaces. The newest 100 private diagnostic records live under `~/.fleet/remote-runs/<run>/RUN.json`.
 Check refreshes the target's update cache. Exit 0 means success; check and diff retain exit 1 for updates and differences.
 Other failures return nonzero. A lost connection cannot prove whether an update finished; inspect the target before retrying.
 
@@ -610,7 +668,7 @@ example-dell · domain personal
     never contacted
 ```
 
-Contact observations live in `~/.local/share/fleet/contacts.json`, with private file permissions.
+Contact observations live in `~/.fleet/contacts.json`, with private file permissions.
 Topology is the human view of that cache. No profile data enters the content repository.
 
 Use `dotfleet status` to inspect saved choices. Change them through `domain`, `tools`, `groups`, or `configure`; do not edit profile.toml.

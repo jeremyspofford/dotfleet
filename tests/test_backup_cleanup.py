@@ -26,7 +26,7 @@ class BackupCleanupTests(unittest.TestCase):
         atomic(self.home / command.PROFILE, toml({"domain": "core", "domain_chosen": True}))
         self.folders = []
         for day in range(1, 6):
-            folder = self.home / "fleet-backups" / f"202611{day:02d}-120000"
+            folder = self.home / ".fleet/backups" / f"202611{day:02d}-120000"
             atomic(folder / "MANIFEST.json", "[]")
             atomic(folder / "RUN.json", '{"result":"SUCCESS"}')
             atomic(folder / "home/.file", "backup bytes")
@@ -63,10 +63,10 @@ class BackupCleanupTests(unittest.TestCase):
 
     def test_keep_two_then_all_leaves_an_empty_store(self):
         output, _ = self.call("--keep", "2")
-        self.assertEqual(sorted((self.home / "fleet-backups").iterdir()), self.folders[-2:])
+        self.assertEqual(sorted((self.home / ".fleet/backups").iterdir()), self.folders[-2:])
         self.assertIn("3 backups", output)
         output, asked = self.call("--all")
-        self.assertEqual(list((self.home / "fleet-backups").iterdir()), [])
+        self.assertEqual(list((self.home / ".fleet/backups").iterdir()), [])
         self.assertIn("2 backups", output)
         self.assertEqual(asked.call_args.args[2], ["delete", "cancel"])
 
@@ -100,7 +100,7 @@ class BackupCleanupTests(unittest.TestCase):
     def test_cleanup_review_and_result_goldens(self):
         record = backup_cleanup.planned_record(self.home, [self.folders[0].name])
         record = json.loads(json.dumps(record).replace(str(self.home), "/home/example"))
-        record["record_path"] = "/home/example/.local/share/fleet/cleanup-runs/example/RUN.json"
+        record["record_path"] = "/home/example/.fleet/cleanup-runs/example/RUN.json"
         for future, name in ((True, "backup deletion plan"), (False, "backup deletion result")):
             if not future:
                 record["completed_files"] = [record["files"][0]["path"]]

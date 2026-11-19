@@ -143,11 +143,11 @@ class DeployTests(unittest.TestCase):
         )
 
     def registry(self, home):
-        path = home / ".local/share/fleet/registry.toml"
+        path = home / ".fleet/registry.toml"
         return tomllib.loads(path.read_text())["machines"] if path.exists() else {}
 
     def run_entries(self, home):
-        folder = home / ".local/share/fleet/runs"
+        folder = home / ".fleet/runs"
         return [json.loads(path.read_text()) for path in sorted(folder.glob("*.json"))]
 
     def test_deploy_enrolls_the_target_and_registers_both_machines(self):
@@ -209,7 +209,7 @@ class DeployTests(unittest.TestCase):
         fetched = curl_log.read_text().splitlines()
         self.assertIn(deploy.RAW + "/install.sh", fetched)
         self.assertIn(deploy.RAW + "/scripts/run_index.py", fetched)
-        self.assertTrue((self.target / ".local/share/fleet/manager/scripts/command.py").is_file())
+        self.assertTrue((self.target / ".fleet/manager/scripts/command.py").is_file())
         self.assertEqual((self.target / ".file").read_text(), "original\n")
         self.assertTrue(self.registry(self.target)["mini-pc"]["enrolled"])
         self.assertTrue(self.registry(self.home)["mini-pc"]["enrolled"])
@@ -242,7 +242,7 @@ class DeployTests(unittest.TestCase):
         self.assertEqual(self.registry(self.home)["mini-pc"]["manager_version"], enrolled)
         self.release("9.9.9")
         self.assertIn("mini-pc: update succeeded", self.call("update", "mini-pc"))
-        manager = self.target / ".local/share/fleet/manager"
+        manager = self.target / ".fleet/manager"
         self.assertEqual((manager / "VERSION").read_text().strip(), "9.9.9")
         self.assertEqual(self.registry(self.target)["mini-pc"]["manager_version"], "9.9.9")
         self.assertEqual(self.registry(self.home)["mini-pc"]["manager_version"], "9.9.9")
@@ -425,8 +425,8 @@ class DeployTests(unittest.TestCase):
             "Python 3.11 or newer is missing (found 3.9). Installing Python 3.12 with Mise.", output
         )
         calls = (self.base / "mise.log").read_text().splitlines()
-        self.assertEqual(calls[0], f"install python@3.12 {self.target}/.local/share/fleet/mise")
-        link = self.target / ".local/share/fleet/python"
+        self.assertEqual(calls[0], f"install python@3.12 {self.target}/.fleet/mise")
+        link = self.target / ".fleet/python"
         self.assertEqual(os.readlink(link), str(python))
         self.assertTrue(self.registry(self.home)["mini-pc"]["enrolled"])
 

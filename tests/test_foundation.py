@@ -7,6 +7,8 @@ Help: PYTHONPATH=scripts:tests python3 tests/test_foundation.py --help.
 
 import unittest
 
+import dotfiles_library
+
 import test_updates
 from test_updates import advance
 
@@ -19,7 +21,7 @@ class FoundationTests(unittest.TestCase):
 
     def test_unmanaged_local_files_never_block_check_or_update(self):
         self.enroll()
-        content = self.home / "dotfiles"
+        content = dotfiles_library.active(self.home)
         (content / "scratch.txt").write_text("my notes\n")
         (content / ".untracked-dotfile").write_text("not managed\n")
         self.assertIn("· clean", self.cli("status"))
@@ -36,7 +38,7 @@ class FoundationTests(unittest.TestCase):
     def test_uncommitted_edits_to_managed_files_still_block(self):
         self.enroll()
         before = self.snapshot()
-        (self.home / "dotfiles/.file").write_text("hand edit\n")
+        (dotfiles_library.active(self.home) / ".file").write_text("hand edit\n")
         for action in ("check", "update"):
             output = self.cli(action, expected=2)
             self.assertIn("uncommitted edits to managed files: .file", output)
@@ -45,14 +47,18 @@ class FoundationTests(unittest.TestCase):
 
     def test_an_update_that_changes_an_unmanaged_local_file_stops_before_backup(self):
         self.enroll()
-        (self.home / "dotfiles/notes.md").write_text("local draft\n")
+        (dotfiles_library.active(self.home) / "notes.md").write_text("local draft\n")
         advance(self.content, 1, "notes.md", "upstream")
         before = self.snapshot()
         for action in ("check", "update"):
             output = self.cli(action, expected=2)
-            self.assertIn("changes files with local edits in ~/dotfiles: notes.md", output)
+            self.assertIn(
+                "changes files with local edits in the active dotfiles repository: notes.md", output
+            )
         self.assertEqual(before, self.snapshot())
-        self.assertEqual((self.home / "dotfiles/notes.md").read_text(), "local draft\n")
+        self.assertEqual(
+            (dotfiles_library.active(self.home) / "notes.md").read_text(), "local draft\n"
+        )
 
 
 if __name__ == "__main__":

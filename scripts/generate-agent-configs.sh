@@ -31,7 +31,7 @@ Examples:
   bash scripts/generate-agent-configs.sh
   bash scripts/generate-agent-configs.sh --home /tmp/demo
 
-Outputs are recorded in ~/.local/state/dotfleet/agents.json after an update applies them.
+Outputs are recorded in ~/.fleet/agents.json after an update applies them.
 Author: Jeremy Spofford / Aria Labs; Version: $DOTFILES_VERSION (VERSION).
 HELP
 }

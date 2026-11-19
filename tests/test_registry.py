@@ -23,7 +23,7 @@ class RegistryTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.home = Path(self.temp.name)
         atomic(
-            self.home / ".config/fleet/profile.toml",
+            self.home / ".fleet/profile.toml",
             toml(
                 {
                     "domain": "personal",
@@ -38,14 +38,14 @@ class RegistryTests(unittest.TestCase):
     def test_refresh_preserves_other_machine_and_private_profile_fields_stay_out(self):
         with patch("socket.gethostname", return_value="other-machine"):
             other = registry.refresh(
-                self.home, "0.2.0", self.home / "fleet-backups/first", "SUCCESS"
+                self.home, "0.2.0", self.home / ".fleet/backups/first", "SUCCESS"
             )
         with patch("socket.gethostname", return_value="this-machine"):
             first = registry.refresh(
-                self.home, "0.2.1", self.home / "fleet-backups/second", "SUCCESS"
+                self.home, "0.2.1", self.home / ".fleet/backups/second", "SUCCESS"
             )
             latest = registry.refresh(
-                self.home, "0.2.1", self.home / "fleet-backups/third", "FAILED"
+                self.home, "0.2.1", self.home / ".fleet/backups/third", "FAILED"
             )
         data = registry.load(self.home)
         self.assertEqual(data["machines"]["other-machine"], other)
@@ -55,11 +55,11 @@ class RegistryTests(unittest.TestCase):
         self.assertNotIn("private@example.invalid", text)
         self.assertNotIn("24.14.1", text)
         self.assertEqual((self.home / registry.REGISTRY).stat().st_mode & 0o777, 0o600)
-        self.assertFalse((self.home / "dotfiles").exists())
+        self.assertFalse((self.home / ".fleet/dotfiles").exists())
 
     def test_legacy_view_is_unchosen_and_does_not_create_store(self):
         atomic(
-            self.home / ".config/fleet/profile.toml",
+            self.home / ".fleet/profile.toml",
             toml({"domain": "core", "content_repo": "https://example.invalid/content"}),
         )
         entities = registry.entities(self.home, "0.2.0")
@@ -106,8 +106,8 @@ class RegistryCommandTests(unittest.TestCase):
             home="/home/recorded",
             domain="work",
             last_run="2026-11-01T10:00:00+00:00",
-            last_backup="/home/recorded/fleet-backups/20261101-100000",
-            last_run_record="/home/recorded/fleet-backups/20261101-100000/RUN.json",
+            last_backup="/home/recorded/.fleet/backups/20261101-100000",
+            last_run_record="/home/recorded/.fleet/backups/20261101-100000/RUN.json",
         )
         data["machines"]["recorded-machine"] = other
         atomic(path, registry.serialize(data))
@@ -141,7 +141,7 @@ class RegistryCommandTests(unittest.TestCase):
         self.enroll()
         from test_manager import command
 
-        for name in [registry.REGISTRY, ".config/fleet/profile.toml"]:
+        for name in [registry.REGISTRY, ".fleet/profile.toml"]:
             target = self.content / name
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text("# must never reach home\n")

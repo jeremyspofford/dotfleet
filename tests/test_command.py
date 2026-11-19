@@ -19,6 +19,8 @@ import time
 import tomllib
 import unittest
 
+import dotfiles_library
+
 import test_manager as helpers
 from test_manager import ROOT, command, repository
 from common import toml
@@ -96,7 +98,7 @@ class CommandTests(unittest.TestCase):
         return result.stdout + result.stderr
 
     def record(self):
-        paths = sorted((self.home / "fleet-backups").glob("*/RUN.json"))
+        paths = sorted((self.home / ".fleet/backups").glob("*/RUN.json"))
         return json.loads(paths[-1].read_text()), paths[-1].parent
 
     def terminal(self, args, answers):
@@ -156,7 +158,7 @@ class CommandTests(unittest.TestCase):
         data = json.dumps(record).replace(str(self.content), "https://example.invalid/dotfiles")
         data = data.replace(str(self.home), "/home/example")
         data = re.sub(
-            r"/fleet-backups/\d{8}-\d{6}(?:-\d+)?", "/fleet-backups/20261117-120000", data
+            r"/.fleet/backups/\d{8}-\d{6}(?:-\d+)?", "/.fleet/backups/20261117-120000", data
         )
         record = json.loads(data)
         for tool in record["software"]:
@@ -257,7 +259,7 @@ class CommandTests(unittest.TestCase):
         self.enroll()
         self.assertIn("Personal shortcut", self.cli("domain", "list"))
         self.assert_review_golden("domain", self.cli("domain", "set", "--name", "personal"))
-        p = tomllib.loads((self.home / ".config/fleet/profile.toml").read_text())
+        p = tomllib.loads((self.home / ".fleet/profile.toml").read_text())
         self.assertEqual(p["domain"], "personal")
         self.assertTrue(p["domain_chosen"])
         output = command("zsh", "-ic", "chosen", env=self.env, cwd=self.home)
@@ -280,7 +282,7 @@ class CommandTests(unittest.TestCase):
         self.enroll()
         self.assert_review_golden("backup", self.cli("backups", "create"))
         _, saved = self.record()
-        original_profile = (self.home / ".config/fleet/profile.toml").read_bytes()
+        original_profile = (self.home / ".fleet/profile.toml").read_bytes()
         (self.home / ".file").write_text("local edit\n")
         output = self.cli("backups", "restore", "--backup", saved.name, expected=1)
         self.assertIn("needs a terminal", output)
@@ -291,13 +293,13 @@ class CommandTests(unittest.TestCase):
         self.assertIn("~ ~/.file", output)
         self.assert_review_golden("rollback", output)
         self.assertEqual((self.home / ".file").read_text(), "original\n")
-        self.assertEqual((self.home / ".config/fleet/profile.toml").read_bytes(), original_profile)
+        self.assertEqual((self.home / ".fleet/profile.toml").read_bytes(), original_profile)
         self.assert_quiet_status()
 
     def test_doctor_names_all_gaps(self):
         self.enroll()
         self.assertNotIn("FAIL", self.cli("doctor"))
-        path = self.home / ".config/fleet/profile.toml"
+        path = self.home / ".fleet/profile.toml"
         p = tomllib.loads(path.read_text())
         p.update(domain_chosen=False, git_name="", git_email="", pins={"node": "latest"})
         path.write_text(toml(p))
@@ -319,7 +321,7 @@ class CommandTests(unittest.TestCase):
 
     def test_missing_domain_provenance_is_unchosen_until_named_choice(self):
         self.enroll()
-        path = self.home / ".config/fleet/profile.toml"
+        path = self.home / ".fleet/profile.toml"
         p = tomllib.loads(path.read_text())
         del p["domain_chosen"]
         path.write_text(toml(p))
@@ -371,11 +373,11 @@ else: sys.exit(1)
         self.assert_review_golden("pins", output)
         record, _ = self.record()
         self.assertIn("node", record["completed_software"])
-        p = tomllib.loads((self.home / ".config/fleet/profile.toml").read_text())
+        p = tomllib.loads((self.home / ".fleet/profile.toml").read_text())
         self.assertEqual(p["pins"]["node"], "24.14.1")
         self.assertIn("Installed  24.14.1", self.cli("tools", "list"))
         self.cli("tools", "remove", "node")
-        p = tomllib.loads((self.home / ".config/fleet/profile.toml").read_text())
+        p = tomllib.loads((self.home / ".fleet/profile.toml").read_text())
         self.assertNotIn("node", p["pins"])
         self.assertIn("node", p["unpinned_tools"])
         self.assertNotIn(
@@ -440,9 +442,9 @@ else: sys.exit(1)
         self.assertIn("− ~/.local/bin/dotfleet", output)
         self.assert_review_golden("uninstall", output)
         self.assertFalse(self.exe.exists())
-        self.assertFalse((self.home / ".local/share/fleet/manager").exists())
-        self.assertTrue((self.home / "dotfiles/.git").exists())
-        self.assertTrue((self.home / "fleet-backups").exists())
+        self.assertFalse((self.home / ".fleet/manager").exists())
+        self.assertTrue((self.home / ".fleet/dotfiles/content/.git").exists())
+        self.assertTrue((self.home / ".fleet/backups").exists())
         self.assertEqual((self.home / ".file").read_text(), "before enrollment\n")
 
 

@@ -19,7 +19,7 @@ def command_name(profile):
 def current_command(home=None):
     home = Path.home() if home is None else home
     try:
-        profile = read_toml(home / ".config/fleet/profile.toml")
+        profile = read_toml(home / ".fleet/profile.toml")
     except (OSError, ValueError):
         # Help must remain available when the profile cannot be read.
         profile = {}

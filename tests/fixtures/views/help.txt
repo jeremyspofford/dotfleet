@@ -16,6 +16,7 @@ commands:
     diff          Show pending file differences.
     doctor        Check this machine and name any fixes.
     domain        Show or choose content additions.
+    dotfiles      Download dotfiles repositories and choose the active one.
     groups        Show or switch optional content.
     logs          Show saved change-making attempts.
     machines      Manage fleet members and saved connections.

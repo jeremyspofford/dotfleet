@@ -20,7 +20,7 @@ import sys
 import tempfile
 import uuid
 
-STORE = ".local/share/fleet/runs"
+STORE = ".fleet/runs"
 LIMIT = 100
 ENVIRONMENT = "FLEET_RUN_ID"
 ACTIVE = None
@@ -36,9 +36,11 @@ def machine_name():
 
 
 def folder(home):
-    # Early installer failures must not block a pending move from the old store.
-    old, new = home / ".local/share/dotfleet", home / ".local/share/fleet"
-    return (old if old.exists() and not new.exists() else new) / "runs"
+    # Before store migration, attempts stay in an older store so migration moves them along.
+    for old in (".local/share/fleet", ".local/share/dotfleet"):
+        if (home / old).is_dir():
+            return home / old / "runs"
+    return home / ".fleet/runs"
 
 
 def private_directory(path, home):
