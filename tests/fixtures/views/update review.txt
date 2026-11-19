@@ -4,7 +4,7 @@ Update triggered by: manager update.
   Already present: chezmoi 0.1.0, Mise 0.1.0, Fleet 0.1.0, Fleet TUI (Textual) 0.1.0
 
 2 · Manager and content — 1 updated.
-  Manager  11111111 → 22222222 · ~/.local/share/fleet/manager
+  Manager  11111111 → 22222222 · ~/.fleet/manager
 
 3 · Files — no changes.
 
@@ -12,14 +12,14 @@ Update triggered by: manager update.
 
 5 · Locations
   Content  ~/dotfiles
-  Profile  ~/.config/fleet/profile.toml
-  Source   ~/.local/share/fleet/chezmoi-source
-  Backup   ~/fleet-backups/20261117-120000
+  Profile  ~/.fleet/profile.toml
+  Source   ~/.fleet/chezmoi-source
+  Backup   ~/.fleet/backups/20261117-120000
 
 6 · Next steps
   Update    dotfleet update
-  Rollback  ~/fleet-backups/20261117-120000/MANIFEST.json
+  Rollback  ~/.fleet/backups/20261117-120000/MANIFEST.json
   Wizard    dotfleet configure
 
 chezmoi status: clean · warnings: none
-Run record: ~/fleet-backups/20261117-120000/RUN.json
+Run record: ~/.fleet/backups/20261117-120000/RUN.json

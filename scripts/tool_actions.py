@@ -44,7 +44,7 @@ def uninstall(home, saved, tool, version):
     display = current_command(home)
     if version in recorded_versions(saved.get("pins", {}).get(tool)):
         raise ValueError(
-            f"{tool} {version} is recorded in ~/.config/fleet/profile.toml; "
+            f"{tool} {version} is recorded in ~/.fleet/profile.toml; "
             f"run {display} tools remove {tool}, or {display} tools set {tool} --version VERSION first."
         )
     installed = enrollment.installed(home).get(tool, [])

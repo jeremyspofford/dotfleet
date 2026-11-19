@@ -155,12 +155,12 @@ class TopologyCommandTests(unittest.TestCase):
     def test_installed_json_has_no_logger_decorations_or_writes(self):
         self.enroll()
         before = (self.home / registry.REGISTRY).read_bytes()
-        backups = list((self.home / "fleet-backups").iterdir())
+        backups = list((self.home / ".fleet/backups").iterdir())
         value = json.loads(self.cli("topology", "--json"))
         self.assertEqual(value["machines"], [])
         self.assertIn("from " + value["from"], self.cli("topology"))
         self.assertEqual((self.home / registry.REGISTRY).read_bytes(), before)
-        self.assertEqual(list((self.home / "fleet-backups").iterdir()), backups)
+        self.assertEqual(list((self.home / ".fleet/backups").iterdir()), backups)
 
 
 if __name__ == "__main__":

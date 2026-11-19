@@ -102,7 +102,7 @@ class AgentModuleTests(unittest.TestCase):
         (self.home / ".codex/config.toml").write_text(
             '[mcp_servers.calendar]\nurl = "https://mine.example.com"\n'
         )
-        backups = sorted((self.home / "fleet-backups").iterdir())
+        backups = sorted((self.home / ".fleet/backups").iterdir())
         manifest = (self.content / "dotfleet.toml").read_text()
         table = AGENTS.replace('[agents.skills.personal-notes]\ndomains = ["personal"]\n', "")
         self.commit_content({"dotfleet.toml": manifest + table}, "feat: declare agents")
@@ -119,7 +119,7 @@ class AgentModuleTests(unittest.TestCase):
         self.assertIn(
             "connectors.calendar in ~/.codex/config.toml differs from the rendered value", result
         )
-        self.assertEqual(sorted((self.home / "fleet-backups").iterdir()), backups)
+        self.assertEqual(sorted((self.home / ".fleet/backups").iterdir()), backups)
         self.assertIn("mine.example.com", (self.home / ".codex/config.toml").read_text())
 
     def test_declared_plugins_reach_claude_through_its_own_listing(self):
@@ -164,7 +164,7 @@ class AgentModuleTests(unittest.TestCase):
 
         output = self.cli("agents", "set", "--name", "mcp.docs", "--state", "off")
         self.assert_review_golden("agents", output)
-        profile = tomllib.loads((self.home / ".config/fleet/profile.toml").read_text())
+        profile = tomllib.loads((self.home / ".fleet/profile.toml").read_text())
         self.assertEqual(profile["agent_items"], {"mcp.docs": "off"})
         # With its only server off, the gateway and its entry leave this machine.
         self.assertFalse((self.home / agent_deploy.TREE / "gateway/codex.json").exists())

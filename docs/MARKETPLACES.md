@@ -60,7 +60,7 @@ A pinned marketplace stays at its pin. The update prints one line that names the
 It prints how many commits each marketplace is behind. A pinned marketplace also says that the pin blocks the update.
 Check exits 1 when the manager, the content, or an unpinned marketplace is behind. A pinned marketplace alone does not change the exit code.
 A failed marketplace fetch prints a warning and exits 2. The earlier marketplace result stays saved.
-`fleet status` and `fleet marketplaces list` read the saved result, `~/.local/share/fleet/marketplaces-check.json`. They never fetch.
+`fleet status` and `fleet marketplaces list` read the saved result, `~/.fleet/marketplaces-check.json`. They never fetch.
 Status describes a pinned marketplace that is behind as held at its pin.
 `fleet update` does not move marketplaces. Run `fleet marketplaces update` for that.
 
@@ -69,8 +69,8 @@ Each change runs the shared review and apply. The backup runs first. Unattended 
 
 ## Where packages live
 
-Pulled-in packages live in an untracked library, `~/.local/share/fleet/library/NAME`. No file enters your tracked content.
-The record of each installation lives in the manager store, `~/.local/share/fleet/marketplaces.json`.
+Pulled-in packages live in an untracked library, `~/.fleet/library/NAME`. No file enters your tracked content.
+The record of each installation lives in the manager store, `~/.fleet/marketplaces.json`.
 Fleet renders pulled-in items into the same agent tree as content items. See [agent configuration](AGENTS.md).
 A pulled-in skill is copied into the tree and linked as `~/.agents/skills/NAME`.
 

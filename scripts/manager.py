@@ -30,6 +30,7 @@ from pathlib import Path
 import re
 import shlex
 import shutil
+import store_migration
 import subprocess
 import sys
 import ui_channel
@@ -189,7 +190,7 @@ def domain_details(checkout, default="core", mark="current"):
         "",
         "Your content declares these domains. Add or remove domains in its fleet.toml.",
         "Choosing a domain does not install software or create accounts.",
-        "Your choice is saved in ~/.config/fleet/profile.toml.",
+        "Your choice is saved in ~/.fleet/profile.toml.",
         "",
         f"  skip      Keep {default} for now without confirming it as your choice.",
         f"Type a domain name, or press Enter alone to choose {default}.",
@@ -484,7 +485,7 @@ def validate_profile(home, profile, defaults=False, configure=False, checkout=No
 def select_profile(home, args, workspace):
     import enrollment as wizard
 
-    path = home / ".config/fleet/profile.toml"
+    path = home / ".fleet/profile.toml"
     exists = path.exists()
     profile, sources = (
         (read_toml(path), ["existing Fleet profile"]) if exists else old_profile(home)
@@ -593,7 +594,7 @@ def fingerprint(path):
 
 
 def backup_location(home):
-    root = home / "fleet-backups"
+    root = home / ".fleet/backups"
     stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     destination = root / stamp
     suffix = 0
@@ -792,27 +793,20 @@ def prepare(home, checkout, profile, manifest, folder, preview=False):
         names |= set(generated)
     private_state = names & {
         CACHE,
-        ".local/share/fleet/registry.toml",
-        ".config/fleet/profile.toml",
+        ".fleet/registry.toml",
+        ".fleet/profile.toml",
     }
     private_state |= {
         name
         for name in names
         if any(
             name == prefix or name.startswith(prefix + "/")
-            for prefix in (
-                ".config/fleet",
-                ".config/dotfleet",
-                ".local/share/fleet",
-                ".local/share/dotfleet",
-                "fleet-backups",
-                "dotfleet-backups",
-            )
+            for prefix in (".fleet", *store_migration.OLD_STORES)
         )
     }
     if private_state:
         raise ValueError("Content cannot own manager state: " + ", ".join(sorted(private_state)))
-    state_path = home / ".local/state/dotfleet/outputs.json"
+    state_path = home / ".fleet/outputs.json"
     previous = json.loads(state_path.read_text()) if state_path.exists() else {}
     stale = set(previous) - names - set(generated)
     for name in stale:
@@ -862,23 +856,23 @@ def prepare(home, checkout, profile, manifest, folder, preview=False):
     }
     changed |= {name for name in stale if fingerprint(home / name) is not None}
     controls = {
-        ".local/share/fleet/marketplaces.json",
-        ".local/share/fleet/registry.toml",
+        ".fleet/marketplaces.json",
+        ".fleet/registry.toml",
         ".config/chezmoi/chezmoi.toml",
-        ".config/fleet/profile.toml",
-        ".local/state/dotfleet/outputs.json",
-        ".local/state/dotfleet/last-run.json",
+        ".fleet/profile.toml",
+        ".fleet/outputs.json",
+        ".fleet/last-run.json",
     }
-    stable_source = home / "dotfiles" if native else home / ".local/share/fleet/chezmoi-source"
+    stable_source = home / "dotfiles" if native else home / ".fleet/chezmoi-source"
     final_config = {"sourceDir": str(stable_source), "umask": 0o077, "data": data}
     for name, content in [
         (".config/chezmoi/chezmoi.toml", toml(final_config)),
-        (".config/fleet/profile.toml", toml(profile)),
+        (".fleet/profile.toml", toml(profile)),
     ]:
         path = home / name
         matches = (
             (read_toml(path) == profile)
-            if name == ".config/fleet/profile.toml" and path.is_file()
+            if name == ".fleet/profile.toml" and path.is_file()
             else path.is_file() and path.read_text() == content
         )
         if not matches or path.is_symlink() or path.stat().st_mode & 0o777 != 0o600:
@@ -1013,7 +1007,7 @@ def apply_confirmed_plan(
         shutil.copytree(plan["source"], stable_source, symlinks=True)
     atomic(home / ".config/chezmoi/chezmoi.toml", toml(plan["config"]))
     reconcile_config_template_state()
-    profile_path = home / ".config/fleet/profile.toml"
+    profile_path = home / ".fleet/profile.toml"
     if not profile_path.exists() or read_toml(profile_path) != profile:
         atomic(profile_path, toml(profile))
     account.profile_written = True
@@ -1052,12 +1046,12 @@ def apply_confirmed_plan(
     # Record the applied profile. A later saved-only change then triggers an update.
     record = json.loads((home / RECORD).read_text())
     record["profile_sha256"] = hashlib.sha256(
-        (home / ".config/fleet/profile.toml").read_bytes()
+        (home / ".fleet/profile.toml").read_bytes()
     ).hexdigest()
     atomic(home / RECORD, json.dumps(record) + "\n")
     names = plan["names"] | set(plan["generated"])
     atomic(
-        home / ".local/state/dotfleet/outputs.json",
+        home / ".fleet/outputs.json",
         json.dumps({name: fingerprint(home / name) for name in sorted(names)}, indent=2) + "\n",
     )
     return account.finish("SUCCESS", warnings, "CLEAN (no differences)")

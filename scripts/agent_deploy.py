@@ -31,8 +31,8 @@ import agent_table
 from common import atomic, value
 
 ROOT = Path(__file__).resolve().parents[1]
-TREE = ".local/share/fleet/agents"
-INVENTORY = ".local/state/dotfleet/agents.json"
+TREE = ".fleet/agents"
+INVENTORY = ".fleet/agents.json"
 SCHEMA = 2
 SKILLS = ".agents/skills"
 PLUGIN_DESCRIPTION = "Agent configuration rendered by Fleet."
@@ -74,7 +74,7 @@ SIGN_IN = {
 }
 OPENCODE_SCHEMA = "https://opencode.ai/config.json"
 GATEWAY = "fleet"  # The one server entry that each agent receives for every declared MCP server.
-MANAGER = ".local/share/fleet/manager"
+MANAGER = ".fleet/manager"
 
 
 # These agents install a listed plugin by themselves at start (tested 2026-11-18).
@@ -1363,7 +1363,7 @@ def main():
     parser.add_argument("--home", type=Path, default=Path.home(), help="full target home path")
     args = parser.parse_args()
     home = args.home
-    profile = read_toml(home / ".config/fleet/profile.toml")
+    profile = read_toml(home / ".fleet/profile.toml")
     catalog = read_toml(ROOT / "agents/manifest.toml")["agents"]
     checkout = home / "dotfiles"
     from convert import content_manifest

@@ -32,11 +32,14 @@ for argument in "$@"; do
 done
 # Keep a minimal attempt even when Python or the downloaded logger cannot start.
 fallback_attempt() {
-	local store="$HOME/.local/share/fleet" identifier stamp machine error path
-	if [[ -d $HOME/.local/share/dotfleet && ! -e $store ]]; then store="$HOME/.local/share/dotfleet"; fi
+	local store="$HOME/.fleet" identifier stamp machine error path old
+	# Before store migration, attempts stay in an older store so migration moves them along.
+	for old in .local/share/dotfleet .local/share/fleet; do
+		if [[ -d $HOME/$old ]]; then store="$HOME/$old"; fi
+	done
 	[[ ! -L $store && ! -L $store/runs ]] || return 1
 	local prefix
-	for prefix in .local .local/share .local/share/fleet .local/share/dotfleet; do
+	for prefix in .local .local/share .local/share/fleet .local/share/dotfleet .fleet; do
 		[[ ! -L $HOME/$prefix ]] || return 1
 	done
 	umask 077
@@ -87,7 +90,7 @@ finish_run() {
 		# Early failures have an index entry, but no apply review.
 		log_error "Setup stopped (exit $result) before the run renderer completed."
 		if [[ -e $DOTFLEET_APPLY_MARKER ]]; then
-			log_warn 'Inspect the latest ~/fleet-backups/ folder for RUN.json before retrying.'
+			log_warn 'Inspect the latest ~/.fleet/backups/ folder for RUN.json before retrying.'
 		else
 			log_info 'No apply review was saved. Use fleet logs show to read the attempt.'
 		fi
@@ -145,7 +148,7 @@ The bundled content declares these domains:
 Domain descriptions and command names come from your content. Empty overlays say they add nothing yet.
 The domain prompt inspects the selected checkout and lists its domain command additions.
 Custom repositories can define other behavior; check their documentation when additions are not described.
-A new profile defaults to core. Later prompts show the domain saved in ~/.config/fleet/profile.toml.
+A new profile defaults to core. Later prompts show the domain saved in ~/.fleet/profile.toml.
 Press Enter to confirm that domain, or type another domain name and press Enter.
 The profile also saves Git identity, exact tool versions, and group choices. Mise tracks installed versions.
 Groups select optional files or alias blocks. Each prompt defines on and off.
@@ -171,10 +174,10 @@ Headings, input, and warnings use the shared logger's colors. Choices also have 
 Set NO_COLOR to disable colors, even with an empty value. Redirected output and TERM=dumb remain plain.
 Requires git, curl, tar, and Python 3.11+. Supports Linux, macOS, and WSL (Windows Subsystem for Linux).
 Missing chezmoi and Mise go in ~/.local/bin. Setup never uses sudo or installs content-default tools.
-Content lives in ~/dotfiles. Backups live in ~/fleet-backups/<timestamp>/.
+Content lives in ~/dotfiles. Backups live in ~/.fleet/backups/<timestamp>/.
 The installer adds ~/.local/bin/dotfleet. Use its --help for updates, checks, rollback, and saved choices.
-The manager checkout lives in ~/.local/share/fleet/manager. Software results include the installed command.
-Setup and update maintain ~/.local/share/fleet/tui-venv, a private Python environment for Textual's terminal interface.
+The manager checkout lives in ~/.fleet/manager. Software results include the installed command.
+Setup and update maintain ~/.fleet/tui, a private Python environment for Textual's terminal interface.
 Its packages are separate from system Python. Software results record environment changes; unchanged environments stay untouched.
 The plain commands work without Textual. The tui subcommand shows plain alternatives when its environment is missing.
 Review MANIFEST.json before restoring backup home/ files and recorded external targets.
@@ -210,6 +213,8 @@ done
 # Start before preflight. Reuse the installed writer if a bootstrap download fails.
 if [[ -n $script_dir && -r $script_dir/scripts/run_index.py ]]; then
 	index_script="$script_dir/scripts/run_index.py"
+elif [[ -r $HOME/.fleet/manager/scripts/run_index.py ]]; then
+	index_script="$HOME/.fleet/manager/scripts/run_index.py"
 elif [[ -r $HOME/.local/share/fleet/manager/scripts/run_index.py ]]; then
 	index_script="$HOME/.local/share/fleet/manager/scripts/run_index.py"
 else
@@ -242,9 +247,15 @@ run_stage="store migration"
 python3 -B "$index_script" stage --name "$run_stage"
 python3 -B "$script_dir/scripts/store_migration.py" --record "$work_dir/store-moves.json"
 export DOTFLEET_STORE_MOVES_FILE="$work_dir/store-moves.json"
-if [[ $script_dir == "$HOME/.local/share/dotfleet/"* ]]; then
-	script_dir="$HOME/.local/share/fleet/${script_dir#"$HOME/.local/share/dotfleet/"}"
-	index_script="$script_dir/scripts/run_index.py"
+# An installed manager in an older store now runs from ~/.fleet.
+for old in .local/share/dotfleet .local/share/fleet; do
+	if [[ $script_dir == "$HOME/$old/"* ]]; then
+		script_dir="$HOME/.fleet/${script_dir#"$HOME/$old/"}"
+		index_script="$script_dir/scripts/run_index.py"
+	fi
+done
+if [[ $index_script == "$HOME/.local/share/"*"/manager/scripts/run_index.py" ]]; then
+	index_script="$HOME/.fleet/manager/scripts/run_index.py"
 fi
 case $(uname -s) in
 Linux)

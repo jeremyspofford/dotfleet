@@ -37,13 +37,13 @@ def command_goldens():
         home = Path(temporary)
         for path in [
             "dotfiles/.git",
-            ".local/share/fleet/manager/.git",
-            ".local/share/fleet/chezmoi-source",
+            ".fleet/manager/.git",
+            ".fleet/chezmoi-source",
             ".config/chezmoi",
         ]:
             (home / path).mkdir(parents=True)
         (home / ".config/chezmoi/chezmoi.toml").write_text(
-            toml({"sourceDir": str(home / ".local/share/fleet/chezmoi-source")})
+            toml({"sourceDir": str(home / ".fleet/chezmoi-source")})
         )
         profile = {
             "domain": "personal",
@@ -77,18 +77,18 @@ def command_goldens():
             "version": "v1.0.0",
             "take": {"packages": ["review-kit"]},
         }
-        (home / ".local/share/fleet").mkdir(parents=True, exist_ok=True)
-        (home / ".local/share/fleet/marketplaces.json").write_text(
+        (home / ".fleet").mkdir(parents=True, exist_ok=True)
+        (home / ".fleet/marketplaces.json").write_text(
             json.dumps({"schema_version": 1, "marketplaces": {"agent-market": record}})
         )
-        library = home / ".local/share/fleet/library/agent-market"
+        library = home / ".fleet/library/agent-market"
         library.mkdir(parents=True)
         (library / "fleet-marketplace.toml").write_text(
             'schema = 1\n[packages.review-kit]\ndescription = "Review commands."\n'
             '[packages.review-kit.mcp.review-docs]\ndescription = "Search review guides."\n'
             'transport = "stdio"\ncommand = "npx"\n'
         )
-        (home / ".local/share/fleet/marketplaces-check.json").write_text(
+        (home / ".fleet/marketplaces-check.json").write_text(
             json.dumps({"marketplaces": {"agent-market": {"behind": 2}}})
         )
         (home / tool_updates.CACHE).write_text(
@@ -103,7 +103,7 @@ def command_goldens():
             )
         )
         (home / ".config/fleet").mkdir(parents=True)
-        (home / ".config/fleet/profile.toml").write_text(toml(profile))
+        (home / ".fleet/profile.toml").write_text(toml(profile))
         cache = home / updates.CACHE
         cache.parent.mkdir(parents=True, exist_ok=True)
         cache.write_text(
@@ -115,7 +115,7 @@ def command_goldens():
                 }
             )
         )
-        backup = home / "fleet-backups/20261116-120000"
+        backup = home / ".fleet/backups/20261116-120000"
         backup.mkdir(parents=True)
         (backup / "RUN.json").write_text('{"result":"SUCCESS"}')
         machine = dict(

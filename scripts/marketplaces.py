@@ -20,10 +20,10 @@ import tomllib
 import agent_table
 from common import atomic
 
-RECORD = ".local/share/fleet/marketplaces.json"
-LIBRARY = ".local/share/fleet/library"
+RECORD = ".fleet/marketplaces.json"
+LIBRARY = ".fleet/library"
 CATALOG = "fleet-marketplace.toml"
-CACHE = ".local/share/fleet/marketplaces-check.json"
+CACHE = ".fleet/marketplaces-check.json"
 SCHEMA = 1
 NAME = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
 FEATURE = re.compile(r"([a-z0-9-]+)/((?:skills|rules|mcp|connectors|plugins|hooks)\.[a-z0-9-]+)")

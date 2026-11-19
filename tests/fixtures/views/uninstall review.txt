@@ -10,18 +10,18 @@
   − ~/.config/dotfiles/aliases/core.zsh
   − ~/.config/dotfiles/aliases/personal.zsh
   − ~/.config/dotfiles/domain
-  − ~/.config/fleet/profile.toml
+  − ~/.fleet/profile.toml
   − ~/.config/git/local.gitconfig
   − ~/.config/mise/config.toml
   − ~/.extra
   − ~/.local/bin/dotfleet
-  − ~/.local/state/dotfleet/last-run.json
-  − ~/.local/state/dotfleet/outputs.json
+  − ~/.fleet/last-run.json
+  − ~/.fleet/outputs.json
   − ~/.secrets
   − ~/.zshrc
-  − ~/.local/share/fleet/manager
-  − ~/.local/share/fleet/chezmoi-source
-  − ~/.local/share/fleet/tui-venv
+  − ~/.fleet/manager
+  − ~/.fleet/chezmoi-source
+  − ~/.fleet/tui
 
 4 · Profile changes — 15 changed.
   Domain             core → not set
@@ -42,14 +42,14 @@
 
 5 · Locations
   Content  ~/dotfiles
-  Profile  ~/.config/fleet/profile.toml
-  Source   ~/.local/share/fleet/chezmoi-source
-  Backup   ~/fleet-backups/20261117-120000
+  Profile  ~/.fleet/profile.toml
+  Source   ~/.fleet/chezmoi-source
+  Backup   ~/.fleet/backups/20261117-120000
 
 6 · Next steps
   Update    dotfleet update
-  Rollback  ~/fleet-backups/20261117-120000/MANIFEST.json
+  Rollback  ~/.fleet/backups/20261117-120000/MANIFEST.json
   Wizard    dotfleet configure
 
 chezmoi status: clean · warnings: none
-Run record: ~/fleet-backups/20261117-120000/RUN.json
+Run record: ~/.fleet/backups/20261117-120000/RUN.json

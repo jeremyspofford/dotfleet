@@ -14,7 +14,7 @@ from pathlib import Path, PurePosixPath
 import re
 import tomllib
 
-STORE = ".local/share/fleet/addons"
+STORE = ".fleet/addons"
 IDENTIFIER = re.compile(r"[a-z][a-z0-9]*(?:-[a-z0-9]+)*")
 PROFILE_FIELDS = {
     "profile_id",
@@ -104,16 +104,18 @@ def home_path(value):
         "paths cannot name home itself, an absolute path, or a parent directory",
     )
     require(
-        path.parts[0] not in {"dotfiles", "fleet-backups", "dotfleet-backups", ".git"}
+        path.parts[0] not in {"dotfiles", ".fleet", "fleet-backups", "dotfleet-backups", ".git"}
         and not any(
             path == PurePosixPath(base) or path.is_relative_to(base)
             for base in [
+                ".config/chezmoi",
                 ".config/fleet",
                 ".config/dotfleet",
-                ".config/chezmoi",
                 ".local/share/fleet",
                 ".local/share/dotfleet",
+                ".local/state/fleet",
                 ".local/state/dotfleet",
+                ".cache/fleet-deploy",
             ]
         ),
         "outputs cannot own content, backups, or manager state",

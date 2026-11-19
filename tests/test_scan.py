@@ -123,7 +123,7 @@ class ScanTests(unittest.TestCase):
                 self.assertIn(f"Press Enter alone to choose {default}.", detail)
                 self.assertNotIn("door", detail)
             (home / ".config/fleet").mkdir(parents=True)
-            (home / ".config/fleet/profile.toml").touch()
+            (home / ".fleet/profile.toml").touch()
             for prior in ["repo", "example", "adopt"]:
                 profile = {"content_repo": "https://example.invalid/content", "source_door": prior}
                 _, default, detail = enrollment.door_options(home, profile, [".zshrc"], {})
@@ -141,17 +141,17 @@ class ScanIntegrationTests(unittest.TestCase):
     def test_enrolled_enter_keeps_content_and_records_scan(self):
         self.defaults_origin()
         self.terminal(self.answers(), flags=[], auto_wizard=False)
-        before = read_toml(self.home / ".config/fleet/profile.toml")
+        before = read_toml(self.home / ".fleet/profile.toml")
         answers = self.answers()
         answers[0] = (b"Content source [repo]:", b"\n")
         answers.insert(1, (b"Content repository [", b"\n"))
         output = self.terminal(answers, flags=["--configure"], auto_wizard=False)
         self.assertIn("Press Enter alone to choose repo.", output)
         self.assertNotIn("Press Enter alone to choose adopt.", output)
-        after = read_toml(self.home / ".config/fleet/profile.toml")
+        after = read_toml(self.home / ".fleet/profile.toml")
         self.assertEqual(before["content_repo"], after["content_repo"])
         record = json.loads(
-            sorted((self.home / "fleet-backups").glob("*/RUN.json"))[-1].read_text()
+            sorted((self.home / ".fleet/backups").glob("*/RUN.json"))[-1].read_text()
         )
         self.assertIn("tools", record["scan"])
         self.assertIn(".zshrc", record["scan"]["candidates"])

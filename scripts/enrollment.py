@@ -213,7 +213,7 @@ def door_options(home, profile, found, excluded):
         (home / name).exists()
         for name in (
             "dotfiles",
-            ".config/fleet/profile.toml",
+            ".fleet/profile.toml",
             ".config/dotfiles/profile.toml",
             ".config/chezmoi/chezmoi.toml",
         )

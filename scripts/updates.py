@@ -19,7 +19,7 @@ import sys
 from common import atomic
 from installation import MANAGER
 
-CACHE = ".local/share/fleet/check.json"
+CACHE = ".fleet/check.json"
 FETCH_TIMEOUT = 10
 CURRENT_MESSAGE = (
     "Fleet is up to date — manager and content match upstream, checked just now. No backup taken."

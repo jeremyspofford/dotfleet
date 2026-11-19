@@ -34,8 +34,8 @@ class RuntimeTests(unittest.TestCase):
     def test_missing_environment_prints_alternatives_and_changes_nothing(self):
         self.enroll()
         shutil.rmtree(self.home / tui_environment.ENVIRONMENT)
-        profile = (self.home / ".config/fleet/profile.toml").read_bytes()
-        backups = sorted((self.home / "fleet-backups").iterdir())
+        profile = (self.home / ".fleet/profile.toml").read_bytes()
+        backups = sorted((self.home / ".fleet/backups").iterdir())
         output = self.cli("tui")
         for name in (
             "status",
@@ -50,8 +50,8 @@ class RuntimeTests(unittest.TestCase):
         ):
             self.assertIn("dotfleet " + name, output)
         self.assertIn("missing", output)
-        self.assertEqual((self.home / ".config/fleet/profile.toml").read_bytes(), profile)
-        self.assertEqual(sorted((self.home / "fleet-backups").iterdir()), backups)
+        self.assertEqual((self.home / ".fleet/profile.toml").read_bytes(), profile)
+        self.assertEqual(sorted((self.home / ".fleet/backups").iterdir()), backups)
         self.assertFalse((self.home / tui_environment.ENVIRONMENT).exists())
 
     def test_runtime_is_recorded_and_unchanged_on_rerun(self):
@@ -175,12 +175,12 @@ class ChannelTests(unittest.IsolatedAsyncioTestCase):
         _, backup = self.record()
         original = (self.home / ".file").read_text()
         (self.home / ".file").write_text("local edit\n")
-        folders = sorted((self.home / "fleet-backups").iterdir())
+        folders = sorted((self.home / ".fleet/backups").iterdir())
         result, output, _, reviews = await self.run_core("rollback", "wrong", str(backup))
         self.assertEqual(result, 0, output)
         self.assertEqual(reviews[0]["word"], "restore")
         self.assertEqual((self.home / ".file").read_text(), "local edit\n")
-        self.assertEqual(sorted((self.home / "fleet-backups").iterdir()), folders)
+        self.assertEqual(sorted((self.home / ".fleet/backups").iterdir()), folders)
         result, output, _, reviews = await self.run_core("rollback", "restore", str(backup))
         self.assertEqual(result, 0, output)
         self.assertEqual((self.home / ".file").read_text(), original)
@@ -193,25 +193,25 @@ class ChannelTests(unittest.IsolatedAsyncioTestCase):
         import updates
 
         self.enroll()
-        before = sorted((self.home / "fleet-backups").iterdir())
+        before = sorted((self.home / ".fleet/backups").iterdir())
         result, output, _, reviews = await self.run_core("update", "confirm")
         self.assertEqual(result, 0, output)
         self.assertIn(updates.CURRENT_MESSAGE, output)
         self.assertEqual(reviews, [])
-        self.assertEqual(sorted((self.home / "fleet-backups").iterdir()), before)
+        self.assertEqual(sorted((self.home / ".fleet/backups").iterdir()), before)
 
     async def test_cleanup_transports_selected_names_to_the_shared_core(self):
         self.enroll()
         self.cli("backups", "create")
         _, latest = self.record()
-        before = sorted((self.home / "fleet-backups").iterdir())
+        before = sorted((self.home / ".fleet/backups").iterdir())
         result, output, events, reviews = await self.run_core(
             "backup-delete-selected", "delete", selected=[latest.name]
         )
         self.assertEqual(result, 0, output)
         self.assertEqual(reviews[0]["word"], "delete")
         self.assertFalse(latest.exists())
-        self.assertEqual(sorted((self.home / "fleet-backups").iterdir()), before[:-1])
+        self.assertEqual(sorted((self.home / ".fleet/backups").iterdir()), before[:-1])
         self.assertTrue(any(event["kind"] == "backups" for event in events))
         self.assertIn("Deleted backups cannot be rolled back to.", output)
 
@@ -283,7 +283,7 @@ class ChannelTests(unittest.IsolatedAsyncioTestCase):
 
         result, output, _, reviews = await self.run_core("domain-set", answer)
         self.assertEqual(result, 0, output)
-        self.assertIn("personal", (self.home / ".config/fleet/profile.toml").read_text())
+        self.assertIn("personal", (self.home / ".fleet/profile.toml").read_text())
         self.assertEqual(self.record()[0]["result"], "SUCCESS")
         result, output, _, reviews = await self.run_core("group-set", answer)
         self.assertEqual(result, 0, output)
@@ -293,7 +293,7 @@ class ChannelTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_uninstall_uses_the_same_typed_confirmation_and_real_record(self):
         self.enroll()
-        profile = self.home / ".config/fleet/profile.toml"
+        profile = self.home / ".fleet/profile.toml"
         before = profile.read_bytes()
         result, output, _, reviews = await self.run_core(
             "uninstall",

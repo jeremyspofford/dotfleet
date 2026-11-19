@@ -49,7 +49,7 @@ class AddonTests(unittest.TestCase):
             "/etc/passwd",
             ".config/other/file",
             "dotfiles/.zshrc",
-            ".local/share/fleet/registry.toml",
+            ".fleet/registry.toml",
         ]:
             manifest = self.manifest()
             manifest["install"]["outputs"][0]["path"] = path

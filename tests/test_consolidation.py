@@ -145,7 +145,7 @@ class ConsolidationTests(unittest.TestCase):
         self.assertIn("  Agents             codex off\n", status)
         self.assertIn("  Updates            none (checked 09:02)\n", status)
         self.assertNotIn("\nUpdates:", status)
-        self.assertIn("~/.config/fleet/profile.toml", status)
+        self.assertIn("~/.fleet/profile.toml", status)
         self.assertFalse(re.search(r"\b(?:pin|pins|pinned|unpin)\b", status, re.I))
 
 

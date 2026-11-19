@@ -24,16 +24,16 @@ class OwnedViewTests(unittest.TestCase):
 
     def test_new_commands_are_human_and_read_only(self):
         self.enroll()
-        profile = self.home / ".config/fleet/profile.toml"
+        profile = self.home / ".fleet/profile.toml"
         before = profile.read_bytes()
-        backups = sorted((self.home / "fleet-backups").iterdir())
+        backups = sorted((self.home / ".fleet/backups").iterdir())
         output = self.cli("status")
         for value in [
             "core",
             "chosen",
             "Command Example",
             "command@example.invalid",
-            "~/.config/fleet/profile.toml",
+            "~/.fleet/profile.toml",
         ]:
             self.assertIn(value, output)
         self.assertIn("SUCCESS", self.cli("backups", "list"))
@@ -43,7 +43,7 @@ class OwnedViewTests(unittest.TestCase):
         self.assertIn("~/dotfiles", self.cli("content"))
         self.assertIn("this machine", self.cli("machines", "export"))
         self.assertEqual(profile.read_bytes(), before)
-        self.assertEqual(sorted((self.home / "fleet-backups").iterdir()), backups)
+        self.assertEqual(sorted((self.home / ".fleet/backups").iterdir()), backups)
         for name in ["status", "backups", "content", "secrets"]:
             self.assertIn("Usage:", self.cli(name, "--help"))
 
@@ -87,7 +87,7 @@ class OwnedViewTests(unittest.TestCase):
             "already exists", self.cli("machines", "export", "--output", str(exported), expected=1)
         )
         output = self.cli("machines", "remove", "--name", "old-hub")
-        self.assertIn("~/.local/share/fleet/registry.toml", output)
+        self.assertIn("~/.fleet/registry.toml", output)
         self.assertEqual(
             set(registry.load(self.home)["machines"]), {socket.gethostname(), "other-hub"}
         )

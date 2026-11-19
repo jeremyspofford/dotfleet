@@ -4,7 +4,7 @@
 2 · Manager and content — no changes.
 
 3 · Files — 1 changed, 1 removed.
-  ~ ~/.config/fleet/profile.toml
+  ~ ~/.fleet/profile.toml
   − ~/.extra
 
 4 · Profile changes — 1 changed.
@@ -12,14 +12,14 @@
 
 5 · Locations
   Content  ~/dotfiles
-  Profile  ~/.config/fleet/profile.toml
-  Source   ~/.local/share/fleet/chezmoi-source
-  Backup   ~/fleet-backups/20261117-120000
+  Profile  ~/.fleet/profile.toml
+  Source   ~/.fleet/chezmoi-source
+  Backup   ~/.fleet/backups/20261117-120000
 
 6 · Next steps
   Update    dotfleet update
-  Rollback  ~/fleet-backups/20261117-120000/MANIFEST.json
+  Rollback  ~/.fleet/backups/20261117-120000/MANIFEST.json
   Wizard    dotfleet configure
 
 chezmoi status: clean · warnings: none
-Run record: ~/fleet-backups/20261117-120000/RUN.json
+Run record: ~/.fleet/backups/20261117-120000/RUN.json

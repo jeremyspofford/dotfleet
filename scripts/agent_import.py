@@ -171,7 +171,7 @@ class Importer:
             for group in groups if isinstance(groups, list) else []:
                 for hook in group.get("hooks", []) if isinstance(group, dict) else []:
                     command = hook.get("command", "")
-                    if "/.local/share/fleet/agents/" in command:
+                    if "/.fleet/agents/" in command:
                         continue  # Fleet's own hook wrapper.
                     self.notes.append(
                         f"{agent}: hook {event} runs {command!r}."

@@ -38,16 +38,16 @@ from render_run import render, render_view
 from run_account import RunAccount, commit, profile_changes
 
 ROOT = Path(__file__).resolve().parents[1]
-PROFILE = ".config/fleet/profile.toml"
+PROFILE = ".fleet/profile.toml"
 TOOL_UPDATES = "Tool updates"
 CONTROLS = {
     registry.REGISTRY,
     updates.CACHE,
     PROFILE,
     ".config/chezmoi/chezmoi.toml",
-    ".local/state/dotfleet/outputs.json",
-    ".local/state/dotfleet/agents.json",
-    ".local/state/dotfleet/last-run.json",
+    ".fleet/outputs.json",
+    ".fleet/agents.json",
+    ".fleet/last-run.json",
     COMMAND,
 }
 DESCRIPTIONS = {
@@ -257,7 +257,11 @@ def profile(home):
 
 def records(home):
     return sorted(
-        (path for path in (home / "fleet-backups").glob("*") if (path / "MANIFEST.json").is_file()),
+        (
+            path
+            for path in (home / ".fleet/backups").glob("*")
+            if (path / "MANIFEST.json").is_file()
+        ),
         key=lambda path: (path.name[:15], int(path.name[16:] or "0")),
     )
 
@@ -642,7 +646,7 @@ def preview_current(home, saved_profile, stat=False):
 def managed_paths(home):
     import agent_deploy
 
-    paths = set(load_json(home / ".local/state/dotfleet/outputs.json", {})) | CONTROLS
+    paths = set(load_json(home / ".fleet/outputs.json", {})) | CONTROLS
     # Agent shared files are not managed paths. Only Fleet's entries inside them belong to Fleet.
     paths |= set(agent_deploy.load_inventory(home).get("paths", {}))
     if (home / ".config/chezmoi/chezmoi.toml").exists():
@@ -689,10 +693,10 @@ def confirm(word, explanation, record=None):
 def validate_backup(home, selected):
     folder = Path(selected).expanduser()
     if not folder.is_absolute():
-        folder = home / "fleet-backups" / folder
+        folder = home / ".fleet/backups" / folder
     folder = folder.resolve()
-    if folder.parent != (home / "fleet-backups").resolve():
-        raise ValueError("Select a backup directly inside ~/fleet-backups.")
+    if folder.parent != (home / ".fleet/backups").resolve():
+        raise ValueError("Select a backup directly inside ~/.fleet/backups.")
     entries = load_json(folder / "MANIFEST.json", None)
     if not isinstance(entries, list):
         raise ValueError("Backup MANIFEST.json is missing or invalid.")
@@ -861,7 +865,7 @@ def transaction(home, operations, label, selected=None, require_word=None, tree_
         run_index.stage("backup")
         manager.backup(home, backup_paths, folder)
         account.bind_backup(folder)
-        source = home / ".local/share/fleet/chezmoi-source"
+        source = home / ".fleet/chezmoi-source"
         if source.is_dir():
             shutil.copytree(source, folder / "previous-chezmoi-source", symlinks=True)
         try:
@@ -1542,9 +1546,9 @@ def remove_fleet(home, selected=None, restored=(), require_word="uninstall"):
         require_word,
         [
             home / MANAGER,
-            home / ".local/share/fleet/chezmoi-source",
-            home / ".local/share/fleet/tui-venv",
-            home / ".local/share/fleet/agents",
+            home / ".fleet/chezmoi-source",
+            home / ".fleet/tui",
+            home / ".fleet/agents",
         ],
     )
 
@@ -1718,7 +1722,7 @@ def snapshot(home, operations):
         run_index.stage("backup")
         manager.backup(home, [name for name, _ in operations], folder)
         account.bind_backup(folder)
-        source = home / ".local/share/fleet/chezmoi-source"
+        source = home / ".fleet/chezmoi-source"
         if source.exists():
             shutil.copytree(source, folder / "previous-chezmoi-source", symlinks=True)
         return account.finish(

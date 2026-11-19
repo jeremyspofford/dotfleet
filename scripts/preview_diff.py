@@ -8,6 +8,7 @@ Direct execution without help keeps its existing behavior.
 from common import atomic, run, toml
 from convert import source_name
 from installation import COMMAND, launcher
+from store_migration import STATE_RECORDS
 
 
 def patches(home, profile, plan, folder, root):
@@ -16,7 +17,7 @@ def patches(home, profile, plan, folder, root):
     extra.mkdir()
     payloads = {
         ".config/chezmoi/chezmoi.toml": toml(plan["config"]),
-        ".config/fleet/profile.toml": toml(profile),
+        ".fleet/profile.toml": toml(profile),
         COMMAND: launcher(root),
     }
     if plan["native"]:
@@ -24,7 +25,7 @@ def patches(home, profile, plan, folder, root):
     agents = plan["agents"].payloads(home)
     extra_names = set()
     for name in sorted(plan["changed"] | plan["removed"]):
-        if name.startswith(".local/state/dotfleet/"):
+        if name in STATE_RECORDS:
             continue  # Inventories describe writes; they are not rendered settings.
         target = extra / source_name(name, "100755" if name == COMMAND else "100644")
         if name in plan["stale"] or (name in agents and agents[name] is None):
@@ -43,7 +44,7 @@ def patches(home, profile, plan, folder, root):
     extra_config = folder / "extra.toml"
     atomic(extra_config, toml({"sourceDir": str(extra), "destDir": str(home), "umask": 0o077}))
     result = []
-    for name in sorted((plan["changed"] | plan["removed"]) - {".local/state/dotfleet/agents.json"}):
+    for name in sorted((plan["changed"] | plan["removed"]) - {".fleet/agents.json"}):
         config = extra_config if name in extra_names else folder / "preview.toml"
         patch = run(
             "chezmoi",

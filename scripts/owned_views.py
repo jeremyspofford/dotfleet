@@ -16,7 +16,7 @@ from command_display import command_name, current_command
 def profile_rows(home, profile):
     display = command_name(profile)
     rows = [
-        ("Profile file", str(home / ".config/fleet/profile.toml")),
+        ("Profile file", str(home / ".fleet/profile.toml")),
         ("Domain", profile.get("domain", "core")),
         (
             "Domain choice",

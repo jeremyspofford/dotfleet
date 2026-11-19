@@ -18,7 +18,7 @@ from command_display import current_command
 from common import atomic, run
 from render_run import render_view
 
-ENVIRONMENT = ".local/share/fleet/tui-venv"
+ENVIRONMENT = ".fleet/tui"
 NAME = "Fleet TUI (Textual)"
 
 

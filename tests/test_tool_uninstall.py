@@ -24,7 +24,7 @@ class ToolTests(unittest.TestCase):
 
     def prepare(self):
         self.enroll()
-        self.profile = self.home / ".config/fleet/profile.toml"
+        self.profile = self.home / ".fleet/profile.toml"
         saved = read_toml(self.profile)
         saved["pins"] = {"node": "26.13.1"}
         self.profile.write_text(toml(saved))
@@ -77,18 +77,18 @@ else: sys.exit(1)
         record, folder = self.record()
         self.assertEqual(record["completed_software"], ["node"])
         self.assertEqual(record["software"][0]["action"], "removed")
-        self.assertTrue((folder / "home/.config/fleet/profile.toml").is_file())
+        self.assertTrue((folder / "home/.fleet/profile.toml").is_file())
 
     def test_recorded_version_is_refused_before_backup_or_mise_mutation(self):
         self.prepare()
-        before = set((self.home / "fleet-backups").iterdir())
+        before = set((self.home / ".fleet/backups").iterdir())
         output = self.cli("tools", "uninstall", "node", "--version", "26.13.1", expected=1)
         self.assertEqual(len(output.splitlines()), 1)
-        self.assertIn("~/.config/fleet/profile.toml", output)
+        self.assertIn("~/.fleet/profile.toml", output)
         self.assertIn("tools remove node", output)
         self.assertIn("tools set node --version VERSION", output)
         self.assertFalse((self.home / "uninstalled.txt").exists())
-        self.assertEqual(set((self.home / "fleet-backups").iterdir()), before)
+        self.assertEqual(set((self.home / ".fleet/backups").iterdir()), before)
 
     def test_list_labels_extras_and_recorded_versions(self):
         self.prepare()

@@ -10,7 +10,7 @@ The executable lifecycle remains deferred. This contract defines its required be
 
 ## Store and versions
 
-Keep add-on records in `~/.local/share/fleet/addons/<id>/`.
+Keep add-on records in `~/.fleet/addons/<id>/`.
 Store the declaration as `addon.toml` and the installation receipt as `receipt.toml`.
 A receipt records explicit opt-in and the outputs written by a completed installation.
 A declaration without a receipt is not an installed add-on.

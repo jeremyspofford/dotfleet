@@ -34,7 +34,7 @@ class RemoteTests(unittest.TestCase):
         self.enroll()
         self.controller = self.base / "controller"
         self.controller.mkdir()
-        atomic(self.controller / ".config/fleet/profile.toml", toml({"git_name": "Caller only"}))
+        atomic(self.controller / ".fleet/profile.toml", toml({"git_name": "Caller only"}))
         saved = registry.load(self.home)["machines"][socket.gethostname()].copy()
         saved.update(hostname="beelink", ssh_target="mini-pc")
         atomic(
@@ -125,7 +125,7 @@ sys.exit(result.returncode)
         self.connect()
         index_before = {path: path.read_bytes() for path in run_index.files(self.home)}
         before = self.caller_files()
-        backups = sorted((self.home / "fleet-backups").iterdir())
+        backups = sorted((self.home / ".fleet/backups").iterdir())
         output = self.call("status", "beelink")
         self.assertIn("Machine · beelink", output)
         self.assertIn("Command Example", output)
@@ -145,7 +145,7 @@ sys.exit(result.returncode)
         self.assertNotIn("+remote content update", stat)
         self.assertEqual((self.home / ".file").read_text(), "original\n")
         self.assertEqual(self.caller_files(), before)
-        self.assertEqual(sorted((self.home / "fleet-backups").iterdir()), backups)
+        self.assertEqual(sorted((self.home / ".fleet/backups").iterdir()), backups)
         self.assertEqual(
             {path: path.read_bytes() for path in run_index.files(self.home)}, index_before
         )
@@ -167,13 +167,14 @@ sys.exit(result.returncode)
         self.connect()
         import updates
 
-        before = {path: path.read_bytes() for path in self.home.glob("fleet-backups/*/RUN.json")}
+        before = {path: path.read_bytes() for path in self.home.glob(".fleet/backups/*/RUN.json")}
         output = self.call("update", "beelink")
         self.assertIn("Machine · beelink", output)
         self.assertIn(updates.CURRENT_MESSAGE, output)
         self.assertNotIn("6 · Next steps", output)
         self.assertEqual(
-            {path: path.read_bytes() for path in self.home.glob("fleet-backups/*/RUN.json")}, before
+            {path: path.read_bytes() for path in self.home.glob(".fleet/backups/*/RUN.json")},
+            before,
         )
         self.assertTrue((self.home / updates.CACHE).is_file())
         entry = run_index.entries(self.home)[0]
@@ -270,13 +271,13 @@ sys.exit(result.returncode)
 
     def test_incomplete_target_stops_and_names_all_gaps(self):
         self.connect()
-        path = self.home / ".config/fleet/profile.toml"
+        path = self.home / ".fleet/profile.toml"
         profile = read_toml(path)
         profile.update(git_name="", git_email="", pins={"node": "latest"})
         profile.pop("domain_chosen")
         atomic(path, toml(profile))
         before = path.read_bytes()
-        backups = sorted((self.home / "fleet-backups").iterdir())
+        backups = sorted((self.home / ".fleet/backups").iterdir())
         output = self.call("update", "beelink", expected=2)
         for gap in (
             "never explicitly chosen",
@@ -295,7 +296,7 @@ sys.exit(result.returncode)
         self.assertIn("Complete these choices on the target", output)
         self.assertNotIn("Confirm", output)
         self.assertEqual(path.read_bytes(), before)
-        self.assertEqual(sorted((self.home / "fleet-backups").iterdir()), backups)
+        self.assertEqual(sorted((self.home / ".fleet/backups").iterdir()), backups)
 
     def test_unattended_conflict_stops_without_overwrite(self):
         self.connect()
@@ -303,7 +304,7 @@ sys.exit(result.returncode)
         self.change_content()
         output = self.call("update", "beelink", expected=1)
         self.assertNotIn("Apply stopped", output)
-        raw = list(self.controller.glob(".local/share/fleet/remote-runs/*/RUN.json"))
+        raw = list(self.controller.glob(".fleet/remote-runs/*/RUN.json"))
         self.assertTrue(any("Apply stopped" in path.read_text() for path in raw))
         self.assertIn("beelink: update failed", output)
         self.assertEqual((self.home / ".file").read_text(), "keep target edit\n")
@@ -324,7 +325,7 @@ sys.exit(result.returncode)
                 self.assertNotIn("zsh:", output)
                 self.assertNotIn("/home/private", output)
                 self.assertEqual(len(self.ssh_log.read_text().splitlines()), attempts)
-                saved = list(self.controller.glob(".local/share/fleet/remote-runs/*/RUN.json"))
+                saved = list(self.controller.glob(".fleet/remote-runs/*/RUN.json"))
                 self.assertTrue(saved)
                 self.assertTrue(
                     any("zsh:1:" in json.loads(path.read_text())["stderr"] for path in saved)
@@ -361,7 +362,7 @@ sys.exit(result.returncode)
         fake_ssh(self.home, self.env)
         self.assertIn("no connection", self.cli("machines", "list"))
         output = self.cli("machines", "set-ssh", "beelink", "mini-pc")
-        self.assertIn("~ ~/.local/share/fleet/registry.toml", output)
+        self.assertIn("~ ~/.fleet/registry.toml", output)
         self.assertEqual(registry.load(self.home)["machines"]["beelink"]["ssh_target"], "mini-pc")
         local = socket.gethostname()
         before = registry.load(self.home)["machines"][local]

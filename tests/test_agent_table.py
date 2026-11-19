@@ -241,7 +241,7 @@ class AgentTableCommandTests(unittest.TestCase):
 
     def test_an_invalid_table_stops_update_before_backup(self):
         self.enroll()
-        backups = sorted((self.home / "fleet-backups").iterdir())
+        backups = sorted((self.home / ".fleet/backups").iterdir())
         manifest = (self.content / "dotfleet.toml").read_text()
         self.commit_content(
             {"dotfleet.toml": manifest + "[agents]\nschema = 1\n[agents.mcp.Docs]\n"},
@@ -249,7 +249,7 @@ class AgentTableCommandTests(unittest.TestCase):
         )
         output = self.cli("update", expected=1)
         self.assertIn("Invalid agents table at agents.mcp.Docs", output)
-        self.assertEqual(sorted((self.home / "fleet-backups").iterdir()), backups)
+        self.assertEqual(sorted((self.home / ".fleet/backups").iterdir()), backups)
 
 
 if __name__ == "__main__":

@@ -75,7 +75,7 @@ class EnrollmentTests(unittest.TestCase):
         runtime = os.environ.get("FLEET_TEST_TUI_ENV")
         if runtime:
             # Cold installation has its own test. Other fixtures reuse its private dependencies.
-            shutil.copytree(runtime, self.home / ".local/share/fleet/tui-venv", symlinks=True)
+            shutil.copytree(runtime, self.home / ".fleet/tui", symlinks=True)
         # Host agent commands must not affect a fixture's detected agents.
         tools = self.base / "tools"
         tools.mkdir()
@@ -110,7 +110,7 @@ class EnrollmentTests(unittest.TestCase):
         existing = [
             self.home / name
             for name in [
-                ".config/fleet/profile.toml",
+                ".fleet/profile.toml",
                 ".config/dotfiles/profile.toml",
                 ".config/chezmoi/chezmoi.toml",
             ]
@@ -127,7 +127,7 @@ class EnrollmentTests(unittest.TestCase):
         return command(*args, env=self.env, cwd=self.home)
 
     def complete_profile(self):
-        path = self.home / ".config/fleet/profile.toml"
+        path = self.home / ".fleet/profile.toml"
         profile = tomllib.loads(path.read_text())
         profile.update(
             domain_chosen=True, git_name="Fixture Person", git_email="fixture@example.invalid"
@@ -187,7 +187,7 @@ class EnrollmentTests(unittest.TestCase):
         output = self.install(repo)
         self.assertIn("chezmoi status: clean", output)
         self.assert_clean()
-        backups = list((self.home / "fleet-backups").iterdir())
+        backups = list((self.home / ".fleet/backups").iterdir())
         saved = backups[0] / "home"
         self.assertEqual((saved / ".zshrc").read_text(), "# existing configuration\n")
         if (self.home / ".aliases").exists():
@@ -196,16 +196,16 @@ class EnrollmentTests(unittest.TestCase):
                 (backups[0] / "external" / str(external).lstrip("/")).read_bytes(),
                 external.read_bytes(),
             )
-        state = self.home / ".local/state/dotfleet/outputs.json"
+        state = self.home / ".fleet/outputs.json"
         before = state.read_bytes()
         # Complete the deliberately defaulted profile before testing unattended updates.
         self.complete_profile()
         self.install(defaults=False)
         before = state.read_bytes()
-        profile = (self.home / ".config/fleet/profile.toml").read_bytes()
+        profile = (self.home / ".fleet/profile.toml").read_bytes()
         self.assertIn("chezmoi status: clean", self.install(defaults=False))
         self.assertEqual(state.read_bytes(), before)
-        self.assertEqual((self.home / ".config/fleet/profile.toml").read_bytes(), profile)
+        self.assertEqual((self.home / ".fleet/profile.toml").read_bytes(), profile)
         self.assert_clean()
 
     def test_fresh_install_and_rerun_have_no_config_warning(self):
@@ -326,7 +326,7 @@ class EnrollmentTests(unittest.TestCase):
     def test_plain_content_and_groups(self):
         repo = Path(os.environ["DOTFLEET_CONTENT_FIXTURE"])
         self.exercise(repo)
-        path = self.home / ".config/fleet/profile.toml"
+        path = self.home / ".fleet/profile.toml"
         profile = tomllib.loads(path.read_text())
         aliases = self.home / ".config/dotfiles/aliases/core.zsh"
         original = aliases.read_text()
@@ -391,14 +391,14 @@ class EnrollmentTests(unittest.TestCase):
             cwd=self.home,
         )
         self.assertIn("old chezmoi data, current Mise tools, saved installer profile", output)
-        profile = tomllib.loads((self.home / ".config/fleet/profile.toml").read_text())
+        profile = tomllib.loads((self.home / ".fleet/profile.toml").read_text())
         self.assertEqual(profile["pins"], {"node": "24.1.0", "python": "3.13.0"})
         self.assertEqual(profile["git_name"], "Example Owner")
         rendered = tomllib.loads((self.home / ".config/mise/config.toml").read_text())
         self.assertEqual(rendered["settings"], {"experimental": False})
-        before = (self.home / ".config/fleet/profile.toml").read_bytes()
+        before = (self.home / ".fleet/profile.toml").read_bytes()
         self.install(defaults=False)
-        self.assertEqual((self.home / ".config/fleet/profile.toml").read_bytes(), before)
+        self.assertEqual((self.home / ".fleet/profile.toml").read_bytes(), before)
         self.assertEqual((self.home / ".secrets").read_text(), "# preserved secret placeholder\n")
         self.assertEqual(command("chezmoi", "status", env=self.env, cwd=self.home), "")
 
@@ -510,7 +510,7 @@ class EnrollmentTests(unittest.TestCase):
         }
         if complete:
             profile["domain_chosen"] = True
-        name = ".config/dotfiles/profile.toml" if legacy else ".config/fleet/profile.toml"
+        name = ".config/dotfiles/profile.toml" if legacy else ".fleet/profile.toml"
         path = self.home / name
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(toml(profile))
@@ -530,7 +530,7 @@ class EnrollmentTests(unittest.TestCase):
         ]
 
     def check_completed_gap_profile(self):
-        path = self.home / ".config/fleet/profile.toml"
+        path = self.home / ".fleet/profile.toml"
         profile = tomllib.loads(path.read_text())
         self.assertTrue(profile["domain_chosen"])
         self.assertEqual(profile["domain"], "core")
@@ -578,7 +578,7 @@ class EnrollmentTests(unittest.TestCase):
         self.assertIn("No domain choice confirmed", output)
         self.assertIn("No complete git identity recorded", output)
         self.assertIn("node has no selected version", output)
-        profile = tomllib.loads((self.home / ".config/fleet/profile.toml").read_text())
+        profile = tomllib.loads((self.home / ".fleet/profile.toml").read_text())
         self.assertFalse(profile["domain_chosen"])
         self.assertNotIn("node", profile["pins"])
         self.assertNotIn(
@@ -623,7 +623,7 @@ class EnrollmentTests(unittest.TestCase):
             self.assertEqual(path.read_bytes(), before)
             self.assertFalse((self.home / "dotfiles").exists())
             self.assertFalse((self.home / ".config/chezmoi/chezmoi.toml").exists())
-            self.assertFalse((self.home / "fleet-backups").exists())
+            self.assertFalse((self.home / ".fleet/backups").exists())
 
     def test_noninteractive_flags_complete_the_profile_without_prompts(self):
         self.seed_profile(installed=False)
@@ -660,7 +660,7 @@ class EnrollmentTests(unittest.TestCase):
         ]:
             self.assertNotIn(prompt, result.stdout + result.stderr)
         self.assertIn("warnings: none", result.stdout)
-        profile = tomllib.loads((self.home / ".config/fleet/profile.toml").read_text())
+        profile = tomllib.loads((self.home / ".fleet/profile.toml").read_text())
         self.assertEqual(profile["domain"], "personal")
         self.assertTrue(profile["domain_chosen"])
         self.assertEqual(profile["git_name"], "Script Person")
@@ -720,7 +720,7 @@ class EnrollmentTests(unittest.TestCase):
                 )
                 self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
                 self.assertIn("usage:", (result.stdout + result.stderr).lower())
-                self.assertFalse((self.home / ".config/fleet/profile.toml").exists())
+                self.assertFalse((self.home / ".fleet/profile.toml").exists())
 
     def test_noninteractive_partial_flags_still_name_remaining_gaps(self):
         self.seed_profile(installed=False)
@@ -755,7 +755,7 @@ class EnrollmentTests(unittest.TestCase):
             )
         ]
         self.terminal(responses)
-        path = self.home / ".config/fleet/profile.toml"
+        path = self.home / ".fleet/profile.toml"
         profile = path.read_bytes()
         self.assertEqual(tomllib.loads(profile.decode())["git_name"], "Fixture Person")
         self.terminal([])
@@ -780,13 +780,13 @@ class EnrollmentTests(unittest.TestCase):
         for description in [
             "Base configuration only. No domain additions.",
             "Choosing a domain does not install software or create accounts.",
-            "Your choice is saved in ~/.config/fleet/profile.toml.",
+            "Your choice is saved in ~/.fleet/profile.toml.",
             "Type a domain name, or press Enter alone to choose core.",
             "  skip      Keep core for now without confirming it as your choice.",
         ]:
             self.assertIn(description, output)
         self.assertNotIn("personal=personal+shared", output)
-        path = self.home / ".config/fleet/profile.toml"
+        path = self.home / ".fleet/profile.toml"
         saved = path.read_bytes()
         profile = tomllib.loads(saved.decode())
         self.assertEqual(profile["domain"], "core")

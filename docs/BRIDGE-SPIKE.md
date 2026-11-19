@@ -7,7 +7,7 @@ A pull request (PR) is a proposed repository change. The owner decides whether a
 
 - An agent is an installed coding assistant, such as Pi or OpenCode.
 - A hook is a command that an agent runs when a named event occurs. The content's `agents.hooks` table declares hooks.
-- The tree is `~/.local/share/fleet/agents`, the Fleet-owned folder that holds each machine's agent configuration.
+- The tree is `~/.fleet/agents`, the Fleet-owned folder that holds each machine's agent configuration.
 - A bridge is one Fleet-shipped plugin per agent. It reads the shared hook declarations from the tree and registers them inside the agent.
 - A pointer is the one link or entry that connects an agent to the tree.
 
@@ -38,7 +38,7 @@ Each claim carries one label. Tested means observed on 2026-11-17. Documented me
 
 ### Shared declarations
 
-Fleet would render one neutral file per agent: `~/.local/share/fleet/agents/bridges/AGENT/hooks.json`.
+Fleet would render one neutral file per agent: `~/.fleet/agents/bridges/AGENT/hooks.json`.
 Each entry would hold the hook name, the neutral event, the tool classes, the timeout, and the wrapper path.
 The wrapper is the same tree script that Claude Code, Codex, and Gemini CLI run today. It sets `FLEET_AGENT`, `FLEET_HOOK`, and `FLEET_HOOK_EVENT`.
 Updates would change this file and the wrappers. They would never change the bridge's pointer.
@@ -52,7 +52,7 @@ Any other exit code reports an error and allows the action. The owner rules on t
 
 ### Pi bridge
 
-The bridge is `~/.local/share/fleet/agents/bridges/pi/index.ts`. The pointer is a link: `~/.pi/agent/extensions/fleet`.
+The bridge is `~/.fleet/agents/bridges/pi/index.ts`. The pointer is a link: `~/.pi/agent/extensions/fleet`.
 
 | Neutral event | Pi event | Action |
 | --- | --- | --- |
@@ -67,7 +67,7 @@ The bridge reads `hooks.json` in `session_start` and on each event. It starts ea
 
 ### OpenCode bridge
 
-The bridge is `~/.local/share/fleet/agents/bridges/opencode/fleet.js`. The pointer is a link: `~/.config/opencode/plugins/fleet.js`.
+The bridge is `~/.fleet/agents/bridges/opencode/fleet.js`. The pointer is a link: `~/.config/opencode/plugins/fleet.js`.
 
 | Neutral event | OpenCode hook or event | Action |
 | --- | --- | --- |

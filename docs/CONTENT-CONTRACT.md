@@ -13,7 +13,7 @@ A tool selection records a version. A group selects optional files or marked blo
 5. If detection remains unclear, ask. `--format plain` selects real names; `--format chezmoi` selects native source names.
 
 Plain content uses real names, such as `.zshrc` and `.config/starship.toml`. It contains no chezmoi templates or installer.
-Fleet converts plain content into `~/.local/share/fleet/chezmoi-source`.
+Fleet converts plain content into `~/.fleet/chezmoi-source`.
 Chezmoi content already uses native source names. Fleet uses that checkout directly; it does not rewrite it.
 Native templates and hooks can execute commands. Use only trusted repositories.
 
@@ -144,7 +144,7 @@ Fleet also owns `~/.config/chezmoi/chezmoi.toml`. Content config templates never
 After writing it, Fleet updates chezmoi's saved template checksum, an identifier for template contents.
 Without a template, it removes the obsolete checksum. It preserves file history and script history.
 
-Fleet owns the agent tree, `~/.local/share/fleet/agents`, and each agent pointer that it records. See [agent configuration](AGENTS.md).
+Fleet owns the agent tree, `~/.fleet/agents`, and each agent pointer that it records. See [agent configuration](AGENTS.md).
 Content cannot manage an agent pointer or a settings file where Fleet writes owned entries. That overlap stops the run before any write.
 
 The local Git file holds profile identity and retains other existing local settings.
@@ -160,7 +160,7 @@ Secret values never enter Git or the profile. Content declares references and na
 ## Ownership and updates
 
 Back up every target before replacement. Preserve symbolic links and copy external file targets separately.
-Save profile data at `~/.config/fleet/profile.toml`. Saved selections win over later defaults.
+Save profile data at `~/.fleet/profile.toml`. Saved selections win over later defaults.
 During legacy adoption, merge old chezmoi tool versions, current Mise tools, and saved installer tool versions, in that order.
 Carry existing Mise settings into `mise_settings` too. This preserves settings beyond tool versions.
 Validate carried and existing profiles before applying files. Ask about missing identity, unconfirmed domains, and floating tool versions.
@@ -204,5 +204,5 @@ Preserve installed prerequisite versions and unchanged checkout commits in the r
 Save RUN.json and CHEZMOI-DIFF.patch beside the backup MANIFEST.json, with owner-only permissions.
 RUN.json records planned actions and completion checks. The diff stays private and never appears in terminal reports.
 Check recorded file operations after apply; do not rebuild their categories or discover new paths afterward.
-Keep the last confirmed manager commit in ~/.local/state/dotfleet/last-run.json. Back it up before replacing it.
+Keep the last confirmed manager commit in ~/.fleet/last-run.json. Back it up before replacing it.
 Internal state records, staged source copies, and backup copies are not rendered setting changes.
