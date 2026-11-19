@@ -247,7 +247,7 @@ class CommandTests(unittest.TestCase):
                 (b"Git author email [", b"\n"),
                 (b"Tools [accept]:", b"\n"),
                 (b"extra [on]:", b"\n"),
-                (b"Review [quit]:", b"confirm\n"),
+                (b"Review [confirm]:", b"confirm\n"),
             ],
         )
         self.assertIn("1. Welcome", output)

@@ -241,6 +241,11 @@ def render(record, future=False):
         lines += wrap(
             "Store moved: " + human(item["old"], home) + " → " + human(item["new"], home), "  "
         )
+    for item in record.get("store_restored", []):
+        lines += wrap(
+            "Store moved back: " + human(item["new"], home) + " → " + human(item["old"], home),
+            "  ",
+        )
     if future and record.get("selected_profile"):
         lines += ["  Selected choices:"]
         lines += block(

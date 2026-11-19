@@ -180,7 +180,7 @@ Report nonempty chezmoi status as incomplete enrollment. Keep all changes recove
 ## Enrollment review and adoption
 
 Terminal enrollment stages content, conversion, and generated files outside home. Review lists choices, warnings, full changed paths, and the proposed backup path.
-Store migration runs first; see [the migration rules](../README.md#store-migration). Those moves remain if later review is cancelled.
+Store migration runs first; see [the migration rules](../README.md#store-migration). Cancelling the review moves those stores back.
 Confirm before applying managed files. Returning to a step rebuilds the plan; quitting discards those planned changes.
 Scripted flags keep their existing behavior. `--defaults` cannot bypass incomplete identity, domain confirmation, or floating tool versions.
 

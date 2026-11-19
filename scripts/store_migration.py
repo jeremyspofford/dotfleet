@@ -3,6 +3,7 @@
 Usage: python3 scripts/store_migration.py --record FILE
 FILE receives private move records for the run review. Nothing is copied.
 Existing destination stores stop migration before any folder moves.
+A cancelled run moves the stores back, using the same FILE.
 Exit codes: 0 success/help; 1 migration failure; 2 invalid arguments.
 """
 
@@ -66,6 +67,7 @@ def repair_config(home):
 
 
 def migrate(home):
+    """Move old stores to their new names. Return the move records and what undoing them needs."""
     moves = []
     for old, new in MOVES:
         source, destination = home / old, home / new
@@ -95,6 +97,10 @@ def migrate(home):
             "Both fleet.toml and registry.toml exist in the manager store. Nothing was moved."
         )
     config = config_changes(home)
+    config_path = home / ".config/chezmoi/chezmoi.toml"
+    undo = {"registry": None, "config": None}
+    if config is not None:
+        undo["config"] = config_path.read_text()
     records = []
     for source, destination in moves:
         destination.parent.mkdir(parents=True, exist_ok=True)
@@ -103,14 +109,45 @@ def migrate(home):
     old_registry = home / OLD_REGISTRY
     if old_registry.exists():
         old_registry.rename(registry_target)
+        undo["registry"] = {"old": str(old_registry), "new": str(registry_target)}
     if config is not None:
-        atomic(home / ".config/chezmoi/chezmoi.toml", config)
-    return records
+        atomic(config_path, config)
+    return records, undo
+
+
+def recorded_state():
+    """Return this run's moves and undo details. An older record file holds only the moves."""
+    path = os.environ.get("DOTFLEET_STORE_MOVES_FILE")
+    value = json.loads(Path(path).read_text()) if path and Path(path).is_file() else []
+    if isinstance(value, list):
+        return {"moves": value, "registry": None, "config": None}
+    return value
 
 
 def recorded_moves():
-    path = os.environ.get("DOTFLEET_STORE_MOVES_FILE")
-    return json.loads(Path(path).read_text()) if path and Path(path).is_file() else []
+    return recorded_state()["moves"]
+
+
+def restore(home):
+    """Undo this run's store moves, newest first. A cancelled run leaves the home as it found it."""
+    state = recorded_state()
+    if registry := state.get("registry"):
+        old, new = Path(registry["old"]), Path(registry["new"])
+        if new.is_file() and not new.is_symlink() and not old.exists():
+            new.rename(old)
+    restored = []
+    for item in reversed(state["moves"]):
+        old, new = Path(item["old"]), Path(item["new"])
+        if not new.is_dir() or new.is_symlink() or old.exists():
+            raise ValueError(f"Store move back stopped: {old} and {new} conflict.")
+        new.rename(old)
+        restored.append(item)
+    if state.get("config") is not None:
+        atomic(home / ".config/chezmoi/chezmoi.toml", state["config"])
+    # A second cancel in the same run must find nothing left to undo.
+    if path := os.environ.get("DOTFLEET_STORE_MOVES_FILE"):
+        atomic(path, json.dumps({"moves": [], "registry": None, "config": None}) + "\n")
+    return restored
 
 
 def main():
@@ -121,9 +158,13 @@ def main():
         "--record", required=True, type=Path, help="private file for this run's move records"
     )
     args = parser.parse_args()
-    records = recorded_moves()
-    records.extend(item for item in migrate(Path.home()) if item not in records)
-    atomic(args.record, json.dumps(records) + "\n")
+    state = recorded_state()
+    moved, undo = migrate(Path.home())
+    state["moves"].extend(item for item in moved if item not in state["moves"])
+    for key, value in undo.items():
+        if value is not None:
+            state[key] = value
+    atomic(args.record, json.dumps(state) + "\n")
     return 0
 
 

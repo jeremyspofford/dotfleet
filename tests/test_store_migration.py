@@ -122,6 +122,40 @@ class StoreMigrationTests(unittest.TestCase):
         self.assertNotIn("Store moved:", self.cli("update"))
         self.assert_quiet_status()
 
+    def test_cancelled_wizard_moves_every_store_back(self):
+        self.enroll()
+        profile, stores, inodes = self.legacy_stores()
+        config_path = self.home / ".config/chezmoi/chezmoi.toml"
+        config = config_path.read_bytes()
+        registry_bytes = (self.home / ".local/share/dotfleet/fleet.toml").read_bytes()
+        output = self.terminal(
+            ["configure"],
+            [
+                (b"Content door [repo]:", b"\n"),
+                (b"Content repository [", b"\n"),
+                (b"Domain [core]:", b"\n"),
+                (b"Git author name [", b"\n"),
+                (b"Git author email [", b"\n"),
+                (b"Tools [accept]:", b"\n"),
+                (b"extra [on]:", b"\n"),
+                (b"Review [confirm]:", b"quit\n"),
+            ],
+        )
+        for old, new in stores:
+            self.assertIn(f"Store moved back: ~/{new} → ~/{old}", output)
+            self.assertEqual((self.home / old).stat().st_ino, inodes[new])
+            self.assertFalse((self.home / new).exists())
+        self.assertEqual((self.home / ".config/dotfleet/profile.toml").read_bytes(), profile)
+        self.assertEqual(config_path.read_bytes(), config)
+        self.assertEqual(
+            (self.home / ".local/share/dotfleet/fleet.toml").read_bytes(), registry_bytes
+        )
+        self.assertFalse((self.home / ".local/share/dotfleet/registry.toml").exists())
+        runs = sorted((self.home / ".local/share/dotfleet/runs").glob("*.json"))
+        self.assertEqual(json.loads(runs[-1].read_text())["result"], "CANCELLED")
+        output = self.cli("update")
+        self.assert_migration(output, profile, stores, inodes)
+
     def test_help_leaves_legacy_stores_in_place(self):
         self.enroll()
         profile, stores, _ = self.legacy_stores()

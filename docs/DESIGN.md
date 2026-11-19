@@ -62,7 +62,7 @@ These operations preserve other machines' records. Each operation refreshes this
 Inspect current records before any manual recovery. An older registry can contain stale facts about other machines.
 
 Backed-up apply, update, restore, and backup runs refresh this machine's record, including failures.
-Read-only commands and cancellations do not update timestamps. Cancelling before confirmation leaves managed files unchanged. Earlier store migration moves remain.
+Read-only commands and cancellations do not update timestamps. Cancelling before confirmation leaves managed files unchanged. It also moves this run's migrated stores back.
 `dotfleet machines list` prints saved records already present in the file. It does not contact other machines or prove that their records are current.
 Keep profile data and the registry out of the content repository. Machine synchronization and a live fleet view remain deferred.
 
@@ -186,7 +186,7 @@ The machine registry is `~/.local/share/fleet/registry.toml`.
 
 Enrollment and update move old stores before other work. The [migration rules](../README.md#store-migration) define all three folder moves.
 Profiles and backup payloads stay intact. Rollback maps their old paths during restoration and repairs chezmoi's source pointer.
-Migration appears under Profile changes in the run record and review. Cancelling later apply does not undo those moves.
+Migration appears under Profile changes in the run record and review. Cancelling the run undoes those moves.
 Internal module names, environment variables, and `.local/state/dotfleet` records keep their existing names.
 
 ## Backup cleanup
@@ -208,7 +208,7 @@ The run index records each change-making attempt before profile validation or ap
 JSON is a structured format that scripts can read. Each entry records progress and links to RUN.json when available.
 The installer and nested update share one entry. Remote updates keep that entry on their target.
 Read-only commands never create entries. Queries can refresh their existing fixed caches.
-Cancellation preserves managed files and keeps a small cancellation entry. Earlier store moves remain recorded separately.
+Cancellation preserves managed files and keeps a small cancellation entry. It moves this run's migrated stores back.
 The Logs screen and commands read the same index. Applied attempts use the existing review renderer.
 See [RUNS.md](RUNS.md) for storage, cleanup, and diagnostic limits.
 
