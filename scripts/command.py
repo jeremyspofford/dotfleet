@@ -175,7 +175,7 @@ DESCRIPTIONS = {
         "A failed check stops without applying files.\n"
         "Use --all to update this machine, then each enrolled member, one at a time.\n"
         "A failed or unreachable member never stops the rest; a summary names each result.\n"
-        "With --all, the exit code is the worst machine's code. Name one machine or use --all."
+        "Name one machine or use --all, never both."
     ),
     "version": ("Show manager and content versions.\nA commit identifies a saved Git version."),
 }

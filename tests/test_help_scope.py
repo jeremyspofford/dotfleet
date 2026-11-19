@@ -109,7 +109,7 @@ class HelpScopeTests(unittest.TestCase):
                     timeout=60,
                 )
                 output = result.stdout + result.stderr
-                if path.name == "tui.py" and "No module named 'textual'" in output:
+                if path.name == "tui.py" and "ModuleNotFoundError: No module named" in output:
                     # Without Textual, check the module text that its help prints.
                     output = ast.get_docstring(ast.parse(path.read_text()))
                 else:
