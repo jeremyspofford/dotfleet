@@ -27,7 +27,6 @@ ACTIVE = None
 IDENTIFIER = re.compile(r"\d{8}-\d{6}-\d{6}-[a-f0-9]{12}")
 
 
-
 def machine_name():
     """Return this machine's fleet name: its host name, unless FLEET_MACHINE_NAME names it.
 
