@@ -313,6 +313,15 @@ def server(agent, spec):
         if spec.get("bearer_token_env"):
             result["bearer_token_env_var"] = spec["bearer_token_env"]
         return result
+    if agent == "antigravity":
+        # agy passes ${NAME} through literally; its servers inherit agy's environment instead.
+        # agy also drops an empty args list when it rewrites the file (tested 2026-11-18).
+        result = {"command": spec["command"]}
+        if spec.get("args"):
+            result["args"] = spec["args"]
+        if env:
+            result["env"] = env
+        return result
     env.update({name: reference(agent, name) for name in spec.get("pass_env", [])})
     headers.update(
         {key: reference(agent, name) for key, name in spec.get("header_env", {}).items()}
@@ -600,9 +609,35 @@ class Planner:
         if self.items("pi", "rules"):
             self.plan.notes.append("pi: rule sets are unsupported; Pi reads no include file.")
 
+    def antigravity(self):
+        """Write the one tested surface: the gateway entry. Report every untested item."""
+        spec = self.catalog["antigravity"]
+        served = self.items("antigravity", "mcp")
+        if served:
+            item, rendered = self.gateway("antigravity", served)
+            self.entry(
+                "antigravity",
+                spec["mcp_file"],
+                "json",
+                ("mcpServers",),
+                GATEWAY,
+                rendered,
+                item.key,
+            )
+        for kind, label in (("connectors", "connector"), ("rules", "rule set"), ("hooks", "hook")):
+            for item in self.items("antigravity", kind):
+                self.plan.notes.append(
+                    f"antigravity: {label} {item.name} is untested for this agent; Fleet writes nothing."
+                )
+
     def plugins(self, agent):
         for item in self.items(agent, "plugins"):
             source = item.spec["sources"][agent]
+            if agent not in LISTED and agent not in PLUGIN_COMMANDS:
+                self.plan.notes.append(
+                    f"{agent}: plugin {item.name} is untested for this agent; Fleet installs nothing."
+                )
+                continue
             if agent in LISTED:
                 self.plugin_listing(agent, item, source)
                 continue
@@ -732,7 +767,8 @@ def read_shared(home, relative, fmt):
         raise ValueError(f"~/{relative} is not a regular file.")
     text = path.read_text()
     try:
-        data = json.loads(text) if fmt == "json" else tomllib.loads(text)
+        # Antigravity creates an empty mcp_config.json at first start. Empty means no values.
+        data = (json.loads(text) if fmt == "json" else tomllib.loads(text)) if text.strip() else {}
     except ValueError as error:
         raise ValueError(f"~/{relative} is not valid {fmt.upper()}: {error}") from error
     if not isinstance(data, dict):

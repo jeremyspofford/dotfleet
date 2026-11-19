@@ -24,9 +24,10 @@ Updates change the tree. Each agent gets one pointer to the tree, set once:
 | codex | Skills: Codex reads `~/.agents/skills` itself. Servers: one gateway entry in `~/.codex/config.toml`. | Owned connector entries and hook entries in `~/.codex/hooks.json`. |
 | opencode | Skills: OpenCode reads `~/.agents/skills` itself. Rules: one `instructions` entry names the tree's rule file. Servers: one gateway entry. | Owned connector entries in `~/.config/opencode/opencode.json`. |
 | pi | Skills: Pi reads `~/.agents/skills` itself. Servers: one gateway entry in `~/.pi/agent/mcp.json`. | Owned connector entries in the same file. |
+| antigravity | Servers: one gateway entry in `~/.gemini/config/mcp_config.json`. | Nothing else. Its other surfaces are untested; see Paths and limits below. |
 
 After the pointer, Fleet does not write inside an agent's own files.
-Codex, OpenCode, and Pi accept no pointer for servers or hooks. They receive owned entries instead.
+Codex, OpenCode, Pi, and Antigravity accept no pointer for servers or hooks. They receive owned entries instead.
 An owned entry is one named value that Fleet writes inside a file that the agent also writes.
 
 Claude Code loads the plugin folder as `fleet@skills-dir`. Its servers appear as `plugin:fleet:NAME`.
@@ -60,6 +61,7 @@ The gateway starts each downstream server on demand. It serves their tools and p
 It serves their resources for reading only. A server that fails to start is skipped; the others keep working.
 Downstream stdio servers start with the gateway's environment plus their `env` values.
 The gateway entry passes each variable that a downstream server reads, in the agent's own reference form, such as `${NAME}` or `{env:NAME}`.
+Antigravity expands no reference. Its servers inherit its environment, so its entry names no variable.
 Fleet never writes a secret value. The wrapper finds `python3` through the agent's `PATH`.
 Hooks, plugins, settings, and skill folders stay on files.
 
@@ -192,11 +194,17 @@ To preview the plan from a separate Fleet checkout, run `bash scripts/generate-a
 | [opencode](https://opencode.ai/docs/config/) | Rendered through owned entries. |
 | [pi](https://docs.pi.dev) | Rendered through owned entries. |
 | [grok](https://docs.x.ai/build/settings) | Detected only; Fleet writes nothing. |
-| [antigravity](https://antigravity.google/docs) | Detected only; Fleet writes nothing. |
+| [antigravity](https://antigravity.google/docs) | Rendered for servers only, through one owned entry. |
 | [Ollama](https://docs.ollama.com/faq) | Unsupported. |
 
-Antigravity and Grok are detected only. Fleet renders nothing for either until a tested install confirms their paths.
-Antigravity's command is `agy`. A community tool also installs a `grok` command; its `~/.grok/user-settings.json` file rules out Grok detection.
+Grok is detected only. Fleet renders nothing for it until a tested install confirms its paths.
+A community tool also installs a `grok` command; its `~/.grok/user-settings.json` file rules out Grok detection.
+
+Antigravity's command is `agy`. Mise lists it as `agy`, `antigravity-cli`, or `aqua:google-antigravity/antigravity-cli`.
+A test with agy 1.5.10 on 2026-11-18 confirmed the server entry without a sign-in. agy started the gateway and listed its tools.
+agy creates an empty `mcp_config.json` at its first start. Fleet reads an empty shared file as one with no values.
+Rule sets, hooks, connectors, and plugins for Antigravity appear as run notes. Fleet writes nothing for them.
+Their paths need a signed-in session to confirm. Antigravity's reading of `~/.agents/skills` is also unconfirmed.
 Pi detection also matches its renamed package, `@earendil-works/pi-coding-agent`.
 
 Ollama is unsupported: it uses process/service environment settings, not a portable configuration file.

@@ -146,10 +146,12 @@ windows = ".config/opencode/skills"
 wsl = ".config/opencode/skills"
 
 [agents.antigravity]
-render = false
-render_reason = "No tested install confirms Antigravity's paths yet."
+# Tested 2026-11-18 with agy 1.5.10: Fleet writes only its MCP entry. Rules, skills, hooks,
+# connectors, and plugins stay unwritten until a signed-in test confirms them.
+render = true
+mcp_file = ".gemini/config/mcp_config.json"
 command = "agy"
-mise_packages = ["antigravity"]
+mise_packages = ["agy", "antigravity-cli", "aqua:google-antigravity/antigravity-cli"]
 format = "json"
 supported = true
 documentation = "https://antigravity.google/docs"

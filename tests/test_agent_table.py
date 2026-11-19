@@ -210,16 +210,21 @@ class AgentTableTests(unittest.TestCase):
 
 
 class CatalogTests(unittest.TestCase):
-    def test_antigravity_and_grok_are_detected_but_not_rendered(self):
-        for name in ("antigravity", "grok"):
-            self.assertTrue(CATALOG[name]["supported"], name)
-            self.assertFalse(CATALOG[name]["render"], name)
-            self.assertIn("tested install", CATALOG[name]["render_reason"])
-        self.assertEqual(CATALOG["antigravity"]["command"], "agy")
+    def test_grok_is_detected_but_not_rendered(self):
+        self.assertTrue(CATALOG["grok"]["supported"])
+        self.assertFalse(CATALOG["grok"]["render"])
+        self.assertIn("tested install", CATALOG["grok"]["render_reason"])
 
     def test_rendered_agents_have_render_on(self):
-        for name in ("claude", "codex", "gemini", "opencode", "pi"):
+        for name in ("antigravity", "claude", "codex", "gemini", "opencode", "pi"):
             self.assertTrue(CATALOG[name]["render"], name)
+
+    def test_antigravity_detects_its_command_and_mise_names(self):
+        # agy 1.5.10 installs as agy or antigravity-cli; mise lists either name or its backend.
+        self.assertEqual(CATALOG["antigravity"]["command"], "agy")
+        for name in ("agy", "antigravity-cli", "aqua:google-antigravity/antigravity-cli"):
+            self.assertIn(name, CATALOG["antigravity"]["mise_packages"])
+        self.assertEqual(CATALOG["antigravity"]["mcp_file"], ".gemini/config/mcp_config.json")
 
     def test_pi_detects_its_renamed_package(self):
         self.assertIn("@earendil-works/pi-coding-agent", CATALOG["pi"]["mise_packages"])
