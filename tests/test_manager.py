@@ -545,7 +545,7 @@ class EnrollmentTests(unittest.TestCase):
     def test_migration_prompts_for_all_gaps_and_records_installed_exact_version(self):
         self.seed_profile(legacy=True)
         output = self.terminal(self.gap_answers(), plain=True)
-        self.assertIn("Press Enter: uses installed 24.14.1", output)
+        self.assertIn("Press Enter alone: Fleet uses installed 24.14.1.", output)
         self.assertIn("Recorded exact version: node = 24.14.1", output)
         self.check_completed_gap_profile()
 
