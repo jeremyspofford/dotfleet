@@ -226,6 +226,7 @@ Command groups require an action. Bare `machines`, `backups`, `secrets`, `tools`
 | --- | --- |
 | `dotfleet tui` | Open the full-screen terminal interface. Missing environments show plain command alternatives and exit 0. |
 | `dotfleet update` | Check upstreams and drift first. Apply only when an update or repair is needed. |
+| `dotfleet update --all` | Update this machine, then each enrolled member in turn. One failure never stops the rest; a summary names each result. |
 | `dotfleet backups list` | List backup dates, results, and sizes without changing files. |
 | `dotfleet backups delete --name BACKUP` | Review and delete one saved backup. |
 | `dotfleet backups delete --keep N` | Review deletion of all but the newest N backups. |

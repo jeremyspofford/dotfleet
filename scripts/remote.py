@@ -189,11 +189,13 @@ def diagnostics(home, machine, target, action, phase, result):
         pass
 
 
-def missing_command(home, machine, target, action):
+def missing_command(home, machine, target, action, report=None):
     reason = "Fleet is not installed on this machine (or predates the fleet command)"
     print(f"Error: {machine}: {reason}.")
     print("Next: Run the Fleet one-liner on that machine once, then retry.")
     topology.remember(home, machine, target, action, reason, 2)
+    if report is not None:
+        report["result"] = "failed: " + reason
     return 2
 
 
@@ -203,7 +205,9 @@ def profile_request(command, action, arguments):
     )
 
 
-def execute(home, machine, action, *, check=False, stat=False, request=None):
+def execute(home, machine, action, *, check=False, stat=False, request=None, report=None):
+    """Run one action on a member. Report, when given, receives a one-line result."""
+    report = {} if report is None else report
     if request is None:
         if action not in CAPABLE:
             return refusal(machine, action)
@@ -217,6 +221,7 @@ def execute(home, machine, action, *, check=False, stat=False, request=None):
         target = validate_target(record["ssh_target"])
     except (OSError, ValueError) as error:
         print(f"Error: {machine}: {connections.one_line(str(error))}.")
+        report["result"] = "unreachable: " + connections.one_line(str(error))
         return 2
     phase = "command probe"
     result = None
@@ -225,12 +230,13 @@ def execute(home, machine, action, *, check=False, stat=False, request=None):
         if result.returncode or result.stderr:
             diagnostics(home, machine, target, action, "command probe", result)
         if result.returncode in (1, 126, 127):
-            return missing_command(home, machine, target, action)
+            return missing_command(home, machine, target, action, report)
         if result.returncode == 255:
             reason = connections.report_failure(
                 home, machine, target, ConnectionError(result.stderr)
             )
             topology.remember(home, machine, target, action, reason, 2)
+            report["result"] = "unreachable: " + reason
             return 2
         phase = "remote command"
         result = connections.invoke(target, REMOTE_COMMAND, json.dumps(request) + "\n")
@@ -238,17 +244,19 @@ def execute(home, machine, action, *, check=False, stat=False, request=None):
         if result.returncode not in expected or result.stderr:
             diagnostics(home, machine, target, action, "remote command", result)
         if result.returncode == 127:
-            return missing_command(home, machine, target, action)
+            return missing_command(home, machine, target, action, report)
         if result.returncode == 255:
             reason = connections.report_failure(
                 home, machine, target, ConnectionError(result.stderr)
             )
             topology.remember(home, machine, target, action, reason, 2)
+            report["result"] = "unreachable: " + reason
             return 2
     except (OSError, subprocess.TimeoutExpired) as error:
         diagnostics(home, machine, target, action, phase, error)
         reason = connections.report_failure(home, machine, target, error)
         topology.remember(home, machine, target, action, reason, 2)
+        report["result"] = "unreachable: " + reason
         return 2
     print(render_view("Machine · " + machine, [("Connection", target)], str(home)), end="")
     if isinstance(sys.stdout, style.LoggerStream) and action == "diff":
@@ -266,6 +274,7 @@ def execute(home, machine, action, *, check=False, stat=False, request=None):
         state = action + " failed"
         print(f"Error: {machine}: {state} (exit {result.returncode}).")
     topology.remember(home, machine, target, action, state, result.returncode)
+    report["result"] = state if result.returncode == 0 else f"{state} (exit {result.returncode})"
     exchange(home, machine, target)
     return result.returncode if result.returncode > 0 else int(result.returncode != 0)
 

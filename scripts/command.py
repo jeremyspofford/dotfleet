@@ -172,7 +172,10 @@ DESCRIPTIONS = {
         "Drift means managed files differ.\n"
         "Current sources without drift stop without a backup or review.\n"
         "Each attempt keeps a small entry in logs.\n"
-        "A failed check stops without applying files."
+        "A failed check stops without applying files.\n"
+        "Use --all to update this machine, then each enrolled member, one at a time.\n"
+        "A failed or unreachable member never stops the rest; a summary names each result.\n"
+        "With --all, the exit code is the worst machine's code. Name one machine or use --all."
     ),
     "version": ("Show manager and content versions.\nA commit identifies a saved Git version."),
 }
@@ -955,6 +958,10 @@ def main(argv=None):
         return 0
     if args.command == "version":
         return read_view(args, home, {})
+    if getattr(args, "all_machines", False):
+        if args.machine:
+            argument_parser.error("Name one machine or use --all, never both.")
+        return update_all(home, args, argument_parser)
     if getattr(args, "machine", None) and args.command in remote.PROFILE_ACTIONS:
         return remote_profile(home, args)
     if getattr(args, "machine", None):
@@ -988,6 +995,34 @@ def main(argv=None):
         label = args.command + (" " + args.action if getattr(args, "action", None) else "")
         return run_index.run(home, label, lambda: dispatch(args, argument_parser, home))
     return dispatch(args, argument_parser, home)
+
+
+def update_all(home, args, argument_parser):
+    """Update this machine, then each enrolled member in turn. One failure never stops the rest.
+
+    Print one result line as each machine finishes, then a summary. Exit with the worst code.
+    """
+    this = registry.machine_name()
+    members = sorted(
+        name
+        for name, record in registry.load(home)["machines"].items()
+        if record.get("enrolled") and name != this
+    )
+    total = len(members) + 1
+    code = run_index.run(home, "update", lambda: dispatch(args, argument_parser, home))
+    results = [(this, code, "update succeeded" if code == 0 else f"update failed (exit {code})")]
+    print(f"[1/{total}] {this}: {results[0][2]}.")
+    for number, name in enumerate(members, 2):
+        report = {}
+        member_code = remote.execute(home, name, "update", report=report)
+        results.append((name, member_code, report.get("result", f"exit {member_code}")))
+        print(f"[{number}/{total}] {name}: {results[-1][2]}.")
+    info(
+        "Fleet update · " + str(total) + (" machine" if total == 1 else " machines"),
+        [(name, result) for name, _, result in results],
+        home,
+    )
+    return max(member_code for _, member_code, _ in results)
 
 
 def remote_profile(home, args):

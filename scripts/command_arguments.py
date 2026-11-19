@@ -270,6 +270,13 @@ def add_parameters(parser, name):
         parser.add_argument(
             "--json", action="store_true", help="print JSON, a structured format for scripts"
         )
+    if name == "update":
+        parser.add_argument(
+            "--all",
+            action="store_true",
+            dest="all_machines",
+            help="update this machine, then each enrolled member, one at a time",
+        )
     if name in remote.CAPABLE:
         parser.add_argument(
             "machine", nargs="?", help="one registered machine; omit to use this machine"
