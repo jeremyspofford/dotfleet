@@ -102,7 +102,7 @@ def command_goldens():
                 }
             )
         )
-        (home / ".config/fleet").mkdir(parents=True)
+        (home / ".fleet").mkdir(parents=True, exist_ok=True)
         (home / ".fleet/profile.toml").write_text(toml(profile))
         cache = home / updates.CACHE
         cache.parent.mkdir(parents=True, exist_ok=True)

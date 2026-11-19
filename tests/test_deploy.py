@@ -242,7 +242,7 @@ class DeployTests(unittest.TestCase):
         self.assertEqual(self.registry(self.home)["mini-pc"]["manager_version"], enrolled)
         self.release("9.9.9")
         self.assertIn("mini-pc: update succeeded", self.call("update", "mini-pc"))
-        manager = self.target / ".local/share/fleet/manager"
+        manager = self.target / ".fleet/manager"
         self.assertEqual((manager / "VERSION").read_text().strip(), "9.9.9")
         self.assertEqual(self.registry(self.target)["mini-pc"]["manager_version"], "9.9.9")
         self.assertEqual(self.registry(self.home)["mini-pc"]["manager_version"], "9.9.9")

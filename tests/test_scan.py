@@ -122,7 +122,7 @@ class ScanTests(unittest.TestCase):
                 self.assertIn("(Recommended.)", detail.split(f"  {default} ", 1)[1].splitlines()[0])
                 self.assertIn(f"Press Enter alone to choose {default}.", detail)
                 self.assertNotIn("door", detail)
-            (home / ".config/fleet").mkdir(parents=True)
+            (home / ".fleet").mkdir(parents=True)
             (home / ".fleet/profile.toml").touch()
             for prior in ["repo", "example", "adopt"]:
                 profile = {"content_repo": "https://example.invalid/content", "source_door": prior}

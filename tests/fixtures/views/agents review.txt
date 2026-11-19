@@ -5,8 +5,8 @@
 
 3 · Files — 3 changed, 4 removed.
   ~ ~/.codex/config.toml
-  ~ ~/.fleet/profile.toml
   ~ ~/.fleet/agents/claude/.mcp.json
+  ~ ~/.fleet/profile.toml
   − ~/.fleet/agents/gateway/claude.json
   − ~/.fleet/agents/gateway/codex.json
   − ~/.fleet/agents/gateway/run-claude

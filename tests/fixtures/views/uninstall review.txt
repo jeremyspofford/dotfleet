@@ -10,13 +10,13 @@
   − ~/.config/dotfiles/aliases/core.zsh
   − ~/.config/dotfiles/aliases/personal.zsh
   − ~/.config/dotfiles/domain
-  − ~/.fleet/profile.toml
   − ~/.config/git/local.gitconfig
   − ~/.config/mise/config.toml
   − ~/.extra
-  − ~/.local/bin/dotfleet
   − ~/.fleet/last-run.json
   − ~/.fleet/outputs.json
+  − ~/.fleet/profile.toml
+  − ~/.local/bin/dotfleet
   − ~/.secrets
   − ~/.zshrc
   − ~/.fleet/manager

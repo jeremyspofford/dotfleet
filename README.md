@@ -367,6 +367,10 @@ Fleet keeps its own state in one folder, `~/.fleet`:
 | `~/.fleet/chezmoi-source/` | The converted source that chezmoi applies. |
 | `~/.fleet/agents/` | The agent deployment tree. |
 | `~/.fleet/agents.json` | The inventory of agent outputs that Fleet wrote. |
+| `~/.fleet/marketplaces.json` | Saved Fleet Marketplace records. |
+| `~/.fleet/marketplaces-check.json` | The last marketplace check. |
+| `~/.fleet/library/` | Installed marketplace packages. |
+| `~/.fleet/addons/` | Add-on records. |
 | `~/.fleet/outputs.json` | Fingerprints of managed files from the last apply. |
 | `~/.fleet/last-run.json` | A short record of the last apply. |
 | `~/.fleet/tui/` | The private Python environment for the terminal interface. |

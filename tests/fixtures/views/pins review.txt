@@ -6,8 +6,8 @@
 
 3 · Files — 3 changed.
   ~ ~/.config/chezmoi/chezmoi.toml
-  ~ ~/.fleet/profile.toml
   ~ ~/.config/mise/config.toml
+  ~ ~/.fleet/profile.toml
 
 4 · Profile changes — 1 changed.
   Tool node  not set → 24.14.1
