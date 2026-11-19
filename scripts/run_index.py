@@ -2,6 +2,7 @@
 
 Usage: import run, stage, failure, and outcome from this module.
 The installer uses begin, stage, and finish before the Python manager starts.
+A fresh install downloads this file alone, so it imports only the standard library.
 Help: python3 scripts/run_index.py --help.
 """
 
@@ -14,7 +15,7 @@ import os
 from pathlib import Path
 import re
 import shutil
-import registry
+import socket
 import sys
 import tempfile
 import uuid
@@ -24,6 +25,15 @@ LIMIT = 100
 ENVIRONMENT = "FLEET_RUN_ID"
 ACTIVE = None
 IDENTIFIER = re.compile(r"\d{8}-\d{6}-\d{6}-[a-f0-9]{12}")
+
+
+
+def machine_name():
+    """Return this machine's fleet name: its host name, unless FLEET_MACHINE_NAME names it.
+
+    The override lets two homes on one host act as two machines in tests and containers.
+    """
+    return os.environ.get("FLEET_MACHINE_NAME") or socket.gethostname()
 
 
 def folder(home):
@@ -108,7 +118,7 @@ def begin(home, command):
         "id": identifier,
         "time": now.isoformat(timespec="microseconds"),
         "command": command,
-        "machine": registry.machine_name(),
+        "machine": machine_name(),
         "remote": os.environ.get("FLEET_REMOTE_RUN") == "1",
         "result": "RUNNING",
         "stage": "preflight",

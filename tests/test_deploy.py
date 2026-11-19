@@ -38,6 +38,37 @@ result = subprocess.run(["/bin/sh", "-c", command], env=homes[target], stdin=sys
 sys.exit(result.returncode)
 """
 
+# Serve the published installer's downloads from the fixture's manager origin.
+FAKE_CURL = r"""#!/usr/bin/env python3
+import os, sys
+from pathlib import Path
+arguments, output, url = sys.argv[1:], None, None
+index = 0
+while index < len(arguments):
+    if arguments[index] in ("-o", "--max-time"):
+        if arguments[index] == "-o":
+            output = arguments[index + 1]
+        index += 2
+        continue
+    if not arguments[index].startswith("-"):
+        url = arguments[index]
+    index += 1
+with Path(os.environ["FAKE_CURL_LOG"]).open("a") as log:
+    log.write(url + "\n")
+raw = os.environ["FAKE_CURL_RAW"] + "/"
+if url == "https://github.com":
+    data = b""
+elif url.startswith(raw) and (Path(os.environ["FAKE_CURL_ROOT"]) / url[len(raw):]).is_file():
+    data = (Path(os.environ["FAKE_CURL_ROOT"]) / url[len(raw):]).read_bytes()
+else:
+    print(f"curl: (22) The requested URL returned error: 404 {url}", file=sys.stderr)
+    sys.exit(22)
+if output:
+    Path(output).write_bytes(data)
+else:
+    sys.stdout.buffer.write(data)
+"""
+
 
 class DeployTests(unittest.TestCase):
     setUp = helpers.EnrollmentTests.setUp
@@ -148,6 +179,42 @@ class DeployTests(unittest.TestCase):
         )
         self.assertTrue(
             any(entry.get("command") == "machines join" for entry in self.run_entries(self.target))
+        )
+
+    def test_deploy_runs_the_published_installer_with_no_local_manager(self):
+        """Stage no manager, so the target pipes install.sh from curl as a real deploy does."""
+        self.prepare()
+        downloads = self.base / "curl-tools"
+        downloads.mkdir()
+        (downloads / "curl").write_text(FAKE_CURL)
+        (downloads / "curl").chmod(0o700)
+        homes = json.loads((self.base / "homes.json").read_text())
+        target = homes["mini-pc"]
+        curl_log = self.base / "curl.log"
+        target.update(
+            PATH=str(downloads) + ":" + target["PATH"],
+            FAKE_CURL_LOG=str(curl_log),
+            FAKE_CURL_RAW=deploy.RAW,
+            FAKE_CURL_ROOT=str(self.origin),
+            # The published manager clone resolves to the fixture's origin.
+            GIT_CONFIG_COUNT="2",
+            GIT_CONFIG_KEY_1=f"url.{self.origin}.insteadOf",
+            GIT_CONFIG_VALUE_1="https://github.com/jeremyspofford/fleet.git",
+        )
+        (self.base / "homes.json").write_text(json.dumps(homes))
+        self.caller_env["FLEET_DEPLOY_MANAGER"] = ""
+        output = self.deploy("--return-target", "caller")
+        self.assertNotIn("ModuleNotFoundError", output)
+        self.assertIn("PASS: mini-pc reaches caller-box through caller.", output)
+        fetched = curl_log.read_text().splitlines()
+        self.assertIn(deploy.RAW + "/install.sh", fetched)
+        self.assertIn(deploy.RAW + "/scripts/run_index.py", fetched)
+        self.assertTrue((self.target / ".local/share/fleet/manager/scripts/command.py").is_file())
+        self.assertEqual((self.target / ".file").read_text(), "original\n")
+        self.assertTrue(self.registry(self.target)["mini-pc"]["enrolled"])
+        self.assertTrue(self.registry(self.home)["mini-pc"]["enrolled"])
+        self.assertTrue(
+            any(entry.get("command") == "install" for entry in self.run_entries(self.target))
         )
 
     def test_a_failed_reverse_test_is_reported_and_never_blocks_enrollment(self):

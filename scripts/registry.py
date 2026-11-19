@@ -15,9 +15,9 @@ import fcntl
 import os
 from pathlib import Path
 import platform
-import socket
 
 from common import atomic, read_toml, run, value
+import run_index
 from store_migration import relocated
 
 REGISTRY = ".local/share/fleet/registry.toml"
@@ -78,11 +78,8 @@ def load(home):
 
 
 def machine_name():
-    """Return this machine's fleet name: its host name, unless FLEET_MACHINE_NAME names it.
-
-    The override lets two homes on one host act as two machines in tests and containers.
-    """
-    return os.environ.get("FLEET_MACHINE_NAME") or socket.gethostname()
+    """Return this machine's fleet name. The run index owns the rule; it runs before the manager."""
+    return run_index.machine_name()
 
 
 def os_name():

@@ -59,6 +59,35 @@ class IndexTests(unittest.TestCase):
         self.environment.start()
         self.addCleanup(self.environment.stop)
 
+    def test_the_downloaded_writer_runs_alone_with_only_the_standard_library(self):
+        # A fresh install downloads run_index.py by itself into a scratch folder.
+        alone = self.home / "download"
+        alone.mkdir()
+        shutil.copy2(ROOT / "scripts/run_index.py", alone / "run_index.py")
+        environment = dict(os.environ, HOME=str(self.home), FLEET_MACHINE_NAME="fresh-box")
+        environment.pop("PYTHONPATH", None)
+        environment.pop("FLEET_RUN_ID", None)
+
+        def writer(*arguments):
+            return subprocess.run(
+                ["python3", "-B", "-I", str(alone / "run_index.py"), *arguments],
+                cwd=alone,
+                env=environment,
+                text=True,
+                capture_output=True,
+                check=True,
+            ).stdout.strip()
+
+        identifier = writer("begin", "--command", "install")
+        environment["FLEET_RUN_ID"] = identifier
+        writer("stage", "--name", "manager checkout")
+        writer("finish", "--code", "1", "--error", "Stopped.")
+        entry = json.loads(run_index.path_for(self.home, identifier).read_text())
+        self.assertEqual(
+            (entry["machine"], entry["stage"], entry["result"]),
+            ("fresh-box", "manager checkout", "FAILED"),
+        )
+
     def test_preapply_failure_keeps_stage_and_error_without_backup(self):
         def fail():
             run_index.stage("plan")

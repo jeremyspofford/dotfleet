@@ -36,11 +36,11 @@ class RegistryTests(unittest.TestCase):
         )
 
     def test_refresh_preserves_other_machine_and_private_profile_fields_stay_out(self):
-        with patch("registry.socket.gethostname", return_value="other-machine"):
+        with patch("socket.gethostname", return_value="other-machine"):
             other = registry.refresh(
                 self.home, "0.2.0", self.home / "fleet-backups/first", "SUCCESS"
             )
-        with patch("registry.socket.gethostname", return_value="this-machine"):
+        with patch("socket.gethostname", return_value="this-machine"):
             first = registry.refresh(
                 self.home, "0.2.1", self.home / "fleet-backups/second", "SUCCESS"
             )
