@@ -28,6 +28,20 @@ def data(*records, removed=None):
 
 
 class MergeTests(unittest.TestCase):
+    def test_an_older_digest_without_a_version_keeps_the_saved_version(self):
+        import remote
+
+        local = data(member("a", "2026-11-01"), member("b", "2026-11-01", manager_version="0.7.0"))
+        older = member("b", "2026-11-09", domain="work")
+        remote.validate_digest({"members": [older], "removed": {}})
+        registry.merge(local, {"members": [older], "removed": {}}, "a")
+        self.assertEqual(local["machines"]["b"]["domain"], "work")
+        self.assertEqual(local["machines"]["b"]["manager_version"], "0.7.0")
+        newer = member("b", "2026-11-10", manager_version="0.8.0")
+        remote.validate_digest({"members": [newer], "removed": {}})
+        registry.merge(local, {"members": [newer], "removed": {}}, "a")
+        self.assertEqual(local["machines"]["b"]["manager_version"], "0.8.0")
+
     def test_the_union_of_members_wins_and_the_newest_fact_wins(self):
         local = data(member("a", "2026-11-01"), member("b", "2026-11-05", domain="work"))
         received = {

@@ -120,12 +120,13 @@ def validate_digest(digest):
     if not isinstance(digest["members"], list) or not isinstance(digest["removed"], dict):
         raise ValueError("Invalid registry digest.")
     for fact in digest["members"]:
-        if not isinstance(fact, dict) or set(fact) != set(registry.DIGEST_FIELDS):
+        required = set(registry.DIGEST_FIELDS) - set(registry.OPTIONAL_DIGEST_FIELDS)
+        if not isinstance(fact, dict) or not required <= set(fact) <= set(registry.DIGEST_FIELDS):
             raise ValueError("Invalid member in the registry digest.")
         if type(fact["enrolled"]) is not bool or not MACHINE_NAME.fullmatch(str(fact["hostname"])):
             raise ValueError("Invalid member in the registry digest.")
-        for field in ("ssh_target", "domain", "os", "recorded_at"):
-            if not isinstance(fact[field], str) or len(fact[field]) > 200:
+        for field in ("ssh_target", "domain", "os", "manager_version", "recorded_at"):
+            if field in fact and (not isinstance(fact[field], str) or len(fact[field]) > 200):
                 raise ValueError("Invalid member in the registry digest.")
         if fact["ssh_target"]:
             validate_target(fact["ssh_target"])
@@ -269,10 +270,18 @@ def execute(home, machine, action, *, check=False, stat=False, request=None):
     return result.returncode if result.returncode > 0 else int(result.returncode != 0)
 
 
+def installed_version():
+    """Return the version of the manager running this code."""
+    import command
+
+    return (command.ROOT / "VERSION").read_text().strip()
+
+
 def exchange(home, machine, target):
     """Swap registry digests with a member after contact. Lists converge when machines talk."""
     import registry
 
+    registry.sync_own_version(home, installed_version())
     request = {"version": 3, "action": "exchange", "digest": registry.digest(home)}
     try:
         result = connections.invoke(target, REMOTE_COMMAND, json.dumps(request) + "\n")
@@ -389,6 +398,8 @@ def receive_deploy(home, request):
     import registry
 
     own = registry.machine_name()
+    # Every contact rechecks the version this machine reports about itself.
+    registry.sync_own_version(home, installed_version())
     if request["action"] == "exchange":
         changes = registry.merge_into(home, request["digest"])
         return answer({"digest": registry.digest(home), "changes": changes})

@@ -516,7 +516,8 @@ fleet update mini-pc
 ```
 
 Each remote command, including install, also exchanges a compact registry digest with the target.
-The digest holds member names, SSH targets, domains, OS, enrolled states, record times, and removal markers.
+The digest holds member names, SSH targets, domains, OS, enrolled states, manager versions, record times, and removal markers.
+A machine rechecks its own manager version whenever its manager is republished, and on each contact.
 Both machines merge it: the union of members wins, and the newest record wins each field. Lists converge when machines talk.
 A removal marker beats an older member fact, so a removed machine never returns from an old peer list.
 A machine stays the only authority on its own record. No background service runs.
