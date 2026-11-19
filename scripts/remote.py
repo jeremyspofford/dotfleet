@@ -106,7 +106,7 @@ def validate_deploy_request(request):
         validate_digest(request["digest"])
     if action == "join":
         peer = request["peer"]
-        allowed = set(registry.FIELDS) | {"ssh_target", "recorded_at"}
+        allowed = set(registry.FIELDS) | set(registry.OPTIONAL_FIELDS)
         if not isinstance(peer, dict) or set(peer) - allowed or set(registry.FIELDS) - set(peer):
             raise ValueError("Invalid machine record in the deploy request.")
         for key, kind in registry.FIELDS.items():
@@ -114,30 +114,52 @@ def validate_deploy_request(request):
                 raise ValueError(f"Invalid {key} in the deploy request.")
         if not MACHINE_NAME.fullmatch(peer["hostname"]):
             raise ValueError("Invalid machine name in the deploy request.")
-        if peer.get("ssh_target"):
-            validate_target(peer["ssh_target"])
+        try:
+            validate_member(dict(peer, recorded_at=peer.get("recorded_at", "")))
+        except ValueError:
+            raise ValueError("Invalid machine record in the deploy request.") from None
     return request
 
 
-def validate_digest(digest):
-    """Accept member facts and removal markers. Every value is a short, typed fact."""
+def validate_member(fact):
+    """Accept one member record: the complete form, or the short form older members send."""
     import registry
 
+    fields = {**registry.FIELDS, **registry.OPTIONAL_FIELDS}
+    if not isinstance(fact, dict) or not {"hostname", "enrolled", "recorded_at"} <= set(fact):
+        raise ValueError("Invalid member in the registry digest.")
+    if set(fact) - set(fields):
+        raise ValueError("Invalid member in the registry digest.")
+    for field, value in fact.items():
+        if type(value) is not fields[field]:
+            raise ValueError("Invalid member in the registry digest.")
+        if isinstance(value, str) and len(value) > 400:
+            raise ValueError("Invalid member in the registry digest.")
+    if not MACHINE_NAME.fullmatch(fact["hostname"]):
+        raise ValueError("Invalid member in the registry digest.")
+    if fact.get("machine_id") and not registry.IDENTIFIER.fullmatch(fact["machine_id"]):
+        raise ValueError("Invalid member in the registry digest.")
+    aliases = fact.get("aliases", [])
+    if len(aliases) > registry.ALIAS_LIMIT or any(
+        not isinstance(alias, str) or not MACHINE_NAME.fullmatch(alias) for alias in aliases
+    ):
+        raise ValueError("Invalid member in the registry digest.")
+    for field in ("home", "last_backup", "last_run_record"):
+        if fact.get(field) and not fact[field].startswith("/"):
+            raise ValueError("Invalid member in the registry digest.")
+    if fact.get("ssh_target"):
+        validate_target(fact["ssh_target"])
+    return fact
+
+
+def validate_digest(digest):
+    """Accept member records and removal markers. Every value is a short, typed fact."""
     if not isinstance(digest, dict) or set(digest) != {"members", "removed"}:
         raise ValueError("Invalid registry digest.")
     if not isinstance(digest["members"], list) or not isinstance(digest["removed"], dict):
         raise ValueError("Invalid registry digest.")
     for fact in digest["members"]:
-        required = set(registry.DIGEST_FIELDS) - set(registry.OPTIONAL_DIGEST_FIELDS)
-        if not isinstance(fact, dict) or not required <= set(fact) <= set(registry.DIGEST_FIELDS):
-            raise ValueError("Invalid member in the registry digest.")
-        if type(fact["enrolled"]) is not bool or not MACHINE_NAME.fullmatch(str(fact["hostname"])):
-            raise ValueError("Invalid member in the registry digest.")
-        for field in ("ssh_target", "domain", "os", "manager_version", "recorded_at"):
-            if field in fact and (not isinstance(fact[field], str) or len(fact[field]) > 200):
-                raise ValueError("Invalid member in the registry digest.")
-        if fact["ssh_target"]:
-            validate_target(fact["ssh_target"])
+        validate_member(fact)
     for name, when in digest["removed"].items():
         if not MACHINE_NAME.fullmatch(name) or not isinstance(when, str) or len(when) > 40:
             raise ValueError("Invalid removal marker in the registry digest.")
@@ -221,7 +243,10 @@ def execute(home, machine, action, *, check=False, stat=False, request=None, rep
             return refusal(machine, action)
         request = validate_request(dict(version=1, action=action, check=check, stat=stat))
     try:
-        record = registry.load(home)["machines"].get(machine)
+        data = registry.load(home)
+        # A member answers to its name or to the SSH target that this machine uses to reach it.
+        machine = registry.resolve(data, machine) or machine
+        record = data["machines"].get(machine)
         if record is None:
             raise ValueError("no saved machine; use machines set-ssh --target HOST first")
         if not record.get("ssh_target"):
@@ -303,12 +328,13 @@ def exchange(home, machine, target):
     try:
         result = connections.invoke(target, REMOTE_COMMAND, json.dumps(request) + "\n")
         lines = result.stdout.strip().splitlines()
-        received = json.loads(lines[-1])["digest"] if result.returncode == 0 and lines else None
-        validate_digest(received)
+        answer = json.loads(lines[-1]) if result.returncode == 0 and lines else {}
+        received = validate_digest(answer["digest"])
+        answered = answer.get("machine") if isinstance(answer.get("machine"), dict) else None
     except (OSError, ValueError, KeyError, TypeError, subprocess.TimeoutExpired):
         # An older or unreachable member keeps its list; the next contact tries again.
         return {}
-    changes = registry.merge_into(home, received)
+    changes = registry.merge_into(home, received, contacted=machine, answered=answered)
     summary = [f"{kind} {', '.join(names)}" for kind, names in changes.items() if names]
     if summary:
         print(f"Fleet members updated from {machine}: " + "; ".join(summary) + ".")
@@ -419,7 +445,9 @@ def receive_deploy(home, request):
     registry.sync_own_version(home, installed_version())
     if request["action"] == "exchange":
         changes = registry.merge_into(home, request["digest"])
-        return answer({"digest": registry.digest(home), "changes": changes})
+        # The caller learns which machine answered at its connection: this machine's ID and name.
+        identity = {"machine_id": registry.machine_id(home), "hostname": own}
+        return answer({"digest": registry.digest(home), "changes": changes, "machine": identity})
     if request["action"] == "unenroll":
         # The caller confirmed. Remove Fleet under the uninstall rules, keeping backups.
         code = run_index.run(
@@ -432,15 +460,26 @@ def receive_deploy(home, request):
         return answer({"machine": record})
     if request["action"] == "join":
         peer = request["peer"]
-        if peer["hostname"] == own:
+        own_id = registry.machine_id(home)
+        if peer.get("machine_id") and peer["machine_id"] == own_id:
+            raise ValueError("The caller has this machine's own ID. Nothing was saved.")
+        if not peer.get("machine_id") and peer["hostname"] == own:
             raise ValueError("The caller has this machine's own name. Nothing was saved.")
 
         def add(data):
-            data["machines"][peer["hostname"]] = dict(peer)
+            fact = {key: peer[key] for key in registry.EXCHANGED if key in peer}
+            fact["recorded_at"] = peer.get("recorded_at", "")
+            registry.merge(data, {"members": [fact], "removed": {}}, own, own_id)
+            key = registry.find_key(data["machines"], fact)
+            if key is not None:
+                # The return target is how this machine reaches the caller: this viewer's own fact.
+                data["machines"][key]["ssh_target"] = peer.get("ssh_target", "")
+                data["machines"][key]["recorded_at"] = fact["recorded_at"]
 
         code = run_index.run(home, "machines join", lambda: command.change_registry(home, add))
         return answer({"code": code}) if code == 0 else code
-    record = registry.load(home)["machines"].get(request["name"], {})
+    data = registry.load(home)
+    record = data["machines"].get(registry.resolve(data, request["name"]) or request["name"], {})
     target = record.get("ssh_target", "")
     if not target:
         return answer({"code": 2, "reason": "no saved connection to " + request["name"]})

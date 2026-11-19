@@ -101,7 +101,8 @@ class ExchangeTests(unittest.TestCase):
         self.add_member(self.target, member("lab-box", "2026-11-10T00:00:00+00:00"))
         output = self.call("status", "mini-pc")
         self.assertIn("Fleet members updated from mini-pc: added lab-box.", output)
-        self.assertEqual(self.registry(self.home)["lab-box"]["ssh_target"], "lab-box")
+        # How a viewer reaches a machine stays with that viewer; the exchange never carries it.
+        self.assertEqual(self.registry(self.home)["lab-box"]["ssh_target"], "")
 
         self.add_member(self.home, member("lab-box", "2026-11-12T00:00:00+00:00", domain="work"))
         self.call("doctor", "mini-pc")
@@ -132,7 +133,8 @@ class ExchangeTests(unittest.TestCase):
         self.assertTrue(any((self.target / ".fleet/backups").iterdir()))
         self.assertNotIn("mini-pc", self.registry(self.home))
         saved = tomllib.loads((self.home / registry.REGISTRY).read_text())
-        self.assertIn("mini-pc", saved["removed"])
+        # The marker names the member's machine ID, so a later name change cannot revive it.
+        self.assertIn(registry.machine_id(self.target), saved["removed"])
         self.assertIn(
             "is not a fleet member", self.call("machines", "uninstall", "mini-pc", expected=1)
         )

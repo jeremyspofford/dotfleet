@@ -391,7 +391,11 @@ def peer_record(home):
     record = data["machines"].get(name) or registry.machine(
         home, (command.ROOT / "VERSION").read_text().strip()
     )
-    return {key: record.get(key, "") for key in registry.FIELDS} | {"recorded_at": now()}
+    peer = {key: record.get(key, "") for key in registry.FIELDS} | {"recorded_at": now()}
+    peer["machine_id"] = registry.machine_id(home, create=True)
+    if record.get("aliases"):
+        peer["aliases"] = record["aliases"]
+    return peer
 
 
 def return_target(home, name, options, terminal):
@@ -421,19 +425,39 @@ def return_target(home, name, options, terminal):
 
 
 def register_caller(home, target, name, options, terminal):
-    """Add the target to this machine's registry under the shared lock and backup rules."""
+    """Add the target to this machine's registry under the shared lock and backup rules.
+
+    The target names itself: its hostname is its fleet name. NAME only reaches it. A record that
+    this machine saved for the same connection, from before IDs, becomes this member.
+    """
     import command
 
     facts = facts_of(name, target)
-    facts.update(hostname=name, ssh_target=target, recorded_at=now())
+    facts.update(recorded_at=now())
+    fact = {key: facts[key] for key in registry.EXCHANGED if key in facts}
+    own = registry.machine_name()
 
     def add(data):
-        data["machines"][name] = {
-            key: facts.get(key, kind()) for key, kind in registry.FIELDS.items()
-        }
-        data["machines"][name].update(ssh_target=target, recorded_at=facts["recorded_at"])
+        contacted = registry.resolve(data, name)
+        registry.merge(
+            data,
+            {"members": [fact], "removed": {}},
+            own,
+            registry.machine_id(home),
+            contacted=contacted,
+            answered=fact,
+        )
+        key = registry.find_key(data["machines"], fact)
+        if key is None or key == own:
+            raise DeployError(
+                "enrollment failed", [f"{name}: it reported this machine's own name and no ID."]
+            )
+        data["machines"][key].update(ssh_target=target, recorded_at=fact["recorded_at"])
 
-    return command.change_registry(home, add)
+    result = command.change_registry(home, add)
+    if not result and facts["hostname"] != name:
+        print(f"{name}: enrolled as {facts['hostname']}, the name that machine reports.")
+    return result
 
 
 def install(home, options):

@@ -197,7 +197,9 @@ def add_action_parameters(parser, name, action):
         elif action == "install":
             import manager
 
-            parser.add_argument("name", nargs="?", help="SSH config host or new machine name")
+            parser.add_argument(
+                "name", nargs="?", help="SSH config host to deploy to; its hostname names it"
+            )
             parser.add_argument("--domain", type=manager.domain_argument, help="scripted domain")
             parser.add_argument("--git-email", help="scripted Git author email")
             parser.add_argument("--git-name", help="scripted Git author name")

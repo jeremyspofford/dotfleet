@@ -40,6 +40,8 @@ class RegistryTests(unittest.TestCase):
             other = registry.refresh(
                 self.home, "0.2.0", self.home / ".fleet/backups/first", "SUCCESS"
             )
+        # Another machine has its own ID. Without that, this record would be a rename of it.
+        (self.home / registry.MACHINE_ID).unlink()
         with patch("socket.gethostname", return_value="this-machine"):
             first = registry.refresh(
                 self.home, "0.2.1", self.home / ".fleet/backups/second", "SUCCESS"
@@ -108,6 +110,7 @@ class RegistryCommandTests(unittest.TestCase):
             last_run="2026-11-01T10:00:00+00:00",
             last_backup="/home/recorded/.fleet/backups/20261101-100000",
             last_run_record="/home/recorded/.fleet/backups/20261101-100000/RUN.json",
+            machine_id="0" * 32,
         )
         data["machines"]["recorded-machine"] = other
         atomic(path, registry.serialize(data))
@@ -184,7 +187,7 @@ class RegistryCommandTests(unittest.TestCase):
         data = registry.load(self.home)
         local = socket.gethostname()
         other = copy.deepcopy(data["machines"][local])
-        other.update(hostname="recorded-later", domain="client")
+        other.update(hostname="recorded-later", domain="client", machine_id="1" * 32)
         data["machines"]["recorded-later"] = other
         atomic(path, registry.serialize(data))
         self.terminal(
