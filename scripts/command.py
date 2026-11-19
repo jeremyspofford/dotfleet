@@ -158,7 +158,7 @@ DESCRIPTIONS = {
         "Open the full-screen terminal interface.\n"
         "Arrows and Tab move; Enter selects; Esc goes back; q quits.\n"
         "Configure returns to the existing wizard.\n"
-        "If the interface environment is missing, print plain command alternatives and exit 0."
+        "If the interface environment is missing, print plain command alternatives instead."
     ),
     "uninstall": (
         "Remove Fleet and its managed files.\n"
@@ -218,7 +218,7 @@ def parser():
             detail += (
                 "\nSSH securely connects to another machine."
                 "\nAdd MACHINE to use one registered machine and its own saved choices."
-                "\nRemote runs never prompt; connection failures exit nonzero."
+                "\nRemote runs never prompt; a failed connection prints an error."
             )
         elif name in remote.PROFILE_ACTIONS:
             detail += (

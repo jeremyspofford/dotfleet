@@ -4,8 +4,9 @@ Usage: python3 scripts/store_migration.py --record FILE
 FILE receives private move records for the run review. Nothing is copied.
 Existing destination stores stop migration before any folder moves.
 A cancelled run moves the stores back, using the same FILE.
-Exit codes: 0 success/help; 1 migration failure; 2 invalid arguments.
 """
+
+# Exit codes: 0 success/help; 1 migration failure; 2 invalid arguments.
 
 import argparse
 import json

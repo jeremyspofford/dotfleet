@@ -1096,10 +1096,11 @@ class ConverterTests(unittest.TestCase):
                 words = (
                     ["Usage:", "global options:"]
                     if path.name == "dotfleet.sh"
-                    else ["Usage:", "Example", "Exit codes:"]
+                    else ["Usage:", "Example"]
                 )
                 for word in words:
                     self.assertIn(word, output, str(path))
+                self.assertNotIn("exit code", output.lower(), str(path))
             result = subprocess.run(
                 ["bash", str(path), "--unknown"], text=True, capture_output=True
             )

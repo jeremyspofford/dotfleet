@@ -308,18 +308,15 @@ class UpdateTests(unittest.TestCase):
         self.assertIn("Warning: Could not check manager: remote fetch timed out", output.getvalue())
         self.assertEqual((cache.read_bytes(), cache.stat().st_mtime_ns), before)
 
-    def test_check_help_codes_and_missing_profile_warning(self):
+    def test_check_help_omits_codes_and_missing_profile_warning(self):
         from test_manager import ROOT
 
         output = command("bash", str(ROOT / "scripts/dotfleet.sh"), "check", "--help", env=self.env)
-        for text in [
-            "upstream",
-            "10-second",
-            "0 Manager and content are current.",
-            "1 Updates are available.",
-            "2 Could not check updates, or invalid arguments.",
-        ]:
+        for text in ["upstream", "10-second"]:
             self.assertIn(text, " ".join(output.split()))
+        # Help never shows exit codes; the check below still returns 2.
+        self.assertNotIn("exit code", output.lower())
+        self.assertNotIn("Updates are available.", output)
         result = subprocess.run(
             ["bash", str(ROOT / "scripts/dotfleet.sh"), "check"],
             env=self.env,

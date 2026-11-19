@@ -25,7 +25,7 @@
 # BOLD (bold text), and CLEAR (reset formatting).
 # error_exit msg [code]: log an error and exit; default code is 1.
 # command_exists cmd: return 0 when PATH, the command search path, contains cmd.
-# require_commands ...: list missing commands and exit through error_exit.
+# require_commands ...: list missing commands and exit 1 through error_exit.
 # get_repo_dir: print the Git root; return 1 without output outside a repository.
 # set_strict: enable set -euo pipefail in the caller.
 # Strict mode stops on failed commands, unset variables, and failed pipeline commands.
@@ -251,7 +251,7 @@ It reads DOTFILES_VERSION from the repository VERSION file; the fallback is unkn
 stdout carries normal output; stderr carries diagnostics; stdin supplies input.
 
 Parameters:
-  -h, --help  Print full help and exit 0.
+  -h, --help  Print full help.
   No other command-line arguments are accepted.
 
 Functions:
@@ -264,9 +264,9 @@ Functions:
   log_section MESSAGE...    Cyan bold banner on stdout.
   log_kv KEY VALUE          Aligned key/value output on stdout.
   log_heredoc COLOR         Read stdin lines and print them in COLOR.
-  error_exit MESSAGE [CODE] Log an error and exit; default code: 1.
+  error_exit MESSAGE [CODE] Log an error and stop the script.
   command_exists COMMAND   Return 0 if PATH, the command search path, contains COMMAND.
-  require_commands CMD...  List missing commands and exit 1 if any are missing.
+  require_commands CMD...  List missing commands and stop the script if any are missing.
   get_repo_dir             Print the Git root; return 1 without output outside a repository.
   set_strict               Enable set -euo pipefail in the caller.
   set_verbose              Enable set -x command tracing for debugging.
@@ -289,7 +289,6 @@ Examples:
   require_commands git curl
   DOTFILES_DEBUG=1 log_debug "Checking configuration"
 
-Exit codes: 0 help; 2 invalid or missing arguments.
 Author: Jeremy Spofford / Aria Labs (original), Muse (improvements).
 Version: $DOTFILES_VERSION (VERSION).
 EOF

@@ -4,7 +4,8 @@
  * Usage: import from release.cjs; test with node --test tests/release-policy.test.cjs.
  * Parameters: strategy and note inputs from release-please's programming interface.
  * Example: new ZeroMajor().bump(Version.parse('0.0.1'), commits).
- * Exit codes: this library throws for forbidden releases; the wrapper reports failure.
+ * Exit codes: 0 for direct execution or help. This library throws for forbidden releases.
+ * The wrapper reports that failure.
  * Author: Jeremy Spofford / Aria Labs; Version: project version comes from VERSION.
  */
 const {
@@ -82,7 +83,7 @@ This module enforces the 0.x release limit and formats release notes.
 Import assertZero, ZeroMajor, or KeepAChangelog from release.cjs.
 -h and --help show help. Other direct calls keep the existing no-operation behavior.
 Example: npm run test:release
-Exit codes: 0 for direct execution or help. Imported validation failures throw errors.`);
+Imported validation failures throw errors.`);
 }
 
 if (

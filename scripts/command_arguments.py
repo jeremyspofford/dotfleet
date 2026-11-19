@@ -92,34 +92,20 @@ EXAMPLES = {
 }
 
 
+# Help never shows exit codes, by owner ruling on 2026-11-18. Commands still return these codes:
+#   0    Success, help, or cancellation. Check: manager and content are current. Diff: no differences.
+#   1    Operation failed. Check: updates are available. Diff: differences exist.
+#        Doctor: one or more checks failed.
+#   2    Invalid arguments. Check: could not check updates. Diff: preview failed.
+#        Machines set-ssh: connection test failed; the saved target stays.
+#   130  Interrupted.
+# Diff --stat returns the same codes as diff. A failed remote connection returns nonzero.
 def help_epilog(name, display, action=None):
-    codes = ["0  Success, help, or cancellation.", "1  Operation failed.", "2  Invalid arguments."]
-    if name == "check":
-        codes = [
-            "0  Manager and content are current.",
-            "1  Updates are available.",
-            "2  Could not check updates, or invalid arguments.",
-        ]
-    elif name == "diff":
-        codes = [
-            "0  No differences.",
-            "1  Differences exist.",
-            "2  Preview failed, or invalid arguments.",
-        ]
-    elif name == "doctor":
-        codes[1] = "1  One or more checks failed."
-    elif name == "machines" and action == "set-ssh":
-        codes[2] = "2  Connection test failed, or invalid arguments. The saved target stays."
-    codes.append("130  Interrupted.")
     choices = EXAMPLES.get(name, name).split("; ")
     if action:
         choices = [value for value in choices if value.split()[:2] == [name, action]]
     examples = ["  " + display + " " + value for value in choices]
-    return (
-        "Exit codes:\n"
-        + "\n".join("  " + code for code in codes)
-        + ("\n\nExamples:\n" + "\n".join(examples) if examples else "")
-    )
+    return "Examples:\n" + "\n".join(examples) if examples else None
 
 
 def add_groups(parser, name, formatter, display):
@@ -133,7 +119,7 @@ def add_groups(parser, name, formatter, display):
             + (
                 "\nEither flag supplies both fields unless the values differ."
                 "\nTest SSH once in batch mode, without password prompts, with a ten-second timeout."
-                "\nA failed test keeps the saved target and exits 2."
+                "\nA failed test keeps the saved target."
                 "\nFleet never edits SSH configuration."
                 if action == "set-ssh"
                 else ""
@@ -263,9 +249,7 @@ def add_action_parameters(parser, name, action):
 
 def add_parameters(parser, name):
     if name == "diff":
-        parser.add_argument(
-            "--stat", action="store_true", help="show paths only; keep the same exit codes"
-        )
+        parser.add_argument("--stat", action="store_true", help="show paths only")
     elif name == "topology":
         parser.add_argument(
             "--json", action="store_true", help="print JSON, a structured format for scripts"

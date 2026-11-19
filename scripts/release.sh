@@ -21,7 +21,7 @@ Usage: bash scripts/release.sh [--dry-run] [-h|--help]
 
 Parameters:
   --dry-run   Build release proposals without writing to GitHub.
-  -h, --help  Print full help and exit 0.
+  -h, --help  Print full help.
 
 Environment:
   GITHUB_TOKEN       Token with content and pull-request write access.
@@ -33,8 +33,6 @@ npm installs the build packages. Run npm install --ignore-scripts first.
 Reject automatic nonzero major versions, including 1.x, and all Release-As overrides.
 The major is the first version number. Release-As requests a forced version.
 Example: bash scripts/release.sh --dry-run
-Exit codes: 0 success/help; 1 policy or GitHub API failure; 2 invalid arguments.
-The API is GitHub's programming interface.
 Author: Jeremy Spofford / Aria Labs; Version: $DOTFILES_VERSION (VERSION).
 EOF
 }

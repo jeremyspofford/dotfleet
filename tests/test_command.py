@@ -185,10 +185,8 @@ class CommandTests(unittest.TestCase):
             self.assertNotIn("Usage: Usage:", output)
             for line in output.splitlines():
                 self.assertLessEqual(len(line), 100)
-            if name and name != "help":
-                self.assertIn("Exit codes:", output)
-            else:
-                self.assertNotIn("Exit codes:", output)
+            # Help never shows exit codes; commands still return them.
+            self.assertNotIn("exit code", output.lower())
             if name and name != "help":
                 self.assertIn(DESCRIPTIONS[name].split(".")[0].split()[0], output)
         result = subprocess.run(

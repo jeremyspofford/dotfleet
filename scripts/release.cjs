@@ -120,9 +120,7 @@ function usage() {
 Propose and publish releases within 0.x. Only the owner can authorize 1.0.0.
 --dry-run validates proposals without GitHub writes. -h and --help show this help.
 GITHUB_REPOSITORY selects owner/repo. GITHUB_TOKEN grants release access.
-Example: bash scripts/release.sh --dry-run
-Exit codes: 0 success/help; 1 validation or API failure.
-API means GitHub's programming interface.`);
+Example: bash scripts/release.sh --dry-run`);
 }
 
 if (require.main === module) {

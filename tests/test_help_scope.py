@@ -1,12 +1,17 @@
-"""Keep help short, raw, alphabetized, and specific to each command.
+"""Keep help short, raw, alphabetized, and specific to each command, without exit codes.
 
 Usage: python3 -m unittest discover -s tests -v.
 """
 
 import argparse
+import ast
 import contextlib
 import io
+import os
 from pathlib import Path
+import re
+import subprocess
+import sys
 import unittest
 from unittest.mock import patch
 
@@ -14,6 +19,8 @@ import command
 import command_arguments
 
 ROOT = Path(__file__).resolve().parents[1]
+# Help never shows exit codes, so match labels, statuses, and numbered or nonzero exits.
+EXIT_CODES = re.compile(r"exit\s+codes?|exit\s+status|\bexits?\s+(?:\d|nonzero)", re.IGNORECASE)
 
 
 def parsers(parser):
@@ -45,13 +52,7 @@ class HelpScopeTests(unittest.TestCase):
             self.assertNotIn(removed, top)
         self.assertTrue(top.rstrip().endswith("show manager and content versions, then exit"))
         check = self.screens["fleet check"].format_help()
-        for line in (
-            "  0  Manager and content are current.",
-            "  1  Updates are available.",
-            "  2  Could not check updates, or invalid arguments.",
-            "  fleet check",
-        ):
-            self.assertIn(line, check.splitlines())
+        self.assertIn("  fleet check", check.splitlines())
 
     def test_every_screen_preserves_structured_text_within_100_columns(self):
         for name, parser in self.screens.items():
@@ -68,6 +69,61 @@ class HelpScopeTests(unittest.TestCase):
                     examples = [line for line in lines if line.startswith("  fleet ")]
                     self.assertTrue(examples, name)
                     self.assertTrue(all(";" not in line for line in examples))
+
+    def test_no_command_help_mentions_exit_codes(self):
+        # Every help route reaches argparse: flags, the help word, help COMMAND, and bare groups.
+        routes = [["--help"], ["-h"], ["help"]]
+        for name in command.DESCRIPTIONS:
+            routes += [[name, "--help"], [name, "help"], ["help", name]]
+            for action in command_arguments.GROUPS.get(name, {}):
+                routes += [[name, action, "--help"], [name, action, "help"], ["help", name, action]]
+            if name in command_arguments.GROUPS:
+                routes.append([name])
+        for route in routes:
+            with self.subTest(route=route):
+                output = io.StringIO()
+                with (
+                    patch.object(command, "current_command", return_value="fleet"),
+                    contextlib.redirect_stdout(output),
+                    contextlib.suppress(SystemExit),
+                ):
+                    command.main(route)
+                self.assertIn("Usage: fleet", output.getvalue())
+                self.assertIsNone(EXIT_CODES.search(output.getvalue()), output.getvalue())
+        for name, parser in self.screens.items():
+            with self.subTest(screen=name):
+                self.assertIsNone(EXIT_CODES.search(parser.format_help()), name)
+
+    def test_no_script_help_mentions_exit_codes(self):
+        environment = dict(os.environ, PYTHONPATH=str(ROOT / "scripts"), NO_COLOR="1")
+        shells = [ROOT / "install.sh", *sorted((ROOT / "scripts").glob("*.sh"))]
+        pythons = sorted((ROOT / "scripts").glob("*.py"))
+        for path in [*shells, *pythons]:
+            with self.subTest(script=path.name):
+                program = ["bash"] if path.suffix == ".sh" else [sys.executable]
+                result = subprocess.run(
+                    [*program, str(path), "--help"],
+                    env=environment,
+                    text=True,
+                    capture_output=True,
+                    timeout=60,
+                )
+                output = result.stdout + result.stderr
+                if path.name == "tui.py" and "No module named 'textual'" in output:
+                    # Without Textual, check the module text that its help prints.
+                    output = ast.get_docstring(ast.parse(path.read_text()))
+                else:
+                    self.assertEqual(result.returncode, 0, output)
+                    self.assertIn("usage", output.lower())
+                self.assertIsNone(EXIT_CODES.search(output), output)
+        for path in sorted((ROOT / "scripts").glob("*.cjs")):
+            with self.subTest(script=path.name):
+                # Release helpers need npm packages to run, so read their usage text directly.
+                usage = re.search(
+                    r"function usage\(\) \{\s+console\.log\(`(.*?)`\);", path.read_text(), re.S
+                )
+                self.assertIsNotNone(usage, path.name)
+                self.assertIsNone(EXIT_CODES.search(usage.group(1)), usage.group(1))
 
     def test_readme_defines_all_removed_terms(self):
         text = (ROOT / "README.md").read_text().lower()
