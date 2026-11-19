@@ -492,16 +492,84 @@ def steps(home, args, workspace, profile, found, excluded, start=0, checkout=Non
         if args.agents is not None:
             agent_flags(profile, args.agents)
         else:
-            choose_agents(home, profile)
+            choose_agents(home, profile, checkout, manifest)
     warnings += gap_warnings(profile)
     return profile, checkout, manifest, list(dict.fromkeys(warnings))
 
 
-def choose_agents(home, profile):
+AGENT_KINDS = [
+    ("skills", "skill", "skills"),
+    ("mcp", "MCP entry", "MCP entries"),
+    ("rules", "rule", "rules"),
+    ("connectors", "connector", "connectors"),
+    ("plugins", "plugin", "plugins"),
+    ("hooks", "hook", "hooks"),
+]
+NO_AGENT_CONFIGURATION = (
+    "This content declares no agent configuration yet. On or off changes nothing today.\n"
+    "On means this machine receives agent configuration at a later update, when you add some."
+)
+
+
+def counted(number, one, many):
+    return f"{number} {one if number == 1 else many}"
+
+
+def listed(parts):
+    return parts[0] if len(parts) == 1 else ", ".join(parts[:-1]) + ", and " + parts[-1]
+
+
+def marketplace_packages(home):
+    """Count the marketplace packages this machine takes. An unreadable record counts none."""
+    import marketplaces
+
+    try:
+        return sum(
+            len(
+                marketplaces.selection(
+                    marketplaces.read_catalog(marketplaces.library(home, name)), record["take"]
+                )
+            )
+            for name, record in marketplaces.records(home).items()
+        )
+    except (OSError, ValueError, KeyError):
+        return 0
+
+
+def agent_configuration(home, checkout, manifest):
+    """Return one line that sizes the declared agent configuration, or the nothing-declared text.
+
+    Skills are skill folders in the checkout. Packages come from this machine's marketplaces.
+    """
+    import agent_table
+
+    table = (manifest or {}).get("agents")
+    table = table if isinstance(table, dict) else {}
+    counts = {
+        kind: len(table.get(kind)) if isinstance(table.get(kind), dict) else 0
+        for kind, _, _ in AGENT_KINDS
+    }
+    if checkout is not None:
+        # Every skill folder deploys; a skills entry only limits its domains.
+        counts["skills"] = len(agent_table.skills(checkout))
+    parts = [counted(counts[kind], one, many) for kind, one, many in AGENT_KINDS if counts[kind]]
+    packages = marketplace_packages(home)
+    if not parts and not packages:
+        return NO_AGENT_CONFIGURATION
+    package_text = counted(packages, "marketplace package", "marketplace packages")
+    if not parts:
+        return f"This content declares no agent configuration. This machine takes {package_text}."
+    line = "This content declares " + listed(parts) + "."
+    return line + (f" This machine also takes {package_text}." if packages else "")
+
+
+def choose_agents(home, profile, checkout=None, manifest=None):
     detected = detected_agents(home)
     print("\n8. Agents\nAn agent is a coding assistant. Only detected agents can be configured.")
     if not detected:
         print("No agents detected. No configuration selected.")
+    else:
+        print(agent_configuration(home, checkout, manifest))
     selections = profile.setdefault("agents", {})
     for name, spec in detected.items():
         if not spec["supported"]:
@@ -518,12 +586,16 @@ def choose_agents(home, profile):
                 heading="Agent: " + name,
                 detail=manager.options(
                     [
-                        ("on", "Write this agent's settings from your content."),
-                        ("off", "Write nothing new for it. Earlier outputs stay."),
+                        ("on", "Fleet manages its skills, MCP entries, rules, and packages."),
+                        ("off", "Fleet leaves its configuration alone. The agent still works."),
                     ],
                     "on" if selections.get(name, False) else "off",
                     "current",
-                    intro="Setup stops before writing if it finds a value Fleet did not write.",
+                    intro=(
+                        "When on, Fleet writes only entries it owns and never touches the agent's "
+                        "login.\nWhen off, outputs Fleet wrote earlier stay in place.\n"
+                        "Setup stops before writing if it finds a value Fleet did not write."
+                    ),
                 ),
             )
             == "on"

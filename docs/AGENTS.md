@@ -9,6 +9,10 @@ Fleet installs and starts no agent. Agent sign-in remains separate.
 
 `PATH` lists directories searched for commands. Detection checks PATH, installed Mise packages, and known configuration folders. Any match detects the agent.
 Turn each detected agent on or off during enrollment. Press Enter to keep its current choice.
+Before the first choice, the step counts the skills, MCP entries, rules, and other items your content declares.
+When the content declares none, the step says so. On or off then changes nothing until you add some.
+On lets Fleet manage the agent's configuration. Fleet writes only entries it owns and never touches the agent's sign-in.
+Off leaves the agent's configuration alone, and the agent still works.
 For scripted runs, use `--agents claude,codex` for detected agents. Use `--agents none` to skip.
 Turning an agent off writes nothing new for it. Its earlier outputs stay for review.
 

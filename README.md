@@ -41,7 +41,7 @@ Prompts read the terminal, never piped input. Complete profiles update without e
 5. Confirm Git name and email. Enter keeps the displayed value; type `skip` explicitly to leave it empty.
 6. Compare installed tools, content defaults, and saved tools. Accept them or enter exact versions.
 7. Choose groups. On includes their content; off excludes it. New groups say NEW.
-8. Select detected agents, which are coding assistants. Set each detected agent on or off. Press Enter to keep its current choice.
+8. Select detected agents, which are coding assistants. The step first counts the agent configuration your content declares, or says it declares none. Set each detected agent on or off. Press Enter to keep its current choice.
 9. Review all choices and the full planned change account. Press Enter to confirm, type `quit` to cancel, or type a step name to return.
 10. Read the apply result and summary warnings.
 

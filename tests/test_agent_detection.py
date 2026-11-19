@@ -77,6 +77,82 @@ class AgentDetectionTests(unittest.TestCase):
         )
         self.assertNotIn("commas", output.getvalue())
 
+    def agents_step(self, files, manifest, packages=None):
+        """Run the Agents step on a git checkout that tracks FILES; return its output."""
+        detected = {"claude": enrollment.agent_manifest()["claude"]}
+        output = io.StringIO()
+        with tempfile.TemporaryDirectory() as folder:
+            home = Path(folder)
+            checkout = home / ".fleet/dotfiles/default"
+            checkout.mkdir(parents=True)
+            command("git", "init", "-q", str(checkout))
+            for name in files:
+                (checkout / name).parent.mkdir(parents=True, exist_ok=True)
+                (checkout / name).write_text("fixture\n")
+            if files:
+                command("git", "-C", str(checkout), "add", *files)
+            patches = [
+                patch.object(enrollment, "detected_agents", return_value=detected),
+                patch.object(
+                    enrollment.manager,
+                    "ask",
+                    side_effect=lambda name, default, choices, heading, detail: print(
+                        heading + "\n" + detail
+                    ),
+                ),
+            ]
+            if packages is not None:
+                patches.append(
+                    patch.object(enrollment, "marketplace_packages", return_value=packages)
+                )
+            with contextlib.ExitStack() as stack, contextlib.redirect_stdout(output):
+                for active in patches:
+                    stack.enter_context(active)
+                enrollment.choose_agents(home, {}, checkout, manifest)
+        return output.getvalue()
+
+    def test_agents_step_says_when_content_declares_no_agent_configuration(self):
+        output = self.agents_step([], {"groups": {}})
+        self.assertIn(
+            "This content declares no agent configuration yet. On or off changes nothing today.\n"
+            "On means this machine receives agent configuration at a later update, "
+            "when you add some.\n",
+            output,
+        )
+        self.assertNotRegex(output, r"declares \d")
+        self.assertLess(output.index("no agent configuration"), output.index("Agent: claude"))
+
+    def test_agents_step_counts_declared_agent_configuration(self):
+        manifest = {
+            "agents": {
+                "schema": 1,
+                "mcp": {"docs": {"description": "Docs", "transport": "stdio"}},
+                "rules": {
+                    "base": {"description": "Base", "file": "rules/base.md"},
+                    "tests": {"description": "Tests", "file": "rules/tests.md"},
+                },
+            }
+        }
+        files = [".agents/skills/review/SKILL.md", "rules/base.md", "rules/tests.md"]
+        output = self.agents_step(files, manifest)
+        self.assertIn("This content declares 1 skill, 1 MCP entry, and 2 rules.\n", output)
+        self.assertNotIn("no agent configuration", output)
+        self.assertNotIn("changes nothing", output)
+        output = self.agents_step(files, manifest, packages=2)
+        self.assertIn(
+            "This content declares 1 skill, 1 MCP entry, and 2 rules. "
+            "This machine also takes 2 marketplace packages.\n",
+            output,
+        )
+
+    def test_marketplace_packages_alone_are_not_called_empty(self):
+        output = self.agents_step([], {}, packages=1)
+        self.assertIn(
+            "This content declares no agent configuration. This machine takes 1 marketplace package.",
+            output,
+        )
+        self.assertNotIn("changes nothing", output)
+
     def test_mise_only_agent_is_detected_and_rendered_without_path_command(self):
         import agent_deploy
         import agent_table
