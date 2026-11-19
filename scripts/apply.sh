@@ -54,18 +54,18 @@ show_apply_output() {
 			log_info 'File conflict'
 			log_info '-------------'
 			log_info "$message."
-			log_info 'Type one letter, then press Enter.'
+			log_info 'Type one letter, then press Enter. Enter alone asks again.'
 			if [[ $choices == */Skip-conflicts/* ]]; then log_info 'Uppercase S differs from lowercase s.'; fi
 			log_info ''
 			if [[ $choices == diff/* ]]; then log_info '  d  Show changes for this file, then ask again.'; fi
 			if [[ $choices == *yes/no/all/quit ]]; then
 				log_info '  y  Apply the proposed change to this file.'
-				log_info '  n  Keep this file unchanged; continue with other files.'
+				log_info '  n  Keep this file unchanged; continue with other files. Recommended if unsure.'
 				log_info '  a  Apply remaining changes, but still ask about conflicts.'
 			else
 				log_info '  o  Overwrite this file with the generated version.'
 				log_info '  a  Overwrite this file and all remaining conflicts without asking again.'
-				log_info '  s  Keep this file unchanged; continue with other files.'
+				log_info '  s  Keep this file unchanged; continue with other files. Recommended if unsure.'
 				if [[ $choices == */Skip-conflicts/* ]]; then
 					log_info '  S  Keep all conflicting files unchanged; apply other changes.'
 				fi

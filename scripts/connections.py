@@ -135,14 +135,26 @@ def pick(home, purpose="connect"):
             "Host number",
             "cancel",
             answers,
-            detail="Enter a listed number, type for another target, or cancel. Press Enter.",
+            detail=manager.options(
+                [
+                    ("NUMBER", "Use the host with that number in the list above."),
+                    ("type", "Type another SSH target next."),
+                    ("cancel", "Stop without connecting."),
+                ],
+                "cancel",
+                None,
+            ),
         )
         if chosen == "cancel":
             return None
         if chosen != "type":
             return available[int(chosen) - 1]
     target = manager.ask(
-        "SSH target", "cancel", detail=detail + " Type the target or cancel, then press Enter."
+        "SSH target",
+        "cancel",
+        detail=detail
+        + "\nType the target, such as user@host.\n  cancel  Stop without connecting."
+        + "\nPress Enter alone to choose cancel.",
     )
     return None if target == "cancel" else target
 

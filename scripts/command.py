@@ -657,7 +657,12 @@ def confirm(word, explanation, record=None):
             "Confirm",
             "cancel",
             [word, "cancel"],
-            detail=explanation + f" Type {word} to proceed or cancel to stop. Press Enter.",
+            detail=manager.options(
+                [(word, "Proceed with the change above."), ("cancel", "Stop. Nothing changes.")],
+                "cancel",
+                None,
+                intro=explanation,
+            ),
         )
         == word
     )
@@ -907,7 +912,11 @@ def restore_command(args, home):
             chosen = manager.ask(
                 "Backup",
                 "cancel",
-                detail="Enter a listed backup folder to restore, or cancel to stop. Press Enter.",
+                detail=(
+                    "Type a backup folder name from the list above to restore it.\n"
+                    "  cancel  Stop. Nothing is restored.\n"
+                    "Press Enter alone to choose cancel."
+                ),
             )
         else:
             return 0
@@ -1186,9 +1195,17 @@ def dispatch(args, argument_parser, home):
                     "Oldest backup",
                     "keep",
                     ["restore", "keep"],
-                    detail=(
-                        "restore: restore the oldest saved files after removal; keep: "
-                        "remove managed files only. Content and backups stay. Press Enter."
+                    detail=manager.options(
+                        [
+                            (
+                                "restore",
+                                "Remove managed files, then restore the oldest saved files.",
+                            ),
+                            ("keep", "Remove managed files only."),
+                        ],
+                        "keep",
+                        None,
+                        intro="Your content and backups stay either way.",
                     ),
                 )
             if restore == "restore":

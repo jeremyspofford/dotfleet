@@ -323,7 +323,8 @@ class DeployTests(unittest.TestCase):
                 (b"Return target [skip]:", b"caller\n"),
             ],
         )
-        self.assertIn("Type skip, or press Enter, to save the caller without a connection.", output)
+        self.assertIn("  skip  Save caller-box on mini-pc without a connection.", output)
+        self.assertIn("Press Enter alone to choose skip.", output)
         self.assertIn("SSH target must be a host name or user@host", output)
         self.assertIn("PASS: mini-pc reaches caller-box through caller.", output)
         self.assertEqual(self.registry(self.target)["caller-box"]["ssh_target"], "caller")

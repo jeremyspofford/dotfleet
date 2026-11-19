@@ -4,10 +4,8 @@ Existing enrollment: none
 Installed tools: 3
 Selected tools: node 24.14.1
 Detected agents: codex
-Home configuration candidates: 5
-  Shell  ~/.bashrc
-  Shell  ~/.zshrc
-  Git    ~/.gitconfig
-  Tools  ~/.config/mise/config.toml
-  Tools  ~/.config/starship.toml
+Home configuration candidates: 5 files
+  Shell         2 files  ~/.bashrc, ~/.zshrc
+  Git            1 file  ~/.gitconfig
+  App settings  2 files  ~/.config/mise/, ~/.config/starship.toml
 Sensitive files are excluded.

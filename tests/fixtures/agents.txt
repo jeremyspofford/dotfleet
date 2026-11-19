@@ -3,22 +3,22 @@
 An agent is a coding assistant. Only detected agents can be configured.
 
 Agent: claude
-on: render the content's agent configuration for this agent.
-off: write nothing new for it; earlier outputs stay.
-A value that Fleet did not write stops setup before writes.
-Press Enter to keep the shown choice.
+Setup stops before writing if it finds a value Fleet did not write.
+  on   Write this agent's settings from your content. (Current.)
+  off  Write nothing new for it. Earlier outputs stay.
+Press Enter alone to choose on.
 claude [on]:
 
 Agent: codex
-on: render the content's agent configuration for this agent.
-off: write nothing new for it; earlier outputs stay.
-A value that Fleet did not write stops setup before writes.
-Press Enter to keep the shown choice.
+Setup stops before writing if it finds a value Fleet did not write.
+  on   Write this agent's settings from your content.
+  off  Write nothing new for it. Earlier outputs stay. (Current.)
+Press Enter alone to choose off.
 codex [off]:
 
 Agent: gemini
-on: render the content's agent configuration for this agent.
-off: write nothing new for it; earlier outputs stay.
-A value that Fleet did not write stops setup before writes.
-Press Enter to keep the shown choice.
+Setup stops before writing if it finds a value Fleet did not write.
+  on   Write this agent's settings from your content.
+  off  Write nothing new for it. Earlier outputs stay. (Current.)
+Press Enter alone to choose off.
 gemini [off]:

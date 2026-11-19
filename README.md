@@ -26,7 +26,7 @@ Prompts read the terminal, never piped input. Complete profiles update without e
 
 1. Read the welcome screen. Backups come before replacement; review comes before apply.
 2. Review the scan: operating system, installed Mise tools, home dotfiles, and existing enrollment.
-3. Choose a source. **Adopt** keeps this machine's files; **defaults** uses our examples; **repo** accepts your Git URL.
+3. Choose a source. **adopt** keeps this machine's files; **example** uses our example files; **repo** accepts your Git URL.
 4. Choose a domain. The prompt lists the domains that your content declares, with descriptions and overlay commands.
 5. Confirm Git name and email. Enter keeps the displayed value; type `skip` explicitly to leave it empty.
 6. Compare installed tools, content defaults, and saved tools. Accept them or enter exact versions.
@@ -48,7 +48,8 @@ Set `NO_COLOR` to disable colors, including an empty value. Redirected output st
 
 Adoption is recommended when the scan finds home dotfiles. It scans root dotfiles and `.config` files, excluding manager state and cache directories.
 It excludes credential filenames, detected secrets, binary files, and files above 2 MiB. Logs, histories, caches, telemetry, session files, and receipts are not candidates.
-The scan shows counts and up to 15 relevant file lines. RUN.json keeps the full scan and private exclusion list.
+The scan shows one line per category, such as Shell or Browser data. Each line has a file count and up to three examples.
+RUN.json keeps the full scan and private exclusion list.
 The scan cannot prove that remaining files contain no secrets. Review your local repository before pushing it.
 Adopted files keep their exact contents, including existing Mise files. Profile choices do not rewrite adopted files.
 Only accepted files enter the first local Git commit. Nothing is uploaded.
@@ -57,6 +58,9 @@ Only accepted files enter the first local Git commit. Nothing is uploaded.
 2. Create an empty repository on your chosen Git host.
 3. Run `cd ~/dotfiles && git remote add origin URL`, replacing URL with that repository's address.
 4. Run `git push -u origin main` when ready.
+
+Each prompt lists its choices one per line: the word to type, then its effect.
+Each prompt marks the recommended or current choice and states what Enter alone does.
 
 An unrelated `~/dotfiles` stops setup. Preserve it before choosing another repository or adopting files.
 Native chezmoi templates and hooks can execute code. Use trusted content only.

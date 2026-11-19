@@ -303,8 +303,8 @@ def return_target(home, name, options, terminal):
     caller = registry.machine_name()
     detail = (
         f"Type the SSH target that {name} uses to reach {caller}, such as user@host.\n"
-        "Type skip, or press Enter, to save the caller without a connection.\n"
-        "Press Enter to submit."
+        f"  skip  Save {caller} on {name} without a connection.\n"
+        "Press Enter alone to choose skip."
     )
     while True:
         answer = manager.ask(

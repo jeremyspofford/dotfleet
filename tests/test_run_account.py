@@ -182,7 +182,7 @@ class RunAccountTests(unittest.TestCase):
             if (path.is_file() or path.is_symlink()) and ".local/share/fleet/runs/" not in str(path)
         }
         answers = [
-            (b"Content door [", b"repo\n"),
+            (b"Content source [", b"repo\n"),
             (b"Content repository [", b"\n"),
             (b"Domain [core]:", b"personal\n"),
             (b"Git author name [", b"\n"),
