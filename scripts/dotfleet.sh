@@ -17,6 +17,20 @@ for old in .local/share/fleet .local/share/dotfleet; do
 done
 local_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 if [[ -f $local_root/scripts/command.py ]]; then manager=$local_root; fi
+# Bootstrap layer: the launcher must start on bash 3.2 to reach update. See docs/STYLE.md.
+# Once a modern bash exists, run again with it so every script this command starts uses it.
+if [ "${BASH_VERSINFO[0]}" -lt 4 ] || { [ "${BASH_VERSINFO[0]}" -eq 4 ] && [ "${BASH_VERSINFO[1]}" -lt 4 ]; }; then
+	if [ -z "${FLEET_BASH_BOOTSTRAPPED:-}" ] && [ -r "$manager/scripts/bash_floor.sh" ]; then
+		# shellcheck source=scripts/bash_floor.sh
+		. "$manager/scripts/bash_floor.sh"
+		if modern_bash=$(fleet_find_bash); then
+			export FLEET_BASH_BOOTSTRAPPED=1
+			exec "$modern_bash" "${BASH_SOURCE[0]}" "$@"
+		fi
+	fi
+else
+	export FLEET_BASH=$BASH
+fi
 # shellcheck source=scripts/logger.sh
 source "$manager/scripts/logger.sh"
 usage() { python3 -B "$manager/scripts/command.py" --help; }

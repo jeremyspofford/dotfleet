@@ -14,6 +14,21 @@ Use [WRITING.md](WRITING.md) for headers, help, comments, and documentation.
 
 Use Prettier, the JavaScript formatter, for release helpers.
 
+## Bash versions
+
+Fleet's shell needs bash 4.4 or newer. macOS ships bash 3.2, so a bootstrap layer comes first.
+The bootstrap layer finds a modern bash, or installs one with Homebrew after the user agrees.
+
+1. Keep the bootstrap layer safe for POSIX sh and bash 3.2. It runs before any upgrade exists.
+2. The bootstrap layer is `scripts/bash_floor.sh`, the bash check at the top of `install.sh`, the deploy probe and bash install scripts, and `scripts/dotfleet.sh`.
+3. In that layer, use no arrays, no `mapfile`, and no `[[ ]]`. Never expand an empty array under `set -u`.
+4. Expand all arguments as `"$@"`, which bash 3.2 allows under `set -u`. Expand a saved array as `${name[@]+"${name[@]}"}`.
+5. The launcher, `scripts/dotfleet.sh`, stays wholly in that layer. It must start on bash 3.2 to reach `fleet update`.
+6. All other shell code may use modern bash. The bootstrap guarantees 4.4 or newer before that code runs.
+7. Start scripts with the resolved bash by path. Python reads it from `FLEET_BASH`; never rely on PATH order over SSH.
+
+The `test_bash_floor` tests run the bootstrap layer on a real bash 3.2 in the `bash:3.2` container image.
+
 ## Command parameters
 
 Use flags for optional parameters and for values that a reader can confuse with each other.
@@ -35,7 +50,7 @@ The command audit uses these forms:
 
 | Command | Parameters |
 | --- | --- |
-| machines install | NAME; --target, --return-target, --domain, --git-name, --git-email, --repo, --tool; no NAME opens the picker |
+| machines install | NAME; --target, --return-target, --domain, --git-name, --git-email, --repo, --tool, --update-bash; no NAME opens the picker |
 | machines uninstall | NAME |
 | machines set-ssh | --name, --target; no flags opens the terminal picker |
 | machines remove | --name |

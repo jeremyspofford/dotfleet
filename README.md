@@ -19,8 +19,18 @@ curl -fsSL https://raw.githubusercontent.com/jeremyspofford/fleet/main/install.s
 - Re-run the same command to update. Saved selections remain unchanged.
 - Backups live in `~/.fleet/backups/<timestamp>/`. Review `MANIFEST.json` before restoring `home/` files and external targets.
 
-Requires Bash, git, curl, tar, and Python 3.11+. Use Linux, macOS, or WSL (Windows Subsystem for Linux).
+Requires bash 4.4+, git, curl, tar, and Python 3.11+. Use Linux, macOS, or WSL (Windows Subsystem for Linux).
 Missing chezmoi and Mise install into `~/.local/bin`. Setup never uses sudo.
+
+macOS ships bash 3.2, which is too old for Fleet's scripts. Fleet then offers to install bash with Homebrew:
+
+1. Setup states the bash version that it found, before anything is installed.
+2. Type `yes` to install bash with Homebrew, or `stop` to quit. Press Enter after either word.
+3. After the install, Fleet runs every script in that run with the new bash, named by its full path.
+
+Without a terminal, setup stops unless you pass `--update-bash`, the scripted form of `yes`.
+Without Homebrew, setup stops and prints the Homebrew install command. Fleet never installs Homebrew, because its installer needs admin rights.
+A machine that already has bash 4.4 or newer sees no prompt. Fleet looks on PATH and in the standard Homebrew folders.
 The wizard runs in a terminal for a new profile, incomplete choices, an unchosen domain, or `--configure`.
 Prompts read the terminal, never piped input. Complete profiles update without enrollment questions.
 
@@ -533,16 +543,21 @@ SSH is the secure connection tool. The deploy uses your SSH config and keys, in 
 
 The deploy runs these steps in order:
 
-1. Probe. Connect once and detect Linux, macOS, or WSL. Check the floor: bash, curl, git, tar, gzip, and a CA certificate bundle.
-2. Bootstrap. When Python 3.11 or newer is missing, install Mise and Python 3.12 in the target user's own folders.
-3. Enroll. Run the Fleet installer on the target with a terminal. Its wizard prompts appear in your terminal.
-4. Register both ways. Your registry gains the target. The target's registry gains your machine and the SSH target that reaches it.
-5. Prove the loop. Run a remote status against the target and print its result after your own run review.
+1. Probe. Connect once and detect Linux, macOS, or WSL. Check the floor: bash 4.4+, curl, git, tar, gzip, and a CA certificate bundle.
+2. Update bash. When the target's bash is older than 4.4, ask in your terminal, then install bash with Homebrew.
+3. Bootstrap. When Python 3.11 or newer is missing, install Mise and Python 3.12 in the target user's own folders.
+4. Enroll. Run the Fleet installer on the target with a terminal. Its wizard prompts appear in your terminal.
+5. Register both ways. Your registry gains the target. The target's registry gains your machine and the SSH target that reaches it.
+6. Prove the loop. Run a remote status against the target and print its result after your own run review.
 
 A missing floor item stops the deploy. The report names each item and the one command that installs it.
 Fleet installs no system packages and uses no admin rights. The bootstrap also needs sha256sum or shasum.
 A CA certificate bundle lets curl verify HTTPS; the probe reports `ca-certificates` when verification fails.
 A network failure during the probe is not a floor item. Later steps report it.
+The probe reports the bash version, not only its presence. Homebrew often sits outside PATH over SSH, so the probe checks the standard Homebrew folders too.
+The bash prompt names the version found and the Homebrew command. Type `yes` to install, or `stop` to end the deploy with nothing installed.
+Without a terminal, the deploy stops before installing unless you pass `--update-bash`. Without Homebrew, the report prints the Homebrew install command.
+The target then runs the deploy script and the installer with that bash, named by its full path, never found through PATH.
 The Python bootstrap keeps its own Mise store at `~/.fleet/mise`, apart from your tool versions.
 The installer reads the target's facts: its scan, wizard steps, and review describe the target.
 
@@ -556,6 +571,7 @@ The deploy tests that reverse connection once and reports the result. A failed r
 | --- | --- | --- |
 | Unreachable | 2 | SSH failed. The report names the reason and one next step. |
 | Missing floor | 2 | The report names each missing item and its install command. |
+| Bash declined | 1 | You typed stop at the bash prompt. Nothing was installed. |
 | Wizard aborted | 1 | The target's installer stopped before enrollment completed. |
 | Enrollment failed | 1 | The installer or the Python bootstrap failed. |
 | Reverse test failed | 0 | Report only. The enrollment and both registrations stand. |

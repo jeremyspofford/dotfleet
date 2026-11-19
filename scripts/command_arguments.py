@@ -216,6 +216,11 @@ def add_action_parameters(parser, name, action):
                 metavar="TOOL=VERSION",
                 help="scripted exact tool version; repeat for more tools",
             )
+            parser.add_argument(
+                "--update-bash",
+                action="store_true",
+                help="accept the Homebrew bash install when the target's bash is older than 4.4",
+            )
         elif action == "export":
             parser.add_argument("--output", help="new private TOML file; omit to show the record")
     elif name == "marketplaces" and action == "add":

@@ -120,3 +120,16 @@ jobs:
       - run: python -m pip install ruff==0.15.21
       - run: ruff format --check scripts tests
       - run: npx --yes prettier@3.6.2 --check 'scripts/*.cjs' 'tests/*.cjs'
+  bash-3-2:
+    # The bootstrap layer must run on bash 3.2, the bash that macOS ships. Docker runs it here.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: docker pull -q bash:3.2
+      - run: python -m unittest -v test_bash_floor
+        working-directory: tests
+        env:
+          FLEET_REQUIRE_DOCKER: '1'
