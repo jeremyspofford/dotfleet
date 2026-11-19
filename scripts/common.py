@@ -8,6 +8,7 @@ Direct execution without help keeps its existing behavior.
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import tempfile
 import tomllib
@@ -46,6 +47,30 @@ def value(item):
 def toml(data):
     # Inline tables preserve tool option tables and version lists without a dependency.
     return "".join(value(k) + " = " + value(v) + "\n" for k, v in data.items())
+
+
+BARE_KEY = re.compile(r"[A-Za-z0-9_-]+")
+
+
+def key(name):
+    """Return a TOML key: bare when TOML allows it, quoted otherwise."""
+    return name if BARE_KEY.fullmatch(name) else value(name)
+
+
+def toml_tables(data):
+    """Write top-level values first, then one [name] table per mapping.
+
+    Tools such as Mise edit [tools] in place and cannot edit a quoted inline table.
+    Nested mappings inside a table stay inline.
+    """
+    lines = [key(k) + " = " + value(v) for k, v in data.items() if not isinstance(v, dict)]
+    for name, table in data.items():
+        if isinstance(table, dict):
+            if lines:
+                lines.append("")
+            lines.append("[" + key(name) + "]")
+            lines += [key(k) + " = " + value(v) for k, v in table.items()]
+    return "\n".join(lines) + "\n"
 
 
 def atomic(path, content, mode=0o600):

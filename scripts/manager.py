@@ -39,7 +39,7 @@ import tui_environment
 import tempfile
 import textwrap
 
-from common import atomic, bash, read_toml, relative, run, toml
+from common import atomic, bash, read_toml, relative, run, toml, toml_tables
 from command_display import command_name
 from render_run import change_marker
 from convert import GENERATED, convert, detect, source_name, tracked
@@ -703,7 +703,7 @@ def generated_files(home, profile, manifest, defaults):
         {
             ".config/git/local.gitconfig": identity,
             ".config/dotfiles/domain": (profile["domain"] + "\n").encode(),
-            ".config/mise/config.toml": toml(mise).encode(),
+            ".config/mise/config.toml": toml_tables(mise).encode(),
             ".secrets": secrets,
         },
         pins,
