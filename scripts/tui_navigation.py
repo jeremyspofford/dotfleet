@@ -13,6 +13,7 @@ ACTIONS = {
     "status": ("Status — local state", ("status",)),
     "check": ("Check — fetch update results", ("check",)),
     "update": ("Update — pull and apply", ("update",)),
+    "update-all": ("Update every fleet machine, this one first", ("update", "--all")),
     "diff": ("Diff — pending changes", ("diff",)),
     "diff-stat": ("Changed paths only", ("diff", "--stat")),
     "doctor": ("Doctor — check this machine", ("doctor",)),
@@ -85,6 +86,7 @@ AREAS = {
 
 RELATED = {
     "help": ("command-help",),
+    "update": ("update-all",),
     "domain": ("domain-set",),
     "groups": ("group-set",),
     "agents": ("agent-set", "agent-import"),
@@ -104,6 +106,7 @@ RELATED = {
 
 CHANGING = {
     "update",
+    "update-all",
     "domain-set",
     "group-set",
     "agent-set",

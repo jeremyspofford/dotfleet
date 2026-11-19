@@ -53,7 +53,7 @@ from pathlib import Path
 payload = sys.stdin.read()
 with Path(os.environ["FAKE_SSH_LOG"]).open("a") as stream:
     stream.write(json.dumps({"args": sys.argv[1:], "request": payload}) + "\\n")
-if os.environ.get("FAKE_SSH_OFFLINE"):
+if os.environ.get("FAKE_SSH_OFFLINE") or "offline-box" in sys.argv:
     print("ssh: connect to host mini-pc port 22: Connection refused", file=sys.stderr)
     print("Connection closed", file=sys.stderr)
     sys.exit(255)
@@ -199,6 +199,62 @@ sys.exit(result.returncode)
         self.assertEqual((self.home / ".file").read_text(), "remote content update\n")
         self.assertEqual(self.caller_files(), before)
         self.assert_quiet_status()
+
+    def fleet_home(self):
+        """Make this home the caller, with one reachable member and one unreachable member."""
+        self.connect()
+        path = self.home / registry.REGISTRY
+        data = registry.load(self.home)
+        own = data["machines"][socket.gethostname()]
+        for name, target in (("atlas", "offline-box"), ("beelink", "mini-pc")):
+            data["machines"][name] = dict(own, hostname=name, ssh_target=target, enrolled=True)
+        atomic(path, registry.serialize(data))
+        caller = dict(self.controller_env)
+        for key in ("HOME", "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME"):
+            if key in self.env:
+                caller[key] = self.env[key]
+            else:
+                caller.pop(key, None)
+        self.controller_env = caller
+        self.controller = self.home
+
+    def test_update_all_updates_every_machine_and_continues_past_an_unreachable_one(self):
+        self.fleet_home()
+        this = socket.gethostname()
+        output = self.call("update", "--all", expected=2)
+        lines = output.splitlines()
+        first = lines.index(f"[1/3] {this}: update succeeded.")
+        unreachable = lines.index("[2/3] atlas: unreachable: SSH connection refused.")
+        reached = lines.index("[3/3] beelink: update succeeded.")
+        self.assertLess(first, unreachable)
+        self.assertLess(unreachable, reached)
+        self.assertIn("Error: atlas: SSH connection refused.", output)
+        self.assertTrue(any(line.startswith("Next: ") for line in lines[first:unreachable]))
+        summary = output[output.index("Fleet update · 3 machines") :]
+        for name in (this, "atlas", "beelink"):
+            self.assertIn(name, summary)
+        self.assertIn("unreachable: SSH connection refused", summary)
+        targets = [json.loads(line)["args"] for line in self.ssh_log.read_text().splitlines()]
+        self.assertEqual(sum("offline-box" in args for args in targets), 1)
+        self.assertTrue(any("mini-pc" in args for args in targets))
+
+    def test_update_all_with_a_machine_name_is_an_error(self):
+        self.fleet_home()
+        before = run_index.entries(self.home)
+        output = self.call("update", "beelink", "--all", expected=2)
+        self.assertIn("Error: Name one machine or use --all, never both", output)
+        self.assertFalse(self.ssh_log.exists())
+        self.assertEqual(run_index.entries(self.home), before)
+
+    def test_plain_update_stays_local_with_members_registered(self):
+        self.fleet_home()
+        import updates
+
+        output = self.call("update")
+        self.assertIn(updates.CURRENT_MESSAGE, output)
+        self.assertNotIn("[1/", output)
+        self.assertNotIn("Fleet update ·", output)
+        self.assertFalse(self.ssh_log.exists())
 
     def test_unreachable_has_next_step_one_attempt_and_private_diagnostics(self):
         self.connect()
