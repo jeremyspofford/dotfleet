@@ -1580,9 +1580,19 @@ def remove_machine(home, hostname):
         raise ValueError("No registry exists. Nothing was removed.")
 
     def remove(data):
-        if hostname not in data["machines"]:
+        key = registry.resolve(data, hostname)
+        if key is None:
             raise ValueError("No saved machine named " + hostname + ". Nothing was removed.")
-        registry.mark_removed(data, hostname)
+        own_id = registry.machine_id(home)
+        if (
+            key == registry.machine_name()
+            or own_id
+            and (data["machines"][key].get("machine_id") == own_id)
+        ):
+            raise ValueError(
+                "This machine is active. Only another machine’s stale record can be removed."
+            )
+        registry.mark_removed(data, key)
 
     return change_registry(home, remove)
 
@@ -1616,7 +1626,9 @@ def remove_fleet(home, selected=None, restored=(), require_word="uninstall"):
 
 def uninstall_machine(home, name):
     """Confirm here, dispatch an unenroll to the member, then mark it removed."""
-    data = registry.load(home)["machines"]
+    loaded = registry.load(home)
+    data = loaded["machines"]
+    name = registry.resolve(loaded, name) or name
     record = data.get(name)
     if name == registry.machine_name():
         raise ValueError(
@@ -1661,10 +1673,12 @@ def install_machine(home, args):
             return 0
         args.name = chosen
     args.name = args.name or args.ssh_target
-    record = data.get(args.name, {})
-    if record.get("enrolled") and args.name != registry.machine_name():
+    # NAME is a target. The registry may know it as a member's name or saved SSH target.
+    member = registry.resolve(registry.load(home), args.name)
+    record = data.get(member, {}) if member else {}
+    if record.get("enrolled") and member != registry.machine_name():
         raise ValueError(
-            f"{args.name} is already a fleet member. Run {current_command(home)} update {args.name}."
+            f"{args.name} is already a fleet member. Run {current_command(home)} update {member}."
         )
     if args.name == registry.machine_name():
         raise ValueError("This machine is already enrolled. Choose another machine.")

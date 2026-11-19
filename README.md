@@ -504,10 +504,14 @@ Run `dotfleet machines list` to read this machine's record and any other records
 Each machine has its own block. The list hides empty fields and keeps run-record and backup paths in their dedicated commands.
 A connection-only record says no local data is recorded. These are saved facts, not live results. Named remote commands query one machine on demand. Automatic registry transfer remains deferred.
 
-Each completed apply, update, restore, or backup refreshes this hostname's record. Other machine records stay intact.
-The record contains hostname, operating system, domain, domain confirmation, content repository and commit, manager version, last run, and last backup.
+Each completed apply, update, restore, or backup refreshes this machine's record. Other machine records stay intact.
+The record contains machine ID, hostname, operating system, domain, domain confirmation, content repository and commit, manager version, last run, and last backup.
 It also records the home folder, RUN.json path, result, and whether this machine remains enrolled. Full commit IDs and paths stay in the file.
-The hostname identifies the record. Choose unique hostnames before combining records from different machines.
+The machine ID identifies the record. Each machine generates its ID once, at enrollment, in `~/.fleet/machine-id`.
+A machine's fleet name is the hostname it reports. When the hostname changes, the next contact renames its member in place.
+Two machines that report one hostname both list. The second lists as `HOSTNAME~ID`, and the list notes the collision.
+Records from before IDs merge when one is this machine's own record and both share a last run time and content commit.
+Without that evidence, both records stay, and the list names the possible duplicate.
 Identity, tool versions, credentials, and secret values stay out of the registry. They remain in their existing private stores.
 Read-only commands and cancellation before confirmation never refresh timestamps or create registry files.
 Uninstall records the completed removal without deleting other machine records. Backups include the earlier registry file for manual recovery.
@@ -537,7 +541,8 @@ A machine joins the fleet from another machine. Run one command at your own term
 fleet machines install mini-pc
 ```
 
-NAME is a host from your SSH config, or a new name with `--target user@host`. No registration step comes first.
+NAME is a host from your SSH config, or any name with `--target user@host`. NAME only reaches the target.
+The target's own hostname becomes its fleet name in every list. No registration step comes first.
 Run `fleet machines install` without NAME to pick from your SSH config hosts and saved connections. The picker needs a terminal.
 SSH is the secure connection tool. The deploy uses your SSH config and keys, in batch mode, without password prompts.
 
@@ -547,7 +552,7 @@ The deploy runs these steps in order:
 2. Update bash. When the target's bash is older than 4.4, ask in your terminal, then install bash with Homebrew.
 3. Bootstrap. When Python 3.11 or newer is missing, install Mise and Python 3.12 in the target user's own folders.
 4. Enroll. Run the Fleet installer on the target with a terminal. Its wizard prompts appear in your terminal.
-5. Register both ways. Your registry gains the target. The target's registry gains your machine and the SSH target that reaches it.
+5. Register both ways. Your registry gains the target under the hostname it reports, with your SSH target for it. The target's registry gains your machine and the SSH target that reaches it.
 6. Prove the loop. Run a remote status against the target and print its result after your own run review.
 
 A missing floor item stops the deploy. The report names each item and the one command that installs it.
@@ -582,7 +587,7 @@ The machines list holds fleet members only. A machine that was never deployed to
 `fleet machines set-ssh --target HOST` saves connection data for remote commands and the deploy picker. Connection data stays out of the list.
 Set-ssh tests SSH once with the fixed command `true`, with a ten-second timeout. A failed test exits 2 and keeps the saved connection.
 
-Run a command on a fleet member. The machine name is the final argument:
+Run a command on a fleet member. The final argument is its fleet name, or the SSH target that reaches it:
 
 ```sh
 fleet status mini-pc
@@ -594,13 +599,14 @@ fleet update mini-pc
 ```
 
 Each remote command, including install, also exchanges a compact registry digest with the target.
-The digest holds member names, SSH targets, domains, OS, enrolled states, manager versions, record times, and removal markers.
+The digest holds each member's complete record, except its SSH target, plus removal markers.
+A record includes the machine ID, name, domain and its confirmation, content and commit, last result and time, version, OS, and enrollment.
 A machine rechecks its own manager version whenever its manager is republished, and on each contact.
 Both machines merge it: the union of members wins, and the newest record wins each field. Lists converge when machines talk.
 A removal marker beats an older member fact, so a removed machine never returns from an old peer list.
 A machine stays the only authority on its own record. No background service runs.
-How to reach a machine is each viewer's own fact. A digest sends no SSH target for its sender.
-An empty incoming target never erases a connection that you saved.
+Members match by machine ID, never by name. A removal marker names the machine ID.
+How to reach a machine is each viewer's own fact. A digest sends no SSH targets, and a merge never changes a saved one.
 
 Remove Fleet from another member with `fleet machines uninstall mini-pc`. Type `uninstall` at your terminal to confirm, then press Enter.
 The member removes its manager and managed files under the uninstall rules. Its content, backups, and own files stay.

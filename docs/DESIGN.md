@@ -17,7 +17,8 @@ Review planned changes before interactive apply. Read decisions from the termina
 ## 2. Keep the registry in the manager store
 
 The registry is `~/.fleet/registry.toml`. A registry holds saved machine records; TOML is its structured file format.
-Schema 1 uses a `machines` table keyed by saved machine name. Its legacy `hostname` field equals that key.
+Schema 1 uses a `machines` table keyed by fleet name. The `hostname` field equals that key.
+A fleet name is the hostname the machine reports. When two machine IDs report one hostname, the second key is `HOSTNAME~ID`, with the first 8 ID digits.
 Each record stores hostname, operating system, domain, content repository and commit, manager version, last run, and last backup.
 A commit identifies a saved Git version. The registry retains full commit identifiers and absolute backup paths.
 The `schema_version` field is 1. Each machine table contains these fields:
@@ -26,6 +27,9 @@ The `schema_version` field is 1. Each machine table contains these fields:
 - Booleans: `domain_chosen` and `enrolled`. These record explicit domain choice and whether the machine retains an installed profile.
 
 `ssh_target` is an optional string: an SSH configuration host name or `user@host`. Missing or empty means `no connection`.
+`machine_id` is an optional string of 32 hexadecimal digits. Each machine generates it once in `~/.fleet/machine-id`; it identifies the record.
+`aliases` is an optional list of earlier fleet names. Records from before IDs that use an alias merge into the member.
+`recorded_at` is an optional string: when the facts were recorded.
 Registration defaults the name to its SSH target. Either --name or --target supplies both, unless both flags differ.
 The machines set-ssh command saves under the same registry lock and backup rules as removal. It then tests SSH once.
 Failure keeps the saved link and returns exit 2 with guidance.
@@ -255,10 +259,16 @@ FLEET_MACHINE_NAME overrides a machine's fleet name. Tests and containers use it
 
 ## Converge fleet lists on contact
 
-Every remote command exchanges a registry digest after it runs. The digest holds member facts and removal markers.
+Every remote command exchanges a registry digest after it runs. The digest holds member records and removal markers.
+Each member record is complete except its SSH target. Members match by machine ID; the hostname is a display name.
+The answer names the machine that answered: its ID and hostname. The caller binds that ID to the record it contacted.
+A newer record with a new hostname renames its member in place. The saved SSH target stays with the renamed member.
 A machine's own record carries its installed manager version. Publishing a manager and every contact recheck it.
 The union of members wins. The newest record time wins each field. A machine is the only authority on its own record.
 A removal marker beats any member fact recorded at or before it. A newer deploy clears an older marker.
-A digest sends no SSH target for its sender. An empty incoming target never erases a connection that the receiver saved.
+A digest sends no SSH targets. A merge never changes a connection that the receiver saved.
+A removal marker names the machine ID. Markers from older members name a hostname and still apply.
+Records from before IDs merge when one is the machine's own record and both share a last run time and content commit.
+Without that evidence, both records stay, and the list names the possible duplicate.
 Contact merges write the registry under its lock without a backup, as the contact cache does. Read-only commands stay read-only in the run index.
 `machines uninstall NAME` confirms on the caller, then sends a version 3 unenroll. The member removes Fleet with backups kept and no restore.

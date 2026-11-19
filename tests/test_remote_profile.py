@@ -57,6 +57,7 @@ class RemoteProfileTests(unittest.TestCase):
         self.assertIn("next update applies this change", output)
         self.assertIn("beelink: domain set succeeded (exit 0).", output)
         self.assertEqual(self.caller_files(), before)
+        test_remote.RemoteTests.assert_one_target_member(self)
         self.assertEqual(self.target_profile()["domain"], "personal")
         # Saved, not applied: the target's own files still carry the earlier domain.
         self.assertEqual((self.home / ".config/dotfiles/domain").read_text(), "core\n")

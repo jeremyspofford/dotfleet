@@ -80,6 +80,8 @@ sys.exit(result.returncode)
             XDG_STATE_HOME=str(self.controller / ".local/state"),
             FAKE_SSH_LOG=str(self.ssh_log),
             FAKE_TARGET_ENV=str(target_env),
+            # The caller is another machine. Its own hostname differs from the target's.
+            FLEET_MACHINE_NAME="caller-box",
         )
 
     def call(self, *arguments, expected=0):
@@ -97,13 +99,23 @@ sys.exit(result.returncode)
         return output
 
     def caller_files(self):
+        """Return the caller's files. Contact may refresh its registry; check that on its own."""
         return {
             str(path.relative_to(self.controller)): path.read_bytes()
             for path in self.controller.rglob("*")
             if path.is_file()
-            and path.name not in ("contacts.json", ".contacts.lock")
+            and path.name not in ("contacts.json", ".contacts.lock", "registry.toml", ".fleet.lock")
             and "remote-runs" not in path.parts
         }
+
+    def assert_one_target_member(self):
+        """The caller keeps one record of the target, under the hostname the target reports."""
+        machines = registry.load(self.controller)["machines"]
+        target = registry.machine_id(self.home)
+        found = [key for key, record in machines.items() if record.get("machine_id") == target]
+        self.assertEqual(found, [socket.gethostname()])
+        self.assertEqual(machines[found[0]]["ssh_target"], "mini-pc")
+        self.assertEqual(sorted(machines), [socket.gethostname()])
 
     def change_content(self):
         (self.content / ".file").write_text("remote content update\n")
@@ -199,6 +211,7 @@ sys.exit(result.returncode)
         self.assertTrue(folder.is_relative_to(self.home))
         self.assertEqual((self.home / ".file").read_text(), "remote content update\n")
         self.assertEqual(self.caller_files(), before)
+        self.assert_one_target_member()
         self.assert_quiet_status()
 
     def fleet_home(self):
@@ -211,6 +224,7 @@ sys.exit(result.returncode)
             data["machines"][name] = dict(own, hostname=name, ssh_target=target, enrolled=True)
         atomic(path, registry.serialize(data))
         caller = dict(self.controller_env)
+        caller.pop("FLEET_MACHINE_NAME", None)  # This home is the caller now, under its own name.
         for key in ("HOME", "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME"):
             if key in self.env:
                 caller[key] = self.env[key]

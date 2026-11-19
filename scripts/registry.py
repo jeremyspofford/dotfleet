@@ -15,6 +15,8 @@ import fcntl
 import os
 from pathlib import Path
 import platform
+import re
+import uuid
 
 from common import atomic, read_toml, run, value
 import run_index
@@ -37,6 +39,12 @@ FIELDS = {
     "result": str,
     "enrolled": bool,
 }
+# Optional record fields. The machine ID is a record's identity; the hostname is its display name.
+OPTIONAL_FIELDS = {"ssh_target": str, "recorded_at": str, "machine_id": str, "aliases": list}
+MACHINE_ID = ".fleet/machine-id"
+IDENTIFIER = re.compile(r"[0-9a-f]{32}")
+NAME = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_.-]*")
+ALIAS_LIMIT = 8
 
 
 def load(home):
@@ -60,14 +68,21 @@ def load(home):
     for key, record in data["machines"].items():
         if not isinstance(key, str) or not key or not isinstance(record, dict):
             raise ValueError("Each fleet record needs a nonempty machine key and a table.")
-        if record.get("hostname") != key:
+        if key not in (record.get("hostname"), collision_key(record)):
             raise ValueError("Fleet record keys must match their hostname fields.")
         for name, kind in FIELDS.items():
             if name not in record or type(record[name]) is not kind:
                 raise ValueError(f"Fleet record {key}: {name} must be {kind.__name__}.")
-        for name in ("ssh_target", "recorded_at"):
-            if name in record and not isinstance(record[name], str):
-                raise ValueError(f"Fleet record {key}: {name} must be str.")
+        for name, kind in OPTIONAL_FIELDS.items():
+            if name in record and type(record[name]) is not kind:
+                raise ValueError(f"Fleet record {key}: {name} must be {kind.__name__}.")
+        if record.get("machine_id") and not IDENTIFIER.fullmatch(record["machine_id"]):
+            raise ValueError(f"Fleet record {key}: machine_id must be 32 hexadecimal digits.")
+        if any(
+            not isinstance(alias, str) or not NAME.fullmatch(alias)
+            for alias in record.get("aliases", [])
+        ):
+            raise ValueError(f"Fleet record {key}: aliases must be machine names.")
         for name in ("home", "last_backup", "last_run_record"):
             if record[name] and not Path(record[name]).is_absolute():
                 raise ValueError(f"Fleet record {key}: {name} must be an absolute path.")
@@ -81,6 +96,53 @@ def load(home):
 def machine_name():
     """Return this machine's fleet name. The run index owns the rule; it runs before the manager."""
     return run_index.machine_name()
+
+
+def machine_id(home, create=False):
+    """Return this machine's stable ID from its own store. Create it once when asked.
+
+    The ID identifies the machine in every record and exchange. The name only labels it.
+    """
+    path = home / MACHINE_ID
+    if path.is_symlink():
+        raise ValueError("The machine ID is a symlink. Keep machine-id inside the manager store.")
+    if path.is_file():
+        saved = path.read_text().strip()
+        if IDENTIFIER.fullmatch(saved):
+            return saved
+    if not create:
+        return ""
+    created = uuid.uuid4().hex
+    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    atomic(path, created + "\n")
+    return created
+
+
+def collision_key(record):
+    """Return the key for a member whose hostname another machine ID already uses."""
+    return f"{record['hostname']}~{record['machine_id'][:8]}" if record.get("machine_id") else None
+
+
+def resolve(data, word):
+    """Return the record key that a word names: its key, its hostname, an alias, or its SSH target.
+
+    A word that matches several members is ambiguous and stops the command.
+    """
+    machines = data["machines"]
+    if word in machines:
+        return word
+    for fields in (("hostname",), ("aliases",), ("ssh_target",)):
+        found = sorted(
+            key
+            for key, record in machines.items()
+            for field in fields
+            if word == record.get(field) or field == "aliases" and word in record.get(field, [])
+        )
+        if len(found) > 1:
+            raise ValueError(f"{word} matches several members: {', '.join(found)}. Use one key.")
+        if found:
+            return found[0]
+    return None
 
 
 def os_name():
@@ -118,6 +180,7 @@ def machine(home, manager_version, fallback=None):
         "result": "not recorded",
         "enrolled": profile_path.exists(),
         "ssh_target": "",
+        "machine_id": machine_id(home),
     }
 
 
@@ -142,7 +205,7 @@ def serialize(data):
 
 
 def refresh(home, manager_version, backup, result, fallback=None, *, run_record=None):
-    """Replace this hostname's record under a lock; preserve all other records."""
+    """Replace this machine's record under a lock; preserve all other records."""
     path = home / REGISTRY
     if not path.parent.resolve().is_relative_to(home.resolve()):
         raise ValueError("Fleet registry parent leaves HOME. Keep the manager store inside HOME.")
@@ -152,6 +215,7 @@ def refresh(home, manager_version, backup, result, fallback=None, *, run_record=
         last_backup=str(backup) if backup else "",
         last_run_record=str(run_record or backup / "RUN.json"),
         result=result,
+        machine_id=machine_id(home, create=True),
     )
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     # No saved credentials or persistent network service are involved.
@@ -159,13 +223,66 @@ def refresh(home, manager_version, backup, result, fallback=None, *, run_record=
     with os.fdopen(descriptor, "a") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
         data = load(home)
-        current["ssh_target"] = data["machines"].get(current["hostname"], {}).get("ssh_target", "")
-        data["machines"][current["hostname"]] = current
+        settle_own(data, current)
         atomic(path, serialize(data))
     return current
 
 
-DIGEST_FIELDS = (
+def same_result(record, other):
+    """Two records share a last result: the same run time and the same content commit."""
+    return (
+        bool(record.get("last_run"))
+        and record.get("last_run") == other.get("last_run")
+        and bool(record.get("content_commit"))
+        and record.get("content_commit") == other.get("content_commit")
+    )
+
+
+def remember_aliases(record, names):
+    """Keep the names a member was known by, newest last, without its current name."""
+    aliases = [alias for alias in record.get("aliases", []) + names if alias != record["hostname"]]
+    aliases = list(dict.fromkeys(reversed(aliases)))[:ALIAS_LIMIT][::-1]
+    if aliases:
+        record["aliases"] = aliases
+    else:
+        record.pop("aliases", None)
+
+
+def settle_own(data, current):
+    """Save this machine's record under its own name. Absorb records that are this machine.
+
+    A record with this machine's ID is this machine under an older name. A record from before IDs
+    is this machine when it carries this machine's own last result: run time and content commit.
+    """
+    machines, own = data["machines"], current["hostname"]
+    previous = machines.get(own)
+    if previous is not None and previous.get("machine_id", "") not in ("", current["machine_id"]):
+        # Another machine reported this name first. It keeps listing, under its collision key.
+        machines[collision_key(previous)] = machines.pop(own)
+        previous = None
+    renamed = [
+        key
+        for key, record in machines.items()
+        if key != own and record.get("machine_id") == current["machine_id"]
+    ]
+    if previous is None and renamed:
+        previous = machines[renamed[0]]
+    absorbed = list(renamed)
+    if previous is not None:
+        absorbed += [
+            key
+            for key, record in machines.items()
+            if key != own and not record.get("machine_id") and same_result(record, previous)
+        ]
+    names = [machines.pop(key)["hostname"] for key in dict.fromkeys(absorbed)]
+    current["ssh_target"] = (previous or {}).get("ssh_target", "")
+    current["aliases"] = list((previous or {}).get("aliases", []))
+    remember_aliases(current, names)
+    machines[own] = current
+
+
+# Older members send these digest fields only. Members before 0.8.1 also omit the version.
+LEGACY_DIGEST_FIELDS = (
     "hostname",
     "ssh_target",
     "domain",
@@ -174,8 +291,8 @@ DIGEST_FIELDS = (
     "manager_version",
     "recorded_at",
 )
-# Members before 0.8.1 send digests without the manager version. Merges keep the saved value.
-OPTIONAL_DIGEST_FIELDS = ("manager_version",)
+# The exchange carries the complete record. The SSH target stays with each viewer.
+EXCHANGED = (*FIELDS, "machine_id", "aliases", "recorded_at")
 
 
 def fact_time(record):
@@ -184,72 +301,163 @@ def fact_time(record):
 
 
 def digest(home):
-    """Describe fleet members and removal markers compactly for an exchange on contact."""
+    """Describe fleet members and removal markers for an exchange on contact.
+
+    Each member carries its complete record except the SSH target. How a viewer reaches a
+    machine is that viewer's own fact.
+    """
     data = load(home)
     members = []
-    for name, record in sorted(data["machines"].items()):
+    for _, record in sorted(data["machines"].items()):
         if not record["enrolled"]:
             continue
-        compact = {field: record.get(field, "") for field in DIGEST_FIELDS}
+        compact = {field: record[field] for field in EXCHANGED if field in record}
         compact["recorded_at"] = fact_time(record)
-        if name == machine_name():
-            compact["ssh_target"] = ""  # How others reach this machine is each viewer's own fact.
         members.append(compact)
     return {"members": members, "removed": dict(sorted(data["removed"].items()))}
 
 
-def merge(data, received, own):
+def blank(name):
+    record = {field: False if kind is bool else "" for field, kind in FIELDS.items()}
+    record.update(hostname=name, result="not recorded")
+    return record
+
+
+def marker_time(removed, record):
+    """Return the newest removal marker that names this record by ID or by name."""
+    names = [record["hostname"], record.get("machine_id", "")]
+    return max(removed.get(name, "") for name in names if name)
+
+
+def find_key(machines, fact):
+    """Find the local record of a member: by its ID, else a record from before IDs by its name."""
+    found = fact.get("machine_id", "")
+    if found:
+        for key, record in machines.items():
+            if record.get("machine_id") == found:
+                return key
+    record = machines.get(fact["hostname"])
+    if record is not None and (not found or not record.get("machine_id")):
+        return fact["hostname"]
+    return None
+
+
+def absorb(machines, fact, key, own, changes):
+    """Fold records from before IDs that name this member into one record. Return its key.
+
+    Candidates are the member's hostname and its aliases. A saved SSH target moves to the survivor.
+    """
+    if not fact.get("machine_id"):
+        return key
+    for name in [fact["hostname"], *fact.get("aliases", [])]:
+        record = machines.get(name)
+        if name in (key, own) or record is None or record.get("machine_id"):
+            continue
+        if key is None:
+            key = name
+            continue
+        if record.get("ssh_target") and not machines[key].get("ssh_target"):
+            machines[key]["ssh_target"] = record["ssh_target"]
+        del machines[name]
+        changes["dropped"].append(name)
+    return key
+
+
+def merge(data, received, own, own_id="", contacted=None, answered=None):
     """Merge a peer digest into registry data. Return the names that were added, changed, or dropped.
 
-    The union of members wins. The newest record time wins each field. A removal marker beats a
-    member fact recorded at or before the removal. A machine stays the only authority on itself.
+    Records match by machine ID; the hostname is a display name. The union of members wins. The
+    newest record time wins each field. A removal marker beats a member fact recorded at or before
+    the removal. A machine stays the only authority on itself. Contacted names the record whose
+    connection reached the answering machine; answered is that machine's own ID and name.
     """
     changes = {"added": [], "updated": [], "dropped": []}
+    machines = data["machines"]
     removed = data.setdefault("removed", {})
     for name, when in received.get("removed", {}).items():
-        if name != own and when > removed.get(name, ""):
+        if name not in (own, own_id) and when > removed.get(name, ""):
             removed[name] = when
+    answered = answered or {}
+    if (
+        contacted in machines
+        and contacted != own
+        and IDENTIFIER.fullmatch(str(answered.get("machine_id", "")))
+        and not machines[contacted].get("machine_id")
+    ):
+        # The machine that answered at this record's connection is that record's machine.
+        machines[contacted]["machine_id"] = answered["machine_id"]
+    mine = machines.get(own, {})
     for fact in received.get("members", []):
-        name = fact["hostname"]
-        if name == own or fact["recorded_at"] <= removed.get(name, ""):
+        name, found = fact["hostname"], fact.get("machine_id", "")
+        if found and found == own_id or not found and name == own:
+            for alias in fact.get("aliases", []):
+                record = machines.get(alias)
+                if alias != own and record is not None and not record.get("machine_id"):
+                    del machines[alias]  # That record was this machine under an older name.
+                    changes["dropped"].append(alias)
             continue
-        current = data["machines"].get(name)
-        if current is None:
-            record = {field: False if kind is bool else "" for field, kind in FIELDS.items()}
-            record.update(hostname=name, result="not recorded")
-            data["machines"][name] = record
-            changes["added"].append(name)
-        elif fact["recorded_at"] > fact_time(current):
-            changes["updated"].append(name)
+        if not found and same_result(fact, mine):
+            # A record from before IDs that carries this machine's own last result is this machine.
+            if name in machines and not machines[name].get("machine_id"):
+                del machines[name]
+                changes["dropped"].append(name)
+            continue
+        if fact["recorded_at"] <= marker_time(removed, fact):
+            continue
+        before = len(changes["dropped"])
+        key = absorb(machines, fact, find_key(machines, fact), own, changes)
+        if key is None:
+            record, key = blank(name), None
         else:
-            continue
-        record = data["machines"][name]
+            record = machines[key]
+            bound = bool(found) and not record.get("machine_id")
+            if bound:
+                record["machine_id"] = found  # A record from before IDs takes the member's ID.
+            if fact["recorded_at"] <= fact_time(record) and len(changes["dropped"]) == before:
+                if bound:
+                    changes["updated"].append(key)
+                continue
         saved_target = record.get("ssh_target", "")
-        record.update({field: fact[field] for field in DIGEST_FIELDS if field in fact})
-        # An empty target says nothing; it never erases a connection that this machine saved.
-        if not fact["ssh_target"] and saved_target:
-            record["ssh_target"] = saved_target
-        removed.pop(name, None)
-    for name, when in removed.items():
-        record = data["machines"].get(name)
-        if name != own and record is not None and fact_time(record) <= when:
-            del data["machines"][name]
-            changes["dropped"].append(name)
+        old_name = record["hostname"]
+        record.update({field: fact[field] for field in EXCHANGED if field in fact})
+        record["ssh_target"] = saved_target  # An empty or foreign target never replaces this one.
+        holder = machines.get(name)
+        target = name
+        if name == own or holder is not None and holder is not record:
+            target = collision_key(record) or name
+        if key is not None and key != target:
+            del machines[key]
+            remember_aliases(record, [old_name])
+        machines[target] = record
+        for marker in (name, found):
+            removed.pop(marker, None)
+        if key is None:
+            changes["added"].append(target)
+        else:
+            changes["updated"].append(target if key == target else f"{target} (was {key})")
+    for key, record in list(machines.items()):
+        if key == own or own_id and record.get("machine_id") == own_id:
+            continue
+        when = max(marker_time(removed, record), removed.get(key, ""))
+        if when and fact_time(record) <= when:
+            del machines[key]
+            changes["dropped"].append(key)
     return changes
 
 
-def merge_into(home, received):
+def merge_into(home, received, contacted=None, answered=None):
     """Merge a digest into this machine's registry under the shared lock. No backup is taken."""
     path = home / REGISTRY
+    own, own_id = machine_name(), machine_id(home)
     # A contact that brings nothing new writes nothing, not even the lock file.
-    if not any(merge(load(home), received, machine_name()).values()):
+    if not any(merge(load(home), received, own, own_id, contacted, answered).values()):
         return {"added": [], "updated": [], "dropped": []}
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     descriptor = os.open(path.parent / ".fleet.lock", os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
     with os.fdopen(descriptor, "a") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
         data = load(home)
-        changes = merge(data, received, machine_name())
+        changes = merge(data, received, own, own_id, contacted, answered)
         if any(changes.values()):
             atomic(path, serialize(data))
     return changes
@@ -284,10 +492,40 @@ def sync_own_version(home, manager_version):
 
 
 def mark_removed(data, name, when=None):
-    """Record that a machine left the fleet, and drop its record."""
+    """Record that a machine left the fleet, and drop its record. The marker names its ID."""
     when = when or datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")
-    data.setdefault("removed", {})[name] = when
-    data["machines"].pop(name, None)
+    record = data["machines"].pop(name, None) or {}
+    data.setdefault("removed", {})[record.get("machine_id") or name] = when
+
+
+def duplicate_notes(members):
+    """Name members that may be one machine: a shared name, or one last run with no ID to tell."""
+    notes = {key: [] for key in members}
+    for key, record in members.items():
+        for other, peer in members.items():
+            if other != key and record["hostname"] == peer["hostname"]:
+                notes[key].append(
+                    f"Name collision: {other} also reports {record['hostname']} with another ID."
+                )
+
+    def one_run(record, peer):
+        return bool(peer.get("last_run")) and peer["last_run"] in (
+            record.get("last_run"),
+            record.get("recorded_at"),
+        )
+
+    names = sorted(members)
+    for index, first in enumerate(names):
+        for second in names[index + 1 :]:
+            a, b = members[first], members[second]
+            if a.get("machine_id") and b.get("machine_id") or a["hostname"] == b["hostname"]:
+                continue
+            if one_run(a, b) or one_run(b, a):
+                notes[second].append(
+                    f"Possible duplicate of {first}: same last run. The next contact merges them "
+                    "once both machines run this Fleet version."
+                )
+    return notes
 
 
 def entities(home, manager_version):
@@ -303,6 +541,7 @@ def entities(home, manager_version):
         for key, record in data["machines"].items()
         if record["enrolled"] or key == local
     }
+    duplicates = duplicate_notes(members)
     for key, record in sorted(members.items(), key=lambda item: (item[0] != local, item[0])):
         known = any(
             record.get(field)
@@ -338,7 +577,8 @@ def entities(home, manager_version):
             {
                 "name": key + (" · this machine" if key == local else " · recorded only"),
                 "fields": fields,
-                "notes": [] if known else ["No local data recorded for this machine."],
+                "notes": ([] if known else ["No local data recorded for this machine."])
+                + duplicates[key],
             }
         )
     return output

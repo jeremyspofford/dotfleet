@@ -76,8 +76,9 @@ class OwnedViewTests(unittest.TestCase):
         path = self.home / registry.REGISTRY
         data = registry.load(self.home)
         current = data["machines"][socket.gethostname()]
-        data["machines"]["old-hub"] = dict(current, hostname="old-hub")
-        data["machines"]["other-hub"] = dict(current, hostname="other-hub")
+        # Other machines have their own IDs; a copy of this machine's ID would be this machine.
+        data["machines"]["old-hub"] = dict(current, hostname="old-hub", machine_id="0" * 32)
+        data["machines"]["other-hub"] = dict(current, hostname="other-hub", machine_id="1" * 32)
         path.write_text(registry.serialize(data))
         exported = self.base / "export.toml"
         output = self.cli("machines", "export", "--output", str(exported))
