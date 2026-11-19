@@ -2,6 +2,22 @@
 
 This file follows Keep a Changelog. Versions use SemVer: major.minor.patch.
 
+## [0.8.0] - 2026-11-19
+
+### Added
+
+- render Antigravity's MCP entry, the surface a tested install confirmed (#56)
+
+### Changed
+
+- https://claude.ai/code/session_01VHXAyZNQYaE3KaWYVP4sXo
+- Claude Opus 5.5 <noreply@anthropic.com>
+- name the marketplace feature Fleet Marketplace (#53)
+
+### Fixed
+
+- keep the downloaded run index writer free of manager imports (#55)
+
 ## [0.7.0] - 2026-11-18
 
 ### Added
