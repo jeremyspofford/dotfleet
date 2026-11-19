@@ -2,6 +2,21 @@
 
 This file follows Keep a Changelog. Versions use SemVer: major.minor.patch.
 
+## [0.10.0] - 2026-11-19
+
+### Added
+
+- update an old bash with Homebrew before Fleet's scripts run (#68)
+
+### Changed
+
+- Claude Opus 5.5 <noreply@anthropic.com>
+- https://claude.ai/code/session_01VHXAyZNQYaE3KaWYVP4sXo
+
+### Fixed
+
+- rename the marketplace package folder to ~/.fleet/marketplace-packages (#66)
+
 ## [0.9.0] - 2026-11-19
 
 ### Added
