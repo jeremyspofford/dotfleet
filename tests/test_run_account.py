@@ -189,10 +189,10 @@ class RunAccountTests(unittest.TestCase):
             (b"Git author email [", b"\n"),
             (b"Tools [accept]:", b"\n"),
             (b"extra [on]:", b"off\n"),
-            (b"Review [quit]:", b"quit\n"),
+            (b"Review [confirm]:", b"quit\n"),
         ]
         output = self.terminal(answers, flags=["--configure"], auto_wizard=False)
-        review = output.split("9. Review before apply", 1)[1].split("Review [quit]:", 1)[0]
+        review = output.split("9. Review before apply", 1)[1].split("Review [confirm]:", 1)[0]
         for number, label in enumerate(
             [
                 "Software",
@@ -247,7 +247,7 @@ class RunAccountTests(unittest.TestCase):
             (b"Tools [accept]:", b"edit\n"),
             (b"Tool versions [none]:", b"none\n"),
             (b"extra [on]:", b"\n"),
-            (b"Review [quit]:", b"confirm\n"),
+            (b"Review [confirm]:", b"confirm\n"),
         ]
         output = self.terminal(
             answers,

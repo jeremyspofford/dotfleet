@@ -24,7 +24,7 @@ Error lines keep at most 2,000 characters. Updates replace each entry atomically
 Install, update, configure, and other change-making actions create entries. Nested installer calls share the original entry.
 Target-side remote updates record attempts on the target. Read-only remote commands create no index entries.
 An empty update records NO_CHANGE and creates no backup, RUN.json, or review.
-Cancellation records CANCELLED without applying files. It leaves the small entry and any earlier store moves.
+Cancellation records CANCELLED without applying files. It leaves the small entry and moves this run's migrated stores back.
 A RUNNING entry has no completion result yet. The process may still run or may have stopped unexpectedly.
 The installer has a shell fallback when Python cannot start. If storage itself is unavailable, it reports that recording failed.
 

@@ -43,7 +43,7 @@ class WizardTests(unittest.TestCase):
                     )["groups"]
                 )
             ]
-        result += [(b"Review [quit]:", b"confirm\n")]
+        result += [(b"Review [confirm]:", b"confirm\n")]
         return result
 
     def defaults_origin(self):
@@ -138,15 +138,26 @@ class WizardTests(unittest.TestCase):
         }
         before = self.snapshot()
         answers = self.answers()
-        answers[-1] = (b"Review [quit]:", b"quit\n")
+        answers[-1] = (b"Review [confirm]:", b"quit\n")
         output = self.terminal(answers, flags=[], auto_wizard=False)
         self.assertIn("chezmoi status: cancelled", output)
         self.assertEqual(self.snapshot(), before)
 
+    def test_enter_alone_at_review_confirms_and_typed_quit_is_required_to_cancel(self):
+        self.defaults_origin()
+        answers = self.answers()
+        answers[-1] = (b"Review [confirm]:", b"q\n")
+        answers += [(b"Choose confirm, quit,", b"\n")]
+        output = self.terminal(answers, flags=[], auto_wizard=False)
+        self.assertIn("Press Enter alone to confirm. Type quit to cancel.", output)
+        self.assertIn("chezmoi status: clean", output)
+        self.assertTrue((self.home / ".config/fleet/profile.toml").is_file())
+        self.assert_quiet_status()
+
     def test_review_go_back_changes_identity_before_apply(self):
         self.defaults_origin()
         answers = self.answers()
-        answers[-1] = (b"Review [quit]:", b"identity\n")
+        answers[-1] = (b"Review [confirm]:", b"identity\n")
         answers += [
             (b"Git author name [Wizard Person]:", b"Changed Person\n"),
             (b"Git author email [wizard@example.invalid]:", b"\n"),
@@ -160,7 +171,7 @@ class WizardTests(unittest.TestCase):
                 )["groups"]
             )
         ]
-        answers += [(b"Review [quit]:", b"confirm\n")]
+        answers += [(b"Review [confirm]:", b"confirm\n")]
         self.terminal(answers, flags=[], auto_wizard=False)
         profile = tomllib.loads((self.home / ".config/fleet/profile.toml").read_text())
         self.assertEqual(profile["git_name"], "Changed Person")
@@ -236,7 +247,7 @@ class WizardTests(unittest.TestCase):
         }
         before = self.snapshot()
         answers = self.answers()
-        answers[-1] = (b"Review [quit]:", b"quit\n")
+        answers[-1] = (b"Review [confirm]:", b"quit\n")
         output = self.terminal(answers, flags=[], auto_wizard=False, timeout=120)
         self.assertIn("Preparing chezmoi", output)
         self.assertIn("Preparing Mise", output)
@@ -297,7 +308,7 @@ class WizardTests(unittest.TestCase):
             (b"Git author name [", b"Wizard Person\n"),
             (b"Git author email [", b"wizard@example.invalid\n"),
             (b"Tools [accept]:", b"\n"),
-            (b"Review [quit]:", b"confirm\n"),
+            (b"Review [confirm]:", b"confirm\n"),
         ]
         self.terminal(answers, flags=[], auto_wizard=False)
         profile = tomllib.loads((self.home / ".config/fleet/profile.toml").read_text())

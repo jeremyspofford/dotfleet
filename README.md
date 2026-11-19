@@ -32,7 +32,7 @@ Prompts read the terminal, never piped input. Complete profiles update without e
 6. Compare installed tools, content defaults, and saved tools. Accept them or enter exact versions.
 7. Choose groups. On includes their content; off excludes it. New groups say NEW.
 8. Select detected agents, which are coding assistants. Set each detected agent on or off. Press Enter to keep its current choice.
-9. Review all choices and the full planned change account. Type `confirm`, `quit`, or a step name to return.
+9. Review all choices and the full planned change account. Press Enter to confirm, type `quit` to cancel, or type a step name to return.
 10. Read the apply result and summary warnings.
 
 **Start with `core` unless you want a domain's examples.** It includes shared shell, Git, aliases, and prompt settings.
@@ -60,7 +60,7 @@ Only accepted files enter the first local Git commit. Nothing is uploaded.
 
 An unrelated `~/dotfiles` stops setup. Preserve it before choosing another repository or adopting files.
 Native chezmoi templates and hooks can execute code. Use trusted content only.
-Quitting review cancels planned file changes. A small attempt entry records the cancellation. Earlier [store moves](README.md#store-migration) stay in place.
+Quitting review cancels planned file changes. A small attempt entry records the cancellation. Fleet also moves this run's [store moves](README.md#store-migration) back.
 Preparation uses temporary files outside home; missing tools move into `~/.local/bin` only after confirmation.
 
 ### Flags and updates
@@ -352,7 +352,7 @@ The registry becomes `~/.local/share/fleet/registry.toml`. The content manifest 
 Older `dotfleet.toml` content manifests still work. When both names exist, `fleet.toml` wins.
 
 Fleet updates chezmoi's source pointer during migration. Rollback translates old backup paths to the new locations.
-The review lists each store move under Profile changes. Cancelling later apply does not undo these earlier moves.
+The review lists each store move under Profile changes. Cancelling the run moves those stores back to their old names.
 If both old and new stores exist, migration stops before moving folders. Resolve that conflict before retrying; Fleet never merges them silently.
 
 ## Remove an extra tool version

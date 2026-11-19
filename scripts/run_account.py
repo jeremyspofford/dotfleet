@@ -23,7 +23,7 @@ from installation import command_software, MANAGER
 import registry
 import style
 import run_index
-from store_migration import recorded_moves
+from store_migration import recorded_moves, restore
 
 RECORD = ".local/state/dotfleet/last-run.json"
 
@@ -115,6 +115,7 @@ class RunAccount:
         self.files = []
         self.profile = []
         self.store_moves = recorded_moves()
+        self.store_restored = []
         self.applied_files = set()
         self.applied_software = set()
         self.applied_checkouts = set()
@@ -222,6 +223,7 @@ class RunAccount:
             "files": self.files,
             "profile_changes": self.profile,
             "store_moves": self.store_moves,
+            "store_restored": self.store_restored,
             "locations": self.locations,
             "backup_manifest": self.manifest,
             "chezmoi_status_before": self.status,
@@ -262,6 +264,13 @@ class RunAccount:
         self.result = result
         self.warnings = warnings or []
         self.status_after = status
+        if result == "CANCELLED" and self.store_moves:
+            # A cancelled run leaves the machine as it was, so this run's store moves are undone.
+            try:
+                self.store_restored = restore(self.home)
+                self.store_moves = []
+            except (OSError, ValueError) as error:
+                self.warnings.append("Stores were not moved back: " + str(error))
         if self.backup:
             try:
                 registry.refresh(

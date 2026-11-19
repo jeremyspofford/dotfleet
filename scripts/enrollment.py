@@ -178,7 +178,7 @@ def welcome(home, sources, profile=None, record=None):
             " is discarded."
         )
     )
-    print("Quit at review to cancel file changes. Earlier store moves stay in place.")
+    print("Type quit at review to cancel. Fleet then moves any renamed stores back.")
     found, excluded = scan(home)
     tools = installed(home)
     os_name = (
@@ -494,14 +494,14 @@ def review(profile, account, warnings):
             )
         ]
     details += [
-        "confirm: back up files and apply these choices.",
-        "quit: cancel planned file changes; earlier store moves stay in place.",
+        "confirm: back up files and apply these choices. Recommended.",
+        "quit: cancel the planned changes and move any renamed stores back.",
         "source, domain, identity, tools, groups, agents: return to that step, then review again.",
-        "Type a word and press Enter. Enter alone quits.",
+        "Press Enter alone to confirm. Type quit to cancel.",
     ]
     return manager.ask(
         "Review",
-        "quit",
+        "confirm",
         ["confirm", "quit", *STEPS],
         heading="9. Review before apply",
         detail="\n".join(details),

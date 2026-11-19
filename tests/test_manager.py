@@ -470,7 +470,7 @@ class EnrollmentTests(unittest.TestCase):
                         (rb"Content repository \[[^]]+\]:", b"\n"),
                         (rb"Tools \[accept\]:", b"accept\n"),
                         (rb"(?:claude|codex|gemini|grok|pi|opencode) \[(?:on|off)\]:", b"\n"),
-                        (rb"Review \[quit\]:", b"confirm\n"),
+                        (rb"Review \[confirm\]:", b"confirm\n"),
                         (
                             rb"(?:docker|terraform|kubectl|python|npm|helpers) \[(?:on|off)\]:",
                             b"\n",
