@@ -2,7 +2,7 @@
 
 A marketplace is a Git repository with a catalog file, fleet-marketplace.toml.
 A package bundles any mix of skills, rule sets, MCP servers, connectors, plugins, and hooks.
-Pulled-in packages live in an untracked library under the manager store, never in tracked content.
+Pulled-in packages live in an untracked folder, ~/.fleet/marketplace-packages, never in tracked content.
 The record of each installation lives in the manager store.
 
 Usage: import this module from the command dispatcher.
@@ -21,7 +21,7 @@ import agent_table
 from common import atomic
 
 RECORD = ".fleet/marketplaces.json"
-LIBRARY = ".fleet/library"
+LIBRARY = ".fleet/marketplace-packages"
 CATALOG = "fleet-marketplace.toml"
 CACHE = ".fleet/marketplaces-check.json"
 SCHEMA = 1
@@ -177,7 +177,7 @@ def selection(catalog, take):
 
 
 def items(home, agents):
-    """Return the selected items of every marketplace, with their library roots."""
+    """Return the selected items of every marketplace, with their package-copy roots."""
     result = {}
     for name, record in sorted(records(home).items()):
         root = library(home, name)
@@ -229,13 +229,13 @@ def version(root):
 
 
 def save(home, pending, backup_path):
-    """Move staged clones into the library and save the records. Run after the backup."""
+    """Move staged clones into the package folder and save the records. Run after the backup."""
     data = load_records(home)
     for name, record in pending.items():
         destination = home / LIBRARY / name
         if destination.exists():
-            # The backup keeps the earlier library copy, including any edited file.
-            destination.rename(Path(backup_path) / f"previous-library-{name}")
+            # The backup keeps the earlier package copy, including any edited file.
+            destination.rename(Path(backup_path) / f"previous-marketplace-packages-{name}")
         if record is None:
             data["marketplaces"].pop(name, None)
             continue
@@ -260,7 +260,7 @@ def take_from(packages, features):
 def check(home):
     """Fetch each marketplace with a time limit and save how far each one is behind.
 
-    Fetch only into the library's Git data. A pin blocks updates, not this information.
+    Fetch only into the package copy's Git data. A pin blocks updates, not this information.
     """
     import datetime
 

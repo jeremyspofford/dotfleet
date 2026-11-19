@@ -32,13 +32,15 @@ MERGED = (
     ".local/state/fleet",
     ".local/state/dotfleet",
 )
-# Entries renamed on the way in, so every name inside ~/.fleet is plain.
-RENAMED = {"fleet.toml": "registry.toml", "tui-venv": "tui"}
+# Entries renamed on the way in, so every name inside ~/.fleet is plain and none repeats.
+# The marketplace folder must never share the dotfiles library's name.
+RENAMED = {"fleet.toml": "registry.toml", "tui-venv": "tui", "library": "marketplace-packages"}
 # Folders that move whole to a named place inside ~/.fleet.
 WHOLE = (
     ("fleet-backups", ROOT + "/backups"),
     ("dotfleet-backups", ROOT + "/backups"),
     (".cache/fleet-deploy", ROOT + "/deploy"),
+    (ROOT + "/library", ROOT + "/marketplace-packages"),
 )
 # Inventories keyed by home-relative paths. Their keys follow the moved files.
 INVENTORIES = (ROOT + "/agents.json", ROOT + "/outputs.json")
@@ -298,7 +300,7 @@ def migrate(home, stash):
     records += [
         {"old": str(source), "new": str(destination)}
         for source, destination in moves
-        if source.parent != destination.parent and source.parent not in emptied
+        if source.parent not in emptied
     ]
     return records, journal
 

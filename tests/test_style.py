@@ -83,9 +83,9 @@ def command_goldens():
         (home / ".fleet/marketplaces.json").write_text(
             json.dumps({"schema_version": 1, "marketplaces": {"agent-market": record}})
         )
-        library = home / ".fleet/library/agent-market"
-        library.mkdir(parents=True)
-        (library / "fleet-marketplace.toml").write_text(
+        packages = home / ".fleet/marketplace-packages/agent-market"
+        packages.mkdir(parents=True)
+        (packages / "fleet-marketplace.toml").write_text(
             'schema = 1\n[packages.review-kit]\ndescription = "Review commands."\n'
             '[packages.review-kit.mcp.review-docs]\ndescription = "Search review guides."\n'
             'transport = "stdio"\ncommand = "npx"\n'

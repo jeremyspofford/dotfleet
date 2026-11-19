@@ -675,7 +675,7 @@ class Planner:
         label = "OpenCode" if agent == "opencode" else "Pi"
         self.plan.steps.append(f"{agent}: the next {label} start installs {identifier}.")
 
-    def library_skills(self):
+    def marketplace_skills(self):
         """Copy pulled-in skills into the tree and link each one into ~/.agents/skills."""
         for item in self.table.items:
             if item.kind != "skills" or item.origin == "content":
@@ -695,7 +695,7 @@ class Planner:
     def build(self, agents):
         self.pulled_skills = False
         if agents:
-            self.library_skills()
+            self.marketplace_skills()
         for agent in agents:
             getattr(self, agent)()
             self.plugins(agent)

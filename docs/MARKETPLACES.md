@@ -44,7 +44,7 @@ An item name must be unique across the content and every installed package. A co
 3. Use `--pin REF` to keep a tag or commit. The pin blocks updates, not information.
 4. Run `fleet marketplaces list` to see each source, version, pin, installed packages, and saved update result.
 5. Run `fleet marketplaces update` to move every unpinned marketplace to its newest commit.
-6. Run `fleet marketplaces delete --name NAME` to remove a marketplace, its library copy, and its installed outputs.
+6. Run `fleet marketplaces delete --name NAME` to remove a marketplace, its package copy, and its installed outputs.
 
 `marketplaces update --name NAME` changes one marketplace. With `--name`, these flags also apply:
 
@@ -56,7 +56,7 @@ A pinned marketplace stays at its pin. The update prints one line that names the
 
 ## Update results
 
-`fleet check` fetches each marketplace into its library, with a ten-second limit, after the manager and content.
+`fleet check` fetches each marketplace into its package copy, with a ten-second limit, after the manager and content.
 It prints how many commits each marketplace is behind. A pinned marketplace also says that the pin blocks the update.
 Check exits 1 when the manager, the content, or an unpinned marketplace is behind. A pinned marketplace alone does not change the exit code.
 A failed marketplace fetch prints a warning and exits 2. The earlier marketplace result stays saved.
@@ -69,7 +69,7 @@ Each change runs the shared review and apply. The backup runs first. Unattended 
 
 ## Where packages live
 
-Pulled-in packages live in an untracked library, `~/.fleet/library/NAME`. No file enters your tracked content.
+Pulled-in packages live in an untracked folder, `~/.fleet/marketplace-packages/NAME`. No file enters your tracked content.
 The record of each installation lives in the manager store, `~/.fleet/marketplaces.json`.
 Fleet renders pulled-in items into the same agent tree as content items. See [agent configuration](AGENTS.md).
 A pulled-in skill is copied into the tree and linked as `~/.agents/skills/NAME`.
