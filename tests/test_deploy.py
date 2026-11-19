@@ -19,7 +19,7 @@ import deploy
 import registry
 import test_command
 import test_manager as helpers
-from test_manager import ROOT
+from test_manager import ROOT, command
 
 FAKE_SSH = r"""#!/usr/bin/env python3
 import json, os, subprocess, sys
@@ -216,6 +216,51 @@ class DeployTests(unittest.TestCase):
         self.assertTrue(
             any(entry.get("command") == "install" for entry in self.run_entries(self.target))
         )
+
+    def release(self, version):
+        """Land a new manager version on the upstream that the target's manager tracks."""
+        (self.origin / "VERSION").write_text(version + "\n")
+        command("git", "-C", str(self.origin), "add", "VERSION")
+        command(
+            "git",
+            "-C",
+            str(self.origin),
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "-m",
+            "chore: release " + version,
+        )
+
+    def test_an_updated_manager_sends_its_new_version_on_the_next_contact(self):
+        self.prepare()
+        self.deploy("--return-target", "caller")
+        enrolled = (self.origin / "VERSION").read_text().strip()
+        self.assertEqual(self.registry(self.target)["mini-pc"]["manager_version"], enrolled)
+        self.assertEqual(self.registry(self.home)["mini-pc"]["manager_version"], enrolled)
+        self.release("9.9.9")
+        self.assertIn("mini-pc: update succeeded", self.call("update", "mini-pc"))
+        manager = self.target / ".local/share/fleet/manager"
+        self.assertEqual((manager / "VERSION").read_text().strip(), "9.9.9")
+        self.assertEqual(self.registry(self.target)["mini-pc"]["manager_version"], "9.9.9")
+        self.assertEqual(self.registry(self.home)["mini-pc"]["manager_version"], "9.9.9")
+
+    def test_contact_corrects_a_stale_version_record(self):
+        """A machine whose record trails its manager reports the installed version on contact."""
+        self.prepare()
+        self.deploy("--return-target", "caller")
+        installed = (self.origin / "VERSION").read_text().strip()
+        for home in (self.target, self.home):
+            path = home / registry.REGISTRY
+            data = tomllib.loads(path.read_text())
+            data["machines"]["mini-pc"]["manager_version"] = "0.0.1"
+            data["machines"]["mini-pc"]["recorded_at"] = "2000-01-01T00:00:00+00:00"
+            path.write_text(registry.serialize(data))
+        self.call("status", "mini-pc")
+        self.assertEqual(self.registry(self.target)["mini-pc"]["manager_version"], installed)
+        self.assertEqual(self.registry(self.home)["mini-pc"]["manager_version"], installed)
 
     def test_a_failed_reverse_test_is_reported_and_never_blocks_enrollment(self):
         self.prepare()

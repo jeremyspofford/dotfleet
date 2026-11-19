@@ -53,6 +53,14 @@ def publish(home, root, backup):
             destination.rename(backup / "previous-manager")
         staged.rename(destination)
     atomic(home / COMMAND, launcher(root), 0o700)
+    import registry
+
+    # The record this machine sends about itself must never trail its installed manager.
+    # An unreadable registry must not fail an apply; the next contact rechecks the version.
+    try:
+        registry.sync_own_version(home, (destination / "VERSION").read_text().strip())
+    except (OSError, ValueError):
+        pass
 
 
 def usage():

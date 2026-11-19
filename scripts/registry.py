@@ -164,7 +164,17 @@ def refresh(home, manager_version, backup, result, fallback=None, *, run_record=
     return current
 
 
-DIGEST_FIELDS = ("hostname", "ssh_target", "domain", "os", "enrolled", "recorded_at")
+DIGEST_FIELDS = (
+    "hostname",
+    "ssh_target",
+    "domain",
+    "os",
+    "enrolled",
+    "manager_version",
+    "recorded_at",
+)
+# Members before 0.8.1 send digests without the manager version. Merges keep the saved value.
+OPTIONAL_DIGEST_FIELDS = ("manager_version",)
 
 
 def fact_time(record):
@@ -214,7 +224,7 @@ def merge(data, received, own):
             continue
         record = data["machines"][name]
         saved_target = record.get("ssh_target", "")
-        record.update({field: fact[field] for field in DIGEST_FIELDS})
+        record.update({field: fact[field] for field in DIGEST_FIELDS if field in fact})
         # An empty target says nothing; it never erases a connection that this machine saved.
         if not fact["ssh_target"] and saved_target:
             record["ssh_target"] = saved_target
@@ -242,6 +252,34 @@ def merge_into(home, received):
         if any(changes.values()):
             atomic(path, serialize(data))
     return changes
+
+
+def sync_own_version(home, manager_version):
+    """Keep this machine's own record at its installed manager's version. Return True on a change.
+
+    Enrollment writes the version once. A republished manager, or any contact, rechecks it here.
+    The change gets a new record time, so peers take it on the next digest exchange.
+    """
+    path = home / REGISTRY
+    if not path.is_file():
+        return False
+    own = machine_name()
+    record = load(home)["machines"].get(own)
+    if record is None or record.get("manager_version") == manager_version:
+        return False
+    descriptor = os.open(path.parent / ".fleet.lock", os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+    with os.fdopen(descriptor, "a") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        data = load(home)
+        record = data["machines"].get(own)
+        if record is None or record.get("manager_version") == manager_version:
+            return False
+        record["manager_version"] = manager_version
+        record["recorded_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat(
+            timespec="seconds"
+        )
+        atomic(path, serialize(data))
+    return True
 
 
 def mark_removed(data, name, when=None):

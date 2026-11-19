@@ -256,6 +256,7 @@ FLEET_MACHINE_NAME overrides a machine's fleet name. Tests and containers use it
 ## Converge fleet lists on contact
 
 Every remote command exchanges a registry digest after it runs. The digest holds member facts and removal markers.
+A machine's own record carries its installed manager version. Publishing a manager and every contact recheck it.
 The union of members wins. The newest record time wins each field. A machine is the only authority on its own record.
 A removal marker beats any member fact recorded at or before it. A newer deploy clears an older marker.
 A digest sends no SSH target for its sender. An empty incoming target never erases a connection that the receiver saved.
