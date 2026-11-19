@@ -340,11 +340,14 @@ class WizardTests(unittest.TestCase):
         answers[1] = (b"Domain [core]:", b"\n")
         self.terminal(answers, flags=["--configure"], auto_wizard=False)
         self.assertEqual((self.home / ".zshrc").read_bytes(), before)
-        old = list((self.home / ".fleet/backups").glob("*/previous-content"))
-        self.assertEqual(len(old), 1)
+        # The earlier download stays in the library at its commit; adoption adds its own.
+        library = self.home / ".fleet/dotfiles"
+        self.assertEqual(sorted(path.name for path in library.iterdir()), ["adopted", "default"])
         self.assertEqual(
-            command("git", "-C", str(old[0]), "rev-parse", "HEAD").strip(), previous_commit
+            command("git", "-C", str(library / "default"), "rev-parse", "HEAD").strip(),
+            previous_commit,
         )
+        self.assertEqual(dotfiles_library.active(self.home).name, "adopted")
         self.assert_quiet_status()
 
     def test_secret_scan_checks_names_assignments_and_links(self):
