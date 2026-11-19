@@ -363,6 +363,7 @@ Fleet keeps its own state in one folder, `~/.fleet`:
 | `~/.fleet/cleanup-runs/` | Records of backup deletions. |
 | `~/.fleet/remote-runs/` | Private diagnostics from remote commands. |
 | `~/.fleet/check.json` | The last update check. |
+| `~/.fleet/tools-check.json` | The last check for newer tool versions. |
 | `~/.fleet/contacts.json` | Recorded connections to other machines. |
 | `~/.fleet/chezmoi-source/` | The converted source that chezmoi applies. |
 | `~/.fleet/agents/` | The agent deployment tree. |
