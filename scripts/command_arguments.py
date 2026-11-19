@@ -63,6 +63,12 @@ GROUPS = {
         "uninstall": "Uninstall one installed extra version through Mise.\n"
         "Type uninstall to confirm, then press Enter.\n"
         "A recorded version must first be removed from choices or replaced with tools set.",
+        "update": "Record and install the newest available version of selected tools.\n"
+        "Mise finds the newest version; the profile records that exact version.\n"
+        "Without TOOL, update every selected tool, then print a summary.\n"
+        "A current tool stays unchanged.\n"
+        "One failed tool does not stop the others.\n"
+        "A tool that is not selected fails; select it first with tools set.",
     },
     "groups": {
         "list": "List content groups, their state, and what each adds.",
@@ -82,7 +88,7 @@ EXAMPLES = {
     "machines": "machines install mini-pc; machines install lab --target me@10.0.0.7 --return-target me@desk; machines list; machines set-ssh --target mini-pc; machines set-ssh --name beelink --target mini-pc; machines export --output FILE; machines remove --name NAME; machines uninstall mini-pc",
     "domain": "domain list; domain set --name personal",
     "groups": "groups list; groups set --name docker --state off",
-    "tools": "tools list; tools set node --version 26.13.1; tools remove node; tools uninstall node --version 26.3.1",
+    "tools": "tools list; tools set node --version 26.13.1; tools remove node; tools uninstall node --version 26.3.1; tools update; tools update node",
     "backups": "backups create; backups list; backups restore --backup BACKUP; backups delete --name BACKUP; backups delete --keep 2; backups delete --all",
     "secrets": "secrets list",
     "content": "content",
@@ -96,6 +102,7 @@ EXAMPLES = {
 #   0    Success, help, or cancellation. Check: manager and content are current. Diff: no differences.
 #   1    Operation failed. Check: updates are available. Diff: differences exist.
 #        Doctor: one or more checks failed.
+#        Tools update: one or more tools failed, or the tool is not selected.
 #   2    Invalid arguments. Check: could not check updates. Diff: preview failed.
 #        Machines set-ssh: connection test failed; the saved target stays.
 #   130  Interrupted.
@@ -238,6 +245,12 @@ def add_action_parameters(parser, name, action):
         parser.add_argument("--name", required=True, help="content group from groups list")
         parser.add_argument(
             "--state", required=True, choices=["on", "off"], help="include or remove content"
+        )
+    elif name == "tools" and action == "update":
+        parser.add_argument(
+            "tool",
+            nargs="?",
+            help="selected tool, such as node; omit to update every selected tool",
         )
     elif name == "tools" and action in ("set", "remove", "uninstall"):
         parser.add_argument("tool", help="tool name, such as node")

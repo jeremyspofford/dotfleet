@@ -12,6 +12,7 @@
   Content            12345678 · 0 behind last fetched upstream · clean
   Updates            none (checked 09:02)
   Fleet Marketplace  agent-market +2, held at v1.0.0
+  Tool updates       node 26.14.0 available (checked 09:02) — run: fleet tools update
   Drift              none
   Last run           ~/fleet-backups/20261116-120000 · SUCCESS
   Last backup        ~/fleet-backups/20261116-120000

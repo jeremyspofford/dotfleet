@@ -4,3 +4,5 @@ Content: up to date @ abcdef01
 
 Marketplace agent-market: 2 commits behind @ abcdef01
   Pinned at v1.0.0; the pin blocks the update.
+
+Tool node: 26.14.0 available @ 26.13.1

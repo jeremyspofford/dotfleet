@@ -39,6 +39,7 @@ from run_account import RunAccount, commit, profile_changes
 
 ROOT = Path(__file__).resolve().parents[1]
 PROFILE = ".config/fleet/profile.toml"
+TOOL_UPDATES = "Tool updates"
 CONTROLS = {
     registry.REGISTRY,
     updates.CACHE,
@@ -72,7 +73,9 @@ DESCRIPTIONS = {
         "Status reads saved results; check fetches new results.\n"
         "Fetch manager and content upstreams quietly, with a 10-second limit per fetch.\n"
         "An upstream is the remote branch tracked by a checkout, a local Git copy.\n"
-        "Save both results only when both checks succeed."
+        "Save both results only when both checks succeed.\n"
+        "Ask Mise for the newest version of each selected tool, and save those results.\n"
+        "A newer tool version counts as an available update."
     ),
     "configure": (
         "Reopen the enrollment wizard.\n"
@@ -134,7 +137,8 @@ DESCRIPTIONS = {
         "A selection records an exact tool version.\n"
         "Set installs that exact version.\n"
         "Remove clears the selection without uninstalling the tool.\n"
-        "Uninstall removes one extra installed version after typed confirmation."
+        "Uninstall removes one extra installed version after typed confirmation.\n"
+        "Update records and installs the newest version that Mise finds."
     ),
     "secrets": (
         "List secret names as set or unset.\n"
@@ -450,7 +454,7 @@ def read_view(args, home, saved_profile):
             name.capitalize(),
             pairs or [("Selections", "none")],
             str(home),
-            inline_keys={key for key, _ in pairs if key.startswith("Tool ")}
+            inline_keys={key for key, _ in pairs if key.startswith("Tool ") and key != TOOL_UPDATES}
             if name == "status"
             else (),
         ),
@@ -504,6 +508,11 @@ def status_rows(home, saved_profile):
             if (marketplace_summary := marketplaces_summary(home))
             else []
         ),
+        *(
+            [(TOOL_UPDATES, tool_summary)]
+            if (tool_summary := tools_summary(home, saved_profile, display))
+            else []
+        ),
         ("Drift", f"present; run {display} diff" if status(home) else "none"),
         (
             "Last run",
@@ -519,6 +528,12 @@ def status_rows(home, saved_profile):
         ),
     ]
     return pairs
+
+
+def tools_summary(home, saved_profile, display):
+    import tool_updates
+
+    return tool_updates.summary(home, saved_profile, display)
 
 
 def marketplaces_summary(home):
@@ -1032,7 +1047,9 @@ def remote_profile(home, args):
     values.update(name=getattr(args, "name", None), state=getattr(args, "state", None))
     try:
         request = remote.profile_request(
-            args.command, args.action, {key: values[key] for key in names}
+            args.command,
+            args.action,
+            {key: values[key] for key in names if values[key] is not None},
         )
     except ValueError as error:
         print("Error: " + str(error), file=sys.stderr)
@@ -1053,6 +1070,7 @@ def save_remote_choice(home, request):
     display = command_name(saved)
     command, action, values = request["command"], request["action"], request["arguments"]
     changed = copy.deepcopy(saved)
+    failed = 0
     manifest = content_manifest(home / "dotfiles")
     if command == "domain":
         require_domain(manifest, values["name"], display)
@@ -1074,6 +1092,8 @@ def save_remote_choice(home, request):
             exceptions[name] = state
         if not exceptions:
             changed.pop("agent_items")
+    elif action == "update":
+        failed = save_newest_tools(home, saved, changed, values.get("tool"), display)
     elif action == "set":
         tool, version = values["tool"], values["version"]
         if not manager.exact_version(version):
@@ -1092,15 +1112,37 @@ def save_remote_choice(home, request):
             set(changed.get("unpinned_tools", [])) | {values["tool"]}
         )
     if changed == saved:
-        print("No change. The profile already holds this choice.")
-        return 0
+        if action != "update":
+            print("No change. The profile already holds this choice.")
+        return failed
     with tempfile.TemporaryDirectory(prefix="dotfleet-profile-") as folder:
         source = Path(folder) / "profile.toml"
         atomic(source, toml(changed))
         result = transaction(home, [(PROFILE, source)], "Save the profile choice.")
     if result == 0:
         print(f"Saved. The next update applies this change: run {display} update.")
-    return result
+    return result or failed
+
+
+def save_newest_tools(home, saved, changed, tool, display):
+    """Install each newer version now, and record it in the changed profile only.
+
+    The caller saves the profile. Return 1 when any tool failed.
+    """
+    import tool_updates
+
+    def choose(name, version):
+        installed = enrollment.installed(home).get(name, [])
+        if not any(item.get("version") == version for item in installed):
+            # Installing software is not an apply; the next update selects the version.
+            run("mise", "install", name + "@" + version)
+        previous = changed["pins"][name]
+        changed["pins"][name] = (
+            dict(previous, version=version) if isinstance(previous, dict) else version
+        )
+        return "updated", ""
+
+    return tool_updates.update(home, saved, tool, display, choose, remote=True)
 
 
 def profile_digest(home):
@@ -1136,7 +1178,7 @@ def dispatch(args, argument_parser, home):
         saved_profile = profile(home)
         display = command_name(saved_profile)
         if args.command == "check":
-            return updates.check(home, saved_profile, marketplaces=True)
+            return updates.check(home, saved_profile, marketplaces=True, tools=True)
         if args.command == "backups" and args.action == "delete":
             import backup_cleanup
 
@@ -1263,6 +1305,8 @@ def dispatch(args, argument_parser, home):
                 from tool_actions import uninstall
 
                 return uninstall(home, saved_profile, args.tool, args.version)
+            if args.action == "update":
+                return update_tools(home, saved_profile, args.tool, display)
             if not args.pin:
                 argument_parser.error("tools set needs TOOL and --version; tools remove needs TOOL")
             if args.action == "remove":
@@ -1284,40 +1328,7 @@ def dispatch(args, argument_parser, home):
                 argument_parser.error(
                     "tools set needs TOOL --version VERSION with an exact version, such as 24.14.1"
                 )
-            installed = enrollment.installed(home).get(tool, [])
-            present = next((item for item in installed if item.get("version") == version), None)
-            location = (
-                str(present.get("install_path", "Mise installation"))
-                if present
-                else str(home / ".local/share/mise/installs" / tool / version)
-            )
-            software = [
-                {
-                    "name": tool,
-                    "version": version,
-                    "old": None,
-                    "path": location,
-                    "action": "present" if present else "installed",
-                }
-            ]
-
-            def install(account):
-                if not present:
-                    run("mise", "install", tool + "@" + version)
-                    actual = next(
-                        item
-                        for item in enrollment.installed(home).get(tool, [])
-                        if item.get("version") == version
-                    )
-                    software[0]["path"] = actual.get("install_path", location)
-                    account.applied_software.add(tool)
-                    account.save()
-
-            return manager.main(
-                ["--defaults", "--pin", tool + "=" + version],
-                software=software,
-                before_apply=install,
-            )
+            return set_tool(home, tool, version)
     except (OSError, ValueError, RuntimeError) as error:
         if args.command == "check":
             print("Warning: Could not check updates: " + str(error), file=sys.stderr)
@@ -1327,6 +1338,59 @@ def dispatch(args, argument_parser, home):
         print("Error: " + str(error), file=sys.stderr)
         return 2 if args.command == "diff" else 1
     return 0
+
+
+def set_tool(home, tool, version, old=None):
+    """Record one exact version, and install it after the review and backup."""
+    installed = enrollment.installed(home).get(tool, [])
+    present = next((item for item in installed if item.get("version") == version), None)
+    location = (
+        str(present.get("install_path", "Mise installation"))
+        if present
+        else str(home / ".local/share/mise/installs" / tool / version)
+    )
+    software = [
+        {
+            "name": tool,
+            "version": version,
+            "old": old,
+            "path": location,
+            "action": "present" if present else "installed",
+        }
+    ]
+
+    def install(account):
+        if not present:
+            run("mise", "install", tool + "@" + version)
+            actual = next(
+                item
+                for item in enrollment.installed(home).get(tool, [])
+                if item.get("version") == version
+            )
+            software[0]["path"] = actual.get("install_path", location)
+            account.applied_software.add(tool)
+            account.save()
+
+    return manager.main(
+        ["--defaults", "--pin", tool + "=" + version],
+        software=software,
+        before_apply=install,
+    )
+
+
+def update_tools(home, saved_profile, tool, display):
+    """Record and install each selected tool's newest version, one tools set apply per tool."""
+    import tool_updates
+
+    def apply(name, version):
+        old = tool_updates.recorded(saved_profile["pins"][name])
+        code = set_tool(home, name, version, old)
+        if code:
+            return "failed", f"the apply stopped with exit {code}; run {display} logs show"
+        saved = tool_updates.recorded(profile(home).get("pins", {}).get(name))
+        return ("updated", "") if saved == version else ("cancelled", "")
+
+    return tool_updates.update(home, saved_profile, tool, display, apply)
 
 
 def agent_items(home):

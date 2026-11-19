@@ -156,6 +156,7 @@ Stow layouts under `packages/<package>/` also work; their package prefixes do no
 
 Your profile lives at `~/.config/fleet/profile.toml`. It saves the domain, Git identity, exact tool versions, and group choices between runs.
 Use `fleet tools set TOOL --version VERSION` to select and install a version. Mise records which versions are installed; Fleet reads that list during setup.
+Use `fleet tools update TOOL` to select and install the newest version that Mise finds. The profile still records that exact version.
 A saved tool choice selects a version. It does not mean that version is installed.
 Setup asks when identity is incomplete, the domain choice is unconfirmed, or a tool version floats, such as `latest`.
 Prompts show recorded values. Press Enter to use the stated action, or type `skip` to leave a choice incomplete.
@@ -235,9 +236,9 @@ Command groups require an action. Bare `machines`, `backups`, `secrets`, `tools`
 | `dotfleet logs list --limit 10` | Show the newest ten change-making attempts. |
 | `dotfleet logs show` | Read the latest review or failure. Use --name for a timestamp or backup. |
 | `dotfleet content` | Show the content checkout, repository, commit, behind state, and short Git status. |
-| `dotfleet status` | Show choices, installed tools, drift, recent runs and backups, and the last update check. |
+| `dotfleet status` | Show choices, installed tools, drift, recent runs and backups, and the last update and tool checks. |
 | `dotfleet topology` | Show this machine’s recorded connection tree. Use --json for structured output. |
-| `dotfleet check` | Fetch both upstreams and save their update counts. An upstream is the remote branch tracked by a checkout. |
+| `dotfleet check` | Fetch both upstreams and save their update counts. An upstream is the remote branch tracked by a checkout. Also report selected tools with a newer version. |
 | `dotfleet diff` | Show pending patches. Use `--stat` for paths only. Exit 0 means clean; exit 1 means differences. |
 | `dotfleet backups restore` | List backups and choose one in a terminal. Include the saved profile when restoring. |
 | `dotfleet backups restore --backup BACKUP` | Review one backup folder, then type restore to confirm. |
@@ -251,6 +252,8 @@ Command groups require an action. Bare `machines`, `backups`, `secrets`, `tools`
 | `dotfleet tools set node --version 24.14.1` | Explicitly install and record that exact version. Content defaults still never install software. |
 | `dotfleet tools uninstall node --version 26.3.1` | Uninstall an extra installed version through Mise, after typing uninstall to confirm. |
 | `dotfleet tools remove node` | Remove the selection and prevent content defaults from filling it again. Keep installed software. |
+| `dotfleet tools update node` | Ask Mise for the newest version, then record and install it as tools set does. A current tool stays unchanged. |
+| `dotfleet tools update` | Update every selected tool. Print one result line per tool, then a summary. Exit 1 when any tool failed. |
 | `dotfleet configure` | Reopen the enrollment wizard. |
 | `dotfleet doctor` | Check profile completeness, drift, checkout edits, and backups. Print a fix for each failed check. |
 | `dotfleet machines list` | List saved machines with known facts and connections. Make no network requests. |
@@ -316,7 +319,7 @@ Each menu area opens the existing command's view or action:
 | Area | Commands and actions |
 | --- | --- |
 | Machine | Status, Check, Update, Diff, Doctor, and Topology. Diff also offers paths only. |
-| Configuration | Status contains saved choices. Domain list/set; Groups list/set; Tools list/set/remove; Secrets list; Content; Configure. |
+| Configuration | Status contains saved choices. Domain list/set; Groups list/set; Tools list/set/remove/update; Secrets list; Content; Configure. |
 | Machines | List, pick an SSH host, set a named target, export, and remove a stale record. |
 | Backups | List, create, restore, or delete backups. Checkboxes select backups for deletion. |
 | System | Version, Add-ons list, command help, interface help, and Uninstall. |
@@ -559,7 +562,7 @@ Target runs never prompt. Incomplete profiles name the missing choices and stop;
 Configure requires a terminal on the target. Remote rollback and uninstall are refused because they are destructive.
 Run those commands on the target itself.
 
-Profile choices also run on a registered machine. Add `--machine NAME` to `domain`, `groups`, `agents`, or `tools` list and set actions, and to `tools remove`:
+Profile choices also run on a registered machine. Add `--machine NAME` to `domain`, `groups`, `agents`, or `tools` list and set actions, and to `tools remove` and `tools update`:
 
 ```sh
 fleet domain set --name work --machine mini-pc
@@ -570,6 +573,8 @@ fleet update mini-pc
 2. The target's next update applies the saved choice. Its review names the reason: profile change.
 
 The target's manager is the only writer of its profile. `tools set` also installs that exact version on the target through Mise.
+`tools update` asks the target's Mise for the newest version, installs it there, and saves it. The target's next update applies it.
+If one tool fails there, the target still saves the other tools and exits 1.
 An invalid or undeclared value fails on the target with exit 2; nothing is saved.
 
 The target renders results under its machine header. Updates that change files write RUN.json in its backup folder, using the local run renderer.
