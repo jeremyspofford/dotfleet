@@ -931,15 +931,13 @@ def main(argv=None):
             print("Preview failed: " + str(error), file=sys.stderr)
             return 2
     argument_parser = parser()
-    original_arguments = list(sys.argv[1:] if argv is None else argv)
+    original_arguments = command_arguments.canonical(sys.argv[1:] if argv is None else argv)
     successor = command_arguments.successor(original_arguments)
     if successor:
         print("Error: Use " + current_command(home) + " " + successor + ".", file=sys.stderr)
         return 2
     try:
-        argv = command_arguments.help_arguments(
-            sys.argv[1:] if argv is None else argv, DESCRIPTIONS
-        )
+        argv = command_arguments.help_arguments(original_arguments, DESCRIPTIONS)
     except ValueError as error:
         argument_parser.error(str(error))
     args = command_arguments.normalize(argument_parser.parse_args(argv), argument_parser)

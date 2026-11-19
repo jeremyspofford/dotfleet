@@ -6,12 +6,18 @@ Usage: python3 -m unittest discover -s tests -v.
 import argparse
 import contextlib
 import io
+import os
+from pathlib import Path
 import re
+import subprocess
+import sys
 import unittest
 from unittest.mock import patch
 
 import command
 from test_style import command_goldens
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 class ConsolidationTests(unittest.TestCase):
@@ -26,7 +32,6 @@ class ConsolidationTests(unittest.TestCase):
 
     def test_removed_forms_name_their_successor_without_side_effects(self):
         for old, successor in (
-            (["backup"], "backups create"),
             (["rollback"], "backups restore"),
             (["pins", "set", "--tool", "node"], "tools"),
             (["profile", "show"], "status"),
@@ -38,6 +43,70 @@ class ConsolidationTests(unittest.TestCase):
                     self.assertEqual(result, 2)
                     self.assertEqual(text, "Error: Use fleet " + successor + ".\n")
                     profile.assert_not_called()
+
+    def both_forms(self, *arguments):
+        result = subprocess.run(
+            [sys.executable, "-B", str(ROOT / "scripts/command.py"), *arguments],
+            text=True,
+            capture_output=True,
+        )
+        return result.returncode, result.stdout + result.stderr
+
+    def assert_same_command(self, other, name, action):
+        parser = command.parser()
+        for arguments in ([other, action], ["help", other], [other, "--help"]):
+            with self.subTest(arguments=arguments):
+                canonical = command.command_arguments.canonical(arguments)
+                self.assertEqual(canonical, [name if item == other else item for item in arguments])
+                self.assertEqual(self.both_forms(*arguments), self.both_forms(*canonical))
+        args = parser.parse_args(command.command_arguments.canonical([other, action]))
+        self.assertEqual((args.command, getattr(args, "action", action)), (name, action))
+
+    def test_addon_reaches_addons(self):
+        self.assert_same_command("addon", "addons", "list")
+
+    def test_agent_reaches_agents(self):
+        self.assert_same_command("agent", "agents", "list")
+
+    def test_backup_reaches_backups(self):
+        self.assert_same_command("backup", "backups", "list")
+
+    def test_domains_reaches_domain(self):
+        self.assert_same_command("domains", "domain", "list")
+
+    def test_group_reaches_groups(self):
+        self.assert_same_command("group", "groups", "list")
+
+    def test_log_reaches_logs(self):
+        self.assert_same_command("log", "logs", "list")
+
+    def test_machine_reaches_machines(self):
+        self.assert_same_command("machine", "machines", "list")
+
+    def test_marketplace_reaches_marketplaces(self):
+        self.assert_same_command("marketplace", "marketplaces", "list")
+
+    def test_secret_reaches_secrets(self):
+        self.assert_same_command("secret", "secrets", "list")
+
+    def test_tool_reaches_tools(self):
+        self.assert_same_command("tool", "tools", "list")
+
+    def test_every_other_form_names_a_command_and_help_shows_only_canonical_names(self):
+        names = set(command.DESCRIPTIONS)
+        self.assertTrue(set(command.command_arguments.OTHER_FORMS.values()) <= names)
+        self.assertFalse(set(command.command_arguments.OTHER_FORMS) & names)
+        code, text = self.both_forms("--help")
+        self.assertEqual(code, 0)
+        for other in command.command_arguments.OTHER_FORMS:
+            self.assertNotRegex(text, rf"(?m)^\s+{other}\s")
+
+    def test_unknown_command_name_still_errors(self):
+        for name in ("machinez", "toolz", "groupss"):
+            with self.subTest(name=name):
+                code, text = self.both_forms(name, "list")
+                self.assertEqual(code, 2)
+                self.assertIn(f"Unknown choice '{name}'", text)
 
     def test_subject_tool_and_restore_group_use_existing_engine_fields(self):
         parser = command.parser()
