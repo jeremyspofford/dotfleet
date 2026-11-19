@@ -295,7 +295,7 @@ class Bash32Tests(unittest.TestCase):
 
     def test_installer_with_update_bash_installs_then_runs_itself_with_that_bash(self):
         fixture = Fixture(self.base)
-        code, output = self.run32("bash", "install.sh", "--update-bash", fixture=fixture)
+        code, output = self.run32("bash", "/manager/install.sh", "--update-bash", fixture=fixture)
         self.assertEqual(code, 0, output)
         self.assertEqual(fixture.installs(), ["install bash"])
         self.assertIn(f"Running Fleet with bash at {fixture.prefix}/bin/bash", output)
