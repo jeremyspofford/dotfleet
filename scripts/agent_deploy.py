@@ -9,8 +9,9 @@ The inventory lists every output and entry, so Fleet can rebuild, compare, or re
 Usage: python3 scripts/agent_deploy.py [--home PATH]
 Parameters: --home selects a full target home path; the default is the current user's home.
 The command prints the planned outputs for the saved profile and content checkout. It writes nothing.
-Exit codes: 0 success or help; 1 invalid content or conflict; 2 invalid arguments.
 """
+
+# Exit codes: 0 success or help; 1 invalid content or conflict; 2 invalid arguments.
 
 import argparse
 import copy

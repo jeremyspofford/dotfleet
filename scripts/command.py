@@ -158,7 +158,7 @@ DESCRIPTIONS = {
         "Open the full-screen terminal interface.\n"
         "Arrows and Tab move; Enter selects; Esc goes back; q quits.\n"
         "Configure returns to the existing wizard.\n"
-        "If the interface environment is missing, print plain command alternatives and exit 0."
+        "If the interface environment is missing, print plain command alternatives instead."
     ),
     "uninstall": (
         "Remove Fleet and its managed files.\n"
@@ -175,7 +175,7 @@ DESCRIPTIONS = {
         "A failed check stops without applying files.\n"
         "Use --all to update this machine, then each enrolled member, one at a time.\n"
         "A failed or unreachable member never stops the rest; a summary names each result.\n"
-        "With --all, the exit code is the worst machine's code. Name one machine or use --all."
+        "Name one machine or use --all, never both."
     ),
     "version": ("Show manager and content versions.\nA commit identifies a saved Git version."),
 }
@@ -218,7 +218,7 @@ def parser():
             detail += (
                 "\nSSH securely connects to another machine."
                 "\nAdd MACHINE to use one registered machine and its own saved choices."
-                "\nRemote runs never prompt; connection failures exit nonzero."
+                "\nRemote runs never prompt; a failed connection prints an error."
             )
         elif name in remote.PROFILE_ACTIONS:
             detail += (

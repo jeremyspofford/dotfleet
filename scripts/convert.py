@@ -5,9 +5,10 @@ Parameters: CHECKOUT is a Git copy; OUTPUT is an empty staging directory.
 --profile reads local group selections. --format selects plain or chezmoi when detection is unclear.
 -h/--help prints help.
 Example: python3 scripts/convert.py --checkout ~/dotfiles --output /tmp/source
-Exit codes: 0 success/help; 1 invalid content; 2 invalid arguments.
 Author: Jeremy Spofford / Aria Labs; Version: read from ../VERSION.
 """
+
+# Exit codes: 0 success/help; 1 invalid content; 2 invalid arguments.
 
 import argparse
 import style

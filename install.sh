@@ -7,6 +7,7 @@
 # --format selects plain (real names) or chezmoi (native sources); -h/--help prints help.
 # Example: bash install.sh --repo https://github.com/jeremyspofford/dotfiles
 # Exit codes: 0 success/help; 1 setup failure; 2 invalid arguments.
+# Without a terminal, missing identity, an unconfirmed domain, or floating tool versions exit 1.
 # Author: Jeremy Spofford / Aria Labs; Version: read from VERSION.
 set -euo pipefail
 raw=https://raw.githubusercontent.com/jeremyspofford/fleet/main
@@ -128,7 +129,7 @@ Options:
   --git-email EMAIL Record the Git author email.
   --git-name NAME  Record the Git author name.
   --group NAME=on|off Include or exclude a content group. Repeat for more groups.
-  -h, --help       Print full help and exit 0.
+  -h, --help       Print full help.
   --repo URL       Content Git repository; default: https://github.com/jeremyspofford/dotfiles.
                    Plain repositories use real names. Chezmoi repositories use native source names.
   --tool TOOL=VERSION Record a full tool version, such as node=24.14.1. Repeat for more tools.
@@ -163,7 +164,7 @@ Tools use full versions. Enter accepts the prompt's stated action; skip leaves a
 Complete profiles need no profile prompts. Every summary prints all six categories, including scripted runs.
 Empty categories say no changes. Paths start with ~ for your home. RUN.json keeps full paths and commit IDs.
 Skipped gaps appear under Warnings. The last lines show status and the RUN.json location.
-Without a terminal, missing identity, an unconfirmed domain, or floating tool versions stop setup with exit 1.
+Without a terminal, missing identity, an unconfirmed domain, or floating tool versions stop setup.
 Supply the listed flags to complete those values. New group defaults are printed before applying files.
 Prompts read /dev/tty, the terminal device, never piped input.
 Headings, input, and warnings use the shared logger's colors. Choices also have text labels.
@@ -181,7 +182,6 @@ Native chezmoi templates and hooks can execute code. Use only trusted content re
 Examples:
   bash install.sh --domain personal --git-name "Example Person" --git-email person@example.invalid --tool node=24.14.1
   bash install.sh --repo git@github.com:you/dotfiles.git --configure
-Exit codes: 0 success/help; 1 setup failure; 2 invalid arguments.
 Author: Jeremy Spofford / Aria Labs; Version: $DOTFILES_VERSION (VERSION).
 EOF
 }

@@ -24,7 +24,7 @@ Requires Python 3.11+.
 
 Options:
   --dry-run     Accepted for earlier scripts. The script never writes.
-  -h, --help    Print full help and exit 0.
+  -h, --help    Print full help.
   --home PATH   Full target home path; default: the current user's home.
 
 Examples:
@@ -32,7 +32,6 @@ Examples:
   bash scripts/generate-agent-configs.sh --home /tmp/demo
 
 Outputs are recorded in ~/.local/state/dotfleet/agents.json after an update applies them.
-Exit codes: 0 success/help; 1 invalid content or conflict; 2 invalid arguments.
 Author: Jeremy Spofford / Aria Labs; Version: $DOTFILES_VERSION (VERSION).
 HELP
 }

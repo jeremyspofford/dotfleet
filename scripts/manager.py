@@ -8,10 +8,11 @@ Parameters: --repo selects content; --configure asks again; --defaults skips pro
 --adopt seeds a local repository. --group NAME=on|off selects content. --agents selects coding assistants.
 -h/--help prints help.
 Example: bash install.sh --domain core --git-name Example --git-email example@example.invalid
-Exit codes: 0 success/help; 1 setup failure; 2 invalid arguments.
 Author: Jeremy Spofford / Aria Labs; Version: read from ../VERSION.
 Messages use logger.sh. Prompts use /dev/tty.
 """
+
+# Exit codes: 0 success/help; 1 setup failure; 2 invalid arguments.
 
 import argparse
 import agent_table

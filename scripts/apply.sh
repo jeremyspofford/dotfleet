@@ -14,7 +14,6 @@ usage() {
 	log_info "Usage: bash scripts/apply.sh [-h|--help] ($DOTFILES_VERSION)"
 	log_info 'Apply files through chezmoi. Conflict prompts explain keys and require Enter.'
 	log_info 'Parameters: -h, --help prints help. Example: bash scripts/apply.sh'
-	log_info 'Exit codes: 0 success/help; 1 failure; 2 invalid arguments.'
 }
 if [[ $# -gt 0 ]]; then
 	case $1 in -h | --help)

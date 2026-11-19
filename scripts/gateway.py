@@ -7,8 +7,9 @@ It serves their tools and prompts under SERVER__NAME, and their resources for re
 Usage: python3 scripts/gateway.py --config FILE
 Parameters: --config names the agent's gateway file in the Fleet tree.
 Agents start this command themselves. Diagnostics go to standard error, never to the agent's channel.
-Exit codes: 0 after the agent closes the channel; 2 invalid arguments.
 """
+
+# Exit codes: 0 after the agent closes the channel; 2 invalid arguments.
 
 import argparse
 import hashlib

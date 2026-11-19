@@ -24,7 +24,8 @@ Use --name and --target for SSH registration. One flag supplies both values unle
 Help and examples show flags. Keep promised positional SSH-registration forms readable, but do not document them as the main interface.
 Command groups require explicit action verbs. A bare group prints its action list.
 Sort command names, action names, and flags alphabetically in help. Sort flags by their long name, ignoring leading hyphens.
-Use raw-text help formatting. Preserve authored line breaks; put each exit code and example on its own line.
+Use raw-text help formatting. Preserve authored line breaks; put each example on its own line.
+Help never shows exit codes. Record them in a source comment instead, such as the script header.
 Top-level help ends after global options. Put command-specific details in that command’s help, and define shared terms in the README.
 Support help, -h, and --help at each command and action. Support help COMMAND and both version and --version.
 Status reads saved state without network requests. Check fetches updates. Keep their help and output distinct.
