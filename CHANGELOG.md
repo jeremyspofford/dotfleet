@@ -2,6 +2,27 @@
 
 This file follows Keep a Changelog. Versions use SemVer: major.minor.patch.
 
+## [0.9.0] - 2026-11-19
+
+### Added
+
+- keep Fleet's state and dotfiles library under ~/.fleet (#63)
+- resolve the newest tool version with tools update (#64)
+- update every fleet machine with update --all (#61)
+- accept both singular and plural command group names (#60)
+
+### Changed
+
+- Claude Opus 5.5 <noreply@anthropic.com>
+- https://claude.ai/code/session_01VHXAyZNQYaE3KaWYVP4sXo
+
+### Fixed
+
+- remove exit codes from help at every level (#65)
+- keep each machine's recorded manager version current (#62)
+- name every prompt choice plainly and state what Enter does (#59)
+- make Enter confirm at review and undo store moves on cancel (#57)
+
 ## [0.8.0] - 2026-11-19
 
 ### Added
