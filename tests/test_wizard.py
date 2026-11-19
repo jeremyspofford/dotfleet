@@ -93,7 +93,8 @@ class WizardTests(unittest.TestCase):
         self.assertEqual(
             [path.name for path in (self.home / ".fleet/dotfiles").iterdir()], ["default"]
         )
-        self.assertIn('dotfiles = "default"', (self.home / ".fleet/profile.toml").read_text())
+        saved = tomllib.loads((self.home / ".fleet/profile.toml").read_text())
+        self.assertEqual(saved["dotfiles"], "default")
         profile = (self.home / ".fleet/profile.toml").read_bytes()
         output = self.terminal([], flags=[], auto_wizard=False)
         self.assertNotIn("9. Review", output)
