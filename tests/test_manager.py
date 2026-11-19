@@ -466,7 +466,7 @@ class EnrollmentTests(unittest.TestCase):
                 elif auto_wizard:
                     pending = re.sub(rb"\x1b\[[0-9;]*m", b"", transcript[cursor:])
                     for pattern, answer in [
-                        (rb"Content door \[[^]]+\]:", b"repo\n"),
+                        (rb"Content source \[[^]]+\]:", b"repo\n"),
                         (rb"Content repository \[[^]]+\]:", b"\n"),
                         (rb"Tools \[accept\]:", b"accept\n"),
                         (rb"(?:claude|codex|gemini|grok|pi|opencode) \[(?:on|off)\]:", b"\n"),
@@ -781,8 +781,8 @@ class EnrollmentTests(unittest.TestCase):
             "Base configuration only. No domain additions.",
             "Choosing a domain does not install software or create accounts.",
             "Your choice is saved in ~/.config/fleet/profile.toml.",
-            "Press Enter to confirm the value in brackets",
-            "Type skip and press Enter",
+            "Type a domain name, or press Enter alone to choose core.",
+            "  skip      Keep core for now without confirming it as your choice.",
         ]:
             self.assertIn(description, output)
         self.assertNotIn("personal=personal+shared", output)

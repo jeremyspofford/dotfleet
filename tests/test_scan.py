@@ -85,38 +85,50 @@ class ScanTests(unittest.TestCase):
             self.assertNotIn("1.2.3", rendered)
             self.assertIn("Sensitive files are excluded.", rendered)
 
-    def test_scan_caps_file_lines(self):
+    def test_scan_summarizes_each_category_with_a_few_examples(self):
+        browser = [f".config/google-chrome/Default/Cache{i}/data" for i in range(3000)]
         record = {
             "os": "Linux",
             "enrollment": [],
             "tools": {},
             "excluded": {},
-            "candidates": [f".config/tool{i:02}/config.toml" for i in range(20)],
+            "candidates": [".zshrc"]
+            + [f".config/tool{i:02}/config.toml" for i in range(20)]
+            + browser,
         }
         rendered = scan_view.lines(record, {}, [])
-        self.assertEqual(sum("~/" in line for line in rendered), 15)
-        self.assertIn("  + 5 more", rendered)
-        self.assertLess(len(rendered), 25)
+        self.assertIn("Home configuration candidates: 3,021 files", rendered)
+        self.assertIn(
+            "  App settings     20 files  ~/.config/tool00/, ~/.config/tool01/,"
+            " ~/.config/tool02/, + 17 more",
+            rendered,
+        )
+        self.assertIn("  Browser data  3,000 files  ~/.config/google-chrome/", rendered)
+        self.assertIn("  Shell              1 file  ~/.zshrc", rendered)
+        self.assertNotIn("Cache", "\n".join(rendered))
+        self.assertLess(len(rendered), 15)
 
     def test_default_always_matches_recommendation(self):
         with tempfile.TemporaryDirectory() as folder:
             home = Path(folder)
             for found, excluded, expected in [
-                ([], {}, "defaults"),
+                ([], {}, "example"),
                 ([".zshrc"], {}, "adopt"),
-                ([".token"], {".token": "credential filename"}, "defaults"),
+                ([".token"], {".token": "credential filename"}, "example"),
             ]:
                 choices, default, detail = enrollment.door_options(home, {}, found, excluded)
                 self.assertEqual(default, expected)
                 self.assertIn(default, choices)
-                self.assertIn(f"Recommended: {default}.", detail)
+                self.assertIn("(Recommended.)", detail.split(f"  {default} ", 1)[1].splitlines()[0])
+                self.assertIn(f"Press Enter alone to choose {default}.", detail)
+                self.assertNotIn("door", detail)
             (home / ".config/fleet").mkdir(parents=True)
             (home / ".config/fleet/profile.toml").touch()
-            for prior in ["repo", "defaults", "adopt"]:
+            for prior in ["repo", "example", "adopt"]:
                 profile = {"content_repo": "https://example.invalid/content", "source_door": prior}
                 _, default, detail = enrollment.door_options(home, profile, [".zshrc"], {})
                 self.assertEqual(default, "repo")
-                self.assertIn("Recommended: repo.", detail)
+                self.assertIn("(Recommended.)", detail.split("  repo ", 1)[1].splitlines()[0])
                 self.assertIn("Current source: https://example.invalid/content", detail)
 
 
@@ -131,11 +143,11 @@ class ScanIntegrationTests(unittest.TestCase):
         self.terminal(self.answers(), flags=[], auto_wizard=False)
         before = read_toml(self.home / ".config/fleet/profile.toml")
         answers = self.answers()
-        answers[0] = (b"Content door [repo]:", b"\n")
+        answers[0] = (b"Content source [repo]:", b"\n")
         answers.insert(1, (b"Content repository [", b"\n"))
         output = self.terminal(answers, flags=["--configure"], auto_wizard=False)
-        self.assertIn("Recommended: repo.", output)
-        self.assertNotIn("Recommended: adopt.", output)
+        self.assertIn("Press Enter alone to choose repo.", output)
+        self.assertNotIn("Press Enter alone to choose adopt.", output)
         after = read_toml(self.home / ".config/fleet/profile.toml")
         self.assertEqual(before["content_repo"], after["content_repo"])
         record = json.loads(

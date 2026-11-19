@@ -24,8 +24,8 @@ class WizardTests(unittest.TestCase):
     assert_quiet_status = helpers.EnrollmentTests.assert_quiet_status
     seed_profile = helpers.EnrollmentTests.seed_profile
 
-    def answers(self, door="defaults", repo=None):
-        result = [(b"Content door [", (door + "\n").encode())]
+    def answers(self, door="example", repo=None):
+        result = [(b"Content source [", (door + "\n").encode())]
         if repo:
             result.append((b"Content repository [", (str(repo) + "\n").encode()))
         result += [
@@ -77,7 +77,9 @@ class WizardTests(unittest.TestCase):
     def test_defaults_door_bare_home_and_silent_rerun(self):
         self.defaults_origin()
         output = self.terminal(self.answers(), flags=[], auto_wizard=False)
-        self.assertIn("Recommended: defaults.", output)
+        self.assertIn(
+            "  example  Start from Fleet's example shell and Git files. (Recommended.)", output
+        )
         self.assertIn("7. Content groups", output)
         self.assertIn("Group: docker NEW", output)
         self.assertNotIn("7. Group:", output)
@@ -103,7 +105,7 @@ class WizardTests(unittest.TestCase):
         secret.write_bytes(b'export SERVICE_API_TOKEN="fake-secret-for-this-test"\n')
         before = {name: (self.home / name).read_bytes() for name in scan(self.home)[0]}
         output = self.terminal(self.answers("adopt"), flags=[], auto_wizard=False)
-        self.assertIn("Recommended: adopt.", output)
+        self.assertIn("Press Enter alone to choose adopt.", output)
         self.assertIn("Sensitive files are excluded.", output)
         self.assertNotIn("fake-secret-for-this-test", output)
         checkout = self.home / "dotfiles"
@@ -149,7 +151,9 @@ class WizardTests(unittest.TestCase):
         answers[-1] = (b"Review [confirm]:", b"q\n")
         answers += [(b"Choose confirm, quit,", b"\n")]
         output = self.terminal(answers, flags=[], auto_wizard=False)
-        self.assertIn("Press Enter alone to confirm. Type quit to cancel.", output)
+        self.assertIn("  confirm   Back up files, then apply these choices. (Recommended.)", output)
+        self.assertIn("Press Enter alone to choose confirm.", output)
+        self.assertEqual(output.count("5. Git commit identity"), 1)
         self.assertIn("chezmoi status: clean", output)
         self.assertTrue((self.home / ".config/fleet/profile.toml").is_file())
         self.assert_quiet_status()
@@ -301,7 +305,7 @@ class WizardTests(unittest.TestCase):
     def test_unknown_format_is_asked_and_recorded(self):
         repo = repository(self.base / "unknown", {"README.md": "No home files yet."})
         answers = [
-            (b"Content door [", b"repo\n"),
+            (b"Content source [", b"repo\n"),
             (b"Content repository [", (str(repo) + "\n").encode()),
             (b"Format [plain]:", b"plain\n"),
             (b"Domain [core]:", b"\n"),

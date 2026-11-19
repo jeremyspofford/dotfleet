@@ -37,24 +37,60 @@ def sensitive(name):
     return bool(SENSITIVE_NAME.search(name))
 
 
+TOOL_FILES = {".npmrc", ".pypirc", ".tool-versions", ".vimrc", ".tmux.conf"}
+BROWSERS = re.compile(
+    r"^\.config/(?:google-chrome[^/]*|chromium|BraveSoftware|microsoft-edge[^/]*|vivaldi[^/]*"
+    r"|opera[^/]*|mozilla|epiphany)/|^\.mozilla/",
+    re.I,
+)
+ORDER = ("Shell", "Git", "App settings", "Browser data", "Other")
+EXAMPLES = 3
+
+
 def category(name):
     if name in SHELL or name.startswith(".config/fish/"):
         return "Shell"
-    if name == ".gitconfig" or name.startswith(".config/git/"):
+    if name.startswith((".gitconfig", ".gitignore", ".gitattributes", ".config/git/")):
         return "Git"
-    if name.startswith(".config/") or name in {
-        ".npmrc",
-        ".pypirc",
-        ".tool-versions",
-        ".vimrc",
-        ".tmux.conf",
-    }:
-        return "Tools"
-    return None
+    if BROWSERS.search(name):
+        return "Browser data"
+    if name.startswith(".config/") or name in TOOL_FILES:
+        return "App settings"
+    return "Other"
+
+
+def place(name):
+    """Name what a person recognizes: an app's folder for nested files, else the file."""
+    parts = name.split("/")
+    if parts[0] == ".config" and len(parts) > 2:
+        return "~/.config/" + parts[1] + "/"
+    if parts[0] != ".config" and len(parts) > 1:
+        return "~/" + parts[0] + "/"
+    return "~/" + name
+
+
+def summary(candidates):
+    """Return (category, count text, examples) rows. Examples are the largest places first."""
+    groups = {}
+    for name in candidates:
+        places = groups.setdefault(category(name), {})
+        places[place(name)] = places.get(place(name), 0) + 1
+    rows = []
+    for group in ORDER:
+        places = groups.get(group)
+        if not places:
+            continue
+        count = sum(places.values())
+        examples = sorted(places, key=lambda item: (-places[item], item))[:EXAMPLES]
+        text = ", ".join(examples)
+        if len(places) > EXAMPLES:
+            text += f", + {len(places) - EXAMPLES} more"
+        rows.append((group, f"{count:,} file" + ("" if count == 1 else "s"), text))
+    return rows
 
 
 def lines(record, pins, agents):
-    """Keep the inventory in the record. Show at most fifteen relevant file lines."""
+    """Keep the inventory in the record. Show one line per category with a few examples."""
     from render_run import human, wrap
 
     output = [
@@ -67,17 +103,13 @@ def lines(record, pins, agents):
     output += wrap("Selected tools: " + selected)
     output += wrap("Detected agents: " + (", ".join(agents) or "none"))
     candidates = record["candidates"]
-    output.append(f"Home configuration candidates: {len(candidates)}")
-    relevant = sorted(
-        ((category(name), name) for name in candidates if category(name)),
-        key=lambda item: (["Shell", "Git", "Tools"].index(item[0]), item[1]),
-    )
-    file_lines = []
-    for group, name in relevant:
-        file_lines += wrap("~/" + name, f"  {group:5}  ")
-    output += file_lines[:15]
-    if len(file_lines) > 15:
-        output.append(f"  + {len(file_lines) - 15} more")
+    output.append(f"Home configuration candidates: {len(candidates):,} files")
+    rows = summary(candidates)
+    if rows:
+        group_width = max(len(group) for group, _, _ in rows)
+        count_width = max(len(count) for _, count, _ in rows)
+        for group, count, examples in rows:
+            output += wrap(examples, f"  {group:<{group_width}}  {count:>{count_width}}  ")
     if any(
         sensitive(name) or "secret" in reason or "credential" in reason
         for name, reason in record["excluded"].items()

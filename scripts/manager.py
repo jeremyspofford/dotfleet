@@ -106,8 +106,25 @@ def ask(label, default, choices=None, defaults=False, *, detail="", heading=None
         ) from error
 
 
-def domain_details(checkout):
-    """Describe actual domain alias additions without executing their shell code."""
+def options(rows, default, mark="recommended", intro=""):
+    """Return prompt text: one line per choice, then what Enter alone does.
+
+    Each row is (word, effect). Mark names the default as recommended or current; None marks nothing.
+    """
+    width = max(len(word) for word, _ in rows)
+    lines = [intro] if intro else []
+    for word, effect in rows:
+        note = f" ({mark.capitalize()}.)" if word == default and mark else ""
+        lines.append(f"  {word:<{width}}  {effect}{note}")
+    lines.append(f"Press Enter alone to choose {default}.")
+    return "\n".join(lines)
+
+
+def domain_details(checkout, default="core", mark="current"):
+    """Describe actual domain alias additions without executing their shell code.
+
+    List one line per domain word, mark the default, and state what Enter alone does.
+    """
     entries = tracked(checkout) if checkout is not None else {}
     lines = [
         "Your domain chooses optional additions from the content repository.",
@@ -128,7 +145,11 @@ def domain_details(checkout):
             lines += ["Base files in this checkout: " + ", ".join(base) + ".", ""]
     manifest = content_manifest(checkout) if checkout else {}
     descriptions = manifest.get("domains", {})
-    lines.append("  core      Base configuration only. No domain additions.")
+
+    def note(name):
+        return f" ({mark.capitalize()}.)" if name == default else ""
+
+    lines.append("  core      Base configuration only. No domain additions." + note("core"))
     if descriptions.get("core"):
         lines.append("            " + descriptions["core"])
     empty = 0
@@ -158,7 +179,7 @@ def domain_details(checkout):
                     else "Contains custom shell settings."
                 )
                 summary += f" Review .config/dotfiles/aliases/{domain}.zsh for their behavior."
-        lines.append(f"  {domain:<9} {summary}")
+        lines.append(f"  {domain:<9} {summary}{note(domain)}")
         if descriptions.get(domain):
             lines.append("            " + descriptions[domain])
     if additions and empty == len(additions):
@@ -168,10 +189,9 @@ def domain_details(checkout):
         "Your content declares these domains. Add or remove domains in its fleet.toml.",
         "Choosing a domain does not install software or create accounts.",
         "Your choice is saved in ~/.config/fleet/profile.toml.",
-        "The default is core for a new profile, or your saved domain on later runs.",
         "",
-        "Press Enter to confirm the value in brackets, or type a domain name and press Enter.",
-        "Type skip and press Enter to keep the value without confirming it.",
+        f"  skip      Keep {default} for now without confirming it as your choice.",
+        f"Type a domain name, or press Enter alone to choose {default}.",
     ]
     return "\n".join(lines)
 
@@ -360,7 +380,11 @@ def validate_profile(home, profile, defaults=False, configure=False, checkout=No
             [*content_domains(content_manifest(checkout) if checkout else {}), "skip"],
             defaults,
             heading="Choose your domain",
-            detail=domain_details(checkout),
+            detail=domain_details(
+                checkout,
+                profile.get("domain", "core"),
+                "current" if profile["domain_chosen"] else "recommended",
+            ),
         )
         if domain != "skip":
             profile["domain"] = domain
@@ -373,14 +397,22 @@ def validate_profile(home, profile, defaults=False, configure=False, checkout=No
         or not profile.get("git_name", "").strip()
         or not profile.get("git_email", "").strip()
     ):
-        for field, label in [("git_name", "Git author name"), ("git_email", "Git author email")]:
+        for field, label, noun in [
+            ("git_name", "Git author name", "name"),
+            ("git_email", "Git author email", "email address"),
+        ]:
             recorded = profile.get(field, "")
+            keep = f"keep {recorded}" if recorded else "leave it empty"
             answer = ask(
                 label,
                 recorded,
                 defaults=defaults,
                 heading="Git commit identity",
-                detail="Git records this value on commits.\nPress Enter to keep the shown value, or type skip to leave it unchanged.",
+                detail=(
+                    f"Git records this {noun} on commits. Type your {noun}.\n"
+                    "  skip  Leave the saved value unchanged.\n"
+                    f"Press Enter alone to {keep}."
+                ),
             )
             if answer != "skip":
                 profile[field] = answer
@@ -406,9 +438,9 @@ def validate_profile(home, profile, defaults=False, configure=False, checkout=No
                 if not installed:
                     detail += "For this tool, no matching version is installed.\n"
                 detail += (
-                    f"Press Enter: {action}.\n"
-                    "Type a full version (for example 24.14.1), or skip to leave this tool unselected.\n"
-                    "Press Enter to submit."
+                    "Type a full version, such as 24.14.1.\n"
+                    "  skip  Leave this tool unselected.\n"
+                    f"Press Enter alone: Fleet {action}."
                 )
                 while True:
                     answer = ask(
@@ -505,7 +537,11 @@ def select_profile(home, args, workspace):
                 "on",
                 ["on", "off"],
                 unattended,
-                detail=f"{spec['description']}. on: include; off: exclude. Press Enter to submit.",
+                detail=options(
+                    [("on", "Include this new group."), ("off", "Leave it out.")],
+                    "on",
+                    intro=spec["description"] + ".",
+                ),
             )
             if unattended:
                 print(f"Group {group}: using {choice} ({spec['description']}).")

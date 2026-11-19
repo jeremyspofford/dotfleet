@@ -208,7 +208,7 @@ def welcome(home, sources, profile=None, record=None):
 
 def door_options(home, profile, found, excluded):
     """An enrollment keeps its source. New homes choose from safe candidates."""
-    choices = ["defaults", "repo"] + (["adopt"] if set(found) - set(excluded) else [])
+    choices = ["example", "repo"] + (["adopt"] if set(found) - set(excluded) else [])
     enrolled = any(
         (home / name).exists()
         for name in (
@@ -218,19 +218,28 @@ def door_options(home, profile, found, excluded):
             ".config/chezmoi/chezmoi.toml",
         )
     )
-    recommended = "repo" if enrolled else "adopt" if "adopt" in choices else "defaults"
-    detail = ""
+    recommended = "repo" if enrolled else "adopt" if "adopt" in choices else "example"
+    intro = "Content is the set of shell, Git, and tool files that Fleet manages."
     if enrolled:
-        detail += "Current source: " + profile.get("content_repo", manager.DEFAULT_REPO) + "\n"
-    detail += "defaults: use our example shell and Git files.\n"
-    detail += (
-        "repo: keep the current source, or enter another repository URL.\n"
-        if enrolled
-        else "repo: enter your own Git repository URL.\n"
-    )
+        intro += "\nCurrent source: " + profile.get("content_repo", manager.DEFAULT_REPO)
+    rows = [
+        ("example", "Start from Fleet's example shell and Git files."),
+        (
+            "repo",
+            "Keep the current repository, or type another one next."
+            if enrolled
+            else "Use your own Git repository. You type its URL next.",
+        ),
+    ]
     if "adopt" in choices:
-        detail += "adopt: keep your existing files unchanged in a new local repository. Secret matches are excluded.\n"
-    detail += f"Recommended: {recommended}. Press Enter to keep this choice, or type a listed door."
+        rows.append(
+            (
+                "adopt",
+                "Copy your existing files, unchanged, into a new local repository."
+                " Files that look secret stay out.",
+            )
+        )
+    detail = manager.options(rows, recommended, intro=intro)
     return choices, recommended, detail
 
 
@@ -261,10 +270,13 @@ def agent_flags(profile, value):
 
 
 def identity(home, profile, args):
-    for field, label, key in [
-        ("git_name", "Git author name", "user.name"),
-        ("git_email", "Git author email", "user.email"),
-    ]:
+    fields = [
+        ("git_name", "Git author name", "user.name", "name"),
+        ("git_email", "Git author email", "user.email", "email address"),
+    ]
+    # One numbered heading per step: the first prompt carries it, and the second uses its label.
+    heading = "5. Git commit identity"
+    for field, label, key, noun in fields:
         if getattr(args, field) is not None:
             continue
         current = subprocess.run(
@@ -272,11 +284,17 @@ def identity(home, profile, args):
         ).stdout.strip()
         recorded = profile.get(field) or current
         while True:
+            enter = (
+                f"Press Enter alone to keep {recorded}."
+                if recorded
+                else "Press Enter alone to ask again; this value has no saved answer."
+            )
             value = manager.ask(
                 label,
                 recorded,
-                heading="5. Git commit identity",
-                detail="Git records this value on commits.\nPress Enter to keep the value. Type skip to leave it empty explicitly.",
+                heading=heading,
+                detail=f"Git records your {noun} on each commit. Type your {noun}.\n"
+                f"  skip  Leave the {noun} empty.\n{enter}",
             )
             if value == "skip":
                 profile[field] = ""
@@ -284,7 +302,8 @@ def identity(home, profile, args):
             if value:
                 profile[field] = value
                 break
-            print("Enter a value, or type skip. An empty answer cannot silently omit identity.")
+            print(f"Type your {noun}, or type skip. An empty answer cannot silently omit it.")
+        heading = None
 
 
 def pins(home, profile, checkout):
@@ -300,7 +319,13 @@ def pins(home, profile, checkout):
         "Tools",
         "accept",
         ["accept", "edit"],
-        detail="accept: keep saved versions and use installed versions for matching defaults.\nedit: enter TOOL=VERSION pairs, separated by commas. Type none to clear selections.\nPress Enter to submit.",
+        detail=manager.options(
+            [
+                ("accept", "Keep saved versions. Use installed versions for the content defaults."),
+                ("edit", "Type exact versions next, as TOOL=VERSION pairs."),
+            ],
+            "accept",
+        ),
     )
     if action == "edit":
         while True:
@@ -308,8 +333,9 @@ def pins(home, profile, checkout):
                 "Tool versions",
                 "none",
                 detail=(
-                    "Enter pairs such as node=24.14.1,python=3.13.0, or none. Press Enter "
-                    "to submit."
+                    "Type pairs separated by commas, such as node=24.14.1,python=3.13.0.\n"
+                    "  none  Clear every tool selection.\n"
+                    "Press Enter alone to choose none, which clears every selection."
                 ),
             )
             try:
@@ -354,7 +380,7 @@ def steps(home, args, workspace, profile, found, excluded, start=0, checkout=Non
         else:
             choices, recommended, detail = door_options(home, profile, found, excluded)
             door = manager.ask(
-                "Content door",
+                "Content source",
                 recommended,
                 choices,
                 heading="3. Where your content comes from",
@@ -377,15 +403,15 @@ def steps(home, args, workspace, profile, found, excluded, start=0, checkout=Non
                 )
             )
         else:
-            if door == "defaults":
+            if door == "example":
                 repo = manager.DEFAULT_REPO
             elif not args.repo:
                 repo = manager.ask(
                     "Content repository",
                     repo,
                     detail=(
-                        "Enter a trusted Git URL or local repository path. Press Enter to "
-                        "keep the shown value."
+                        "Type a Git URL or a local repository path. Use only content you trust.\n"
+                        f"Press Enter alone to keep {repo}."
                     ),
                 )
             checkout = stage_repo(home, repo, workspace)
@@ -398,7 +424,14 @@ def steps(home, args, workspace, profile, found, excluded, start=0, checkout=Non
                 "Format",
                 "plain",
                 ["plain", "chezmoi"],
-                detail="plain: real home file names.\nchezmoi: native source names and templates.\nType a format and press Enter.",
+                detail=manager.options(
+                    [
+                        ("plain", "Files use their real home names, such as .zshrc."),
+                        ("chezmoi", "Files use chezmoi source names, such as dot_zshrc."),
+                    ],
+                    "plain",
+                    intro="Fleet could not tell how this repository names its files.",
+                ),
             )
             kind, manifest = detect(checkout, kind)
         profile.update(content_repo=repo, format=kind, adopted=bool(manifest.get("adopted", False)))
@@ -408,7 +441,11 @@ def steps(home, args, workspace, profile, found, excluded, start=0, checkout=Non
             profile.get("domain", "core"),
             [*content_domains(manifest), "skip"],
             heading="4. Choose your domain",
-            detail=manager.domain_details(checkout),
+            detail=manager.domain_details(
+                checkout,
+                profile.get("domain", "core"),
+                "current" if profile.get("domain_chosen") else "recommended",
+            ),
         )
         if domain != "skip":
             profile.update(domain=domain, domain_chosen=True)
@@ -431,7 +468,15 @@ def steps(home, args, workspace, profile, found, excluded, start=0, checkout=Non
                     "on" if selections.get(group, True) else "off",
                     ["on", "off"],
                     heading=f"Group: {group}{new}",
-                    detail=f"{spec['description']}\non: include these files or commands.\noff: exclude them.\nPress Enter to keep the shown choice.",
+                    detail=manager.options(
+                        [
+                            ("on", "Include these files or commands."),
+                            ("off", "Leave them out."),
+                        ],
+                        "on" if selections.get(group, True) else "off",
+                        "recommended" if new else "current",
+                        intro=spec["description"],
+                    ),
                 )
                 == "on"
             )
@@ -463,10 +508,15 @@ def choose_agents(home, profile):
                 "on" if selections.get(name, False) else "off",
                 ["on", "off"],
                 heading="Agent: " + name,
-                detail="on: render the content's agent configuration for this agent.\n"
-                "off: write nothing new for it; earlier outputs stay.\n"
-                "A value that Fleet did not write stops setup before writes.\n"
-                "Press Enter to keep the shown choice.",
+                detail=manager.options(
+                    [
+                        ("on", "Write this agent's settings from your content."),
+                        ("off", "Write nothing new for it. Earlier outputs stay."),
+                    ],
+                    "on" if selections.get(name, False) else "off",
+                    "current",
+                    intro="Setup stops before writing if it finds a value Fleet did not write.",
+                ),
             )
             == "on"
         )
@@ -493,12 +543,25 @@ def review(profile, account, warnings):
                 "existing content."
             )
         ]
-    details += [
-        "confirm: back up files and apply these choices. Recommended.",
-        "quit: cancel the planned changes and move any renamed stores back.",
-        "source, domain, identity, tools, groups, agents: return to that step, then review again.",
-        "Press Enter alone to confirm. Type quit to cancel.",
+    rows = [
+        ("confirm", "Back up files, then apply these choices."),
+        ("quit", "Cancel. Nothing is applied, and any renamed stores move back."),
     ]
+    rows += [
+        (step, f"Return to step {number}, {title}, then review again.")
+        for number, (step, title) in enumerate(
+            [
+                ("source", "content source"),
+                ("domain", "domain"),
+                ("identity", "Git commit identity"),
+                ("tools", "tools"),
+                ("groups", "content groups"),
+                ("agents", "agents"),
+            ],
+            3,
+        )
+    ]
+    details += ["", *manager.options(rows, "confirm").splitlines()]
     return manager.ask(
         "Review",
         "confirm",

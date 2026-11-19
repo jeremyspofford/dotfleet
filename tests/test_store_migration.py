@@ -131,7 +131,7 @@ class StoreMigrationTests(unittest.TestCase):
         output = self.terminal(
             ["configure"],
             [
-                (b"Content door [repo]:", b"\n"),
+                (b"Content source [repo]:", b"\n"),
                 (b"Content repository [", b"\n"),
                 (b"Domain [core]:", b"\n"),
                 (b"Git author name [", b"\n"),
