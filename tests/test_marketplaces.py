@@ -61,7 +61,13 @@ class CatalogTests(unittest.TestCase):
         self.addCleanup(self.folder.cleanup)
         self.root = market(Path(self.folder.name) / "market")
 
-    def test_packages_validate_and_items_keep_their_library_root(self):
+    def test_packages_live_apart_from_the_dotfiles_library(self):
+        import dotfiles_library
+
+        self.assertEqual(marketplaces.LIBRARY, ".fleet/marketplace-packages")
+        self.assertNotEqual(marketplaces.LIBRARY, dotfiles_library.LIBRARY)
+
+    def test_packages_validate_and_items_keep_their_package_root(self):
         catalog = marketplaces.read_catalog(self.root)
         items = marketplaces.package_items(
             self.root, "review-kit", catalog["packages"]["review-kit"], AGENTS
@@ -143,7 +149,7 @@ class MarketplaceCommandTests(unittest.TestCase):
         )
         self.market = market(self.base / "market")
 
-    def test_add_installs_packages_into_the_library_and_the_tree(self):
+    def test_add_installs_packages_into_the_package_folder_and_the_tree(self):
         self.setup_agents()
         output = self.cli(
             "marketplaces", "add", "--source", str(self.market), "--packages", "review-kit"
@@ -157,8 +163,8 @@ class MarketplaceCommandTests(unittest.TestCase):
         served = json.loads((tree / "gateway/codex.json").read_text())["servers"]
         self.assertEqual(served["review-docs"]["command"], "npx")
         self.assertFalse((tree / "rules/claude.md").exists())
-        library = self.home / marketplaces.LIBRARY / "market"
-        self.assertTrue((library / marketplaces.CATALOG).is_file())
+        packages = self.home / ".fleet/marketplace-packages/market"
+        self.assertTrue((packages / marketplaces.CATALOG).is_file())
         saved = json.loads((self.home / marketplaces.RECORD).read_text())["marketplaces"]["market"]
         self.assertEqual(saved["take"], {"packages": ["review-kit"]})
         self.assertEqual(saved["version"], "v1.0.0")
@@ -182,7 +188,7 @@ class MarketplaceCommandTests(unittest.TestCase):
 
         self.cli("marketplaces", "delete", "--name", "market")
         self.assertFalse((self.home / ".agents/skills/pr-review").is_symlink())
-        self.assertFalse(library.exists())
+        self.assertFalse(packages.exists())
         self.assertFalse((tree / "gateway/codex.json").exists())
         self.assertIn("No marketplaces", self.cli("marketplaces", "list"))
 

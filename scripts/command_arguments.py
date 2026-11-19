@@ -23,7 +23,7 @@ GROUPS = {
         "add": "Add a marketplace and install its packages.\n"
         "Take every package, named packages, or named features where a package allows it.\n"
         "The review lists every output before the apply.",
-        "delete": "Delete a marketplace, its library copy, and its installed outputs.",
+        "delete": "Delete a marketplace, its package copy, and its installed outputs.",
         "update": "Move marketplaces to their newest commit, or change a pin or selection.\n"
         "A pin blocks updates; --pin moves the pin and --unpin clears it.\n"
         "Without --name, update every marketplace.",

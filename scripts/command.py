@@ -126,7 +126,7 @@ DESCRIPTIONS = {
         "Manage agent packages through Fleet Marketplace.\n"
         "A marketplace is a Git repository with a fleet-marketplace.toml catalog.\n"
         "A package bundles skills, rule sets, servers, connectors, plugins, or hooks.\n"
-        "Installed packages live in an untracked library; records stay in the manager store."
+        "Installed packages live in ~/.fleet/marketplace-packages; records stay in the manager store."
     ),
     "machines": (
         "Manage fleet members and saved connections.\n"

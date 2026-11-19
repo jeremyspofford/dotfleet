@@ -69,7 +69,7 @@ class Item:
     kind: str
     name: str
     spec: dict = field(hash=False)
-    # Pulled-in items read their files from the library, not from the content checkout.
+    # Pulled-in items read their files from ~/.fleet/marketplace-packages, not the content checkout.
     root: object = field(default=None, hash=False, compare=False)
     origin: str = "content"
 

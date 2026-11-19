@@ -220,6 +220,37 @@ class StoreMigrationTests(unittest.TestCase):
         self.migrate_and_rerun(self.older_layout(["deploy"]))
         self.assertTrue((self.home / ".fleet/deploy/run.sh").is_file())
 
+    def marketplace_packages(self, old):
+        """Create an older marketplace package folder at old. Return the package inode."""
+        package = self.home / old / "market"
+        package.mkdir(parents=True)
+        (package / "fleet-marketplace.toml").write_text("schema = 1\n")
+        return package.stat().st_ino
+
+    def assert_marketplace_packages_moved(self, inode):
+        package = self.home / ".fleet/marketplace-packages/market"
+        self.assertEqual(package.stat().st_ino, inode)
+        self.assertEqual((package / "fleet-marketplace.toml").read_text(), "schema = 1\n")
+        self.assertFalse((self.home / ".fleet/library").exists())
+        self.assert_no_orphans()
+
+    def test_marketplace_library_folder_moves_to_marketplace_packages(self):
+        self.enroll()
+        inode = self.marketplace_packages(".fleet/library")
+        self.cli("update")
+        self.assert_marketplace_packages_moved(inode)
+        # A second run finds nothing left to move.
+        before = self.snapshot()
+        self.cli("status")
+        self.assertEqual(self.snapshot(), before)
+        self.assert_quiet_status()
+
+    def test_older_marketplace_library_moves_straight_to_marketplace_packages(self):
+        self.enroll()
+        inode = self.marketplace_packages(".local/share/fleet/library")
+        self.cli("update")
+        self.assert_marketplace_packages_moved(inode)
+
     def test_first_generation_dotfleet_stores_move(self):
         self.enroll()
         moved = self.older_layout(generation=1)

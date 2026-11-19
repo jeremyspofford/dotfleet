@@ -229,7 +229,7 @@ Stale outputs that still match their record leave. Changed stale outputs stay, w
 
 Fleet Marketplace pulls agent packages from marketplaces into the agent tree. See [Fleet Marketplace](MARKETPLACES.md).
 A marketplace is a Git repository with a `fleet-marketplace.toml` catalog.
-Pulled-in components live in an untracked library under the manager store. The installation record lives there too.
+Pulled-in components live in an untracked folder, `~/.fleet/marketplace-packages`. The installation record lives in the manager store.
 No pulled-in file enters the user's tracked content. Updates never rewrite the user's own files.
 A refresh replaces a pulled-in component, keeps any edited copy in the run backup, and prints one line.
 
