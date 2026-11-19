@@ -184,7 +184,7 @@ class ScreenTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(len(run_index.entries(self.home)), 1)
 
     async def test_updates_call_check_and_update_cores_with_review(self):
-        def check(home, profile, display=True, marketplaces=False):
+        def check(home, profile, display=True, marketplaces=False, tools=False):
             print("Manager: 3 commits behind @ abcdef01")
             print("Content: up to date @ abcdef01")
             return 1
