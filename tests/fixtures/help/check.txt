@@ -8,6 +8,8 @@ Status reads saved results; check fetches new results.
 Fetch manager and content upstreams quietly, with a 10-second limit per fetch.
 An upstream is the remote branch tracked by a checkout, a local Git copy.
 Save both results only when both checks succeed.
+Ask Mise for the newest version of each selected tool, and save those results.
+A newer tool version counts as an available update.
 SSH securely connects to another machine.
 Add MACHINE to use one registered machine and its own saved choices.
 Remote runs never prompt; a failed connection prints an error.

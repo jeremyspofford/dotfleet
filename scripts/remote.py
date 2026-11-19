@@ -27,8 +27,15 @@ PROFILE_ACTIONS = {
     "agents": {"list": (), "set": ("name", "state")},
     "domain": {"list": (), "set": ("name",)},
     "groups": {"list": (), "set": ("name", "state")},
-    "tools": {"list": (), "set": ("tool", "version"), "remove": ("tool",)},
+    "tools": {
+        "list": (),
+        "set": ("tool", "version"),
+        "remove": ("tool",),
+        "update": ("tool",),
+    },
 }
+# A request may leave these values out. Tools update without a tool updates every selected tool.
+OPTIONAL = {("tools", "update"): {"tool"}}
 PATTERNS = {
     ("agents", "name"): r"(?:skills|rules|mcp|connectors|plugins|hooks)\.[a-z0-9]+(?:-[a-z0-9]+)*",
     ("agents", "state"): r"on|off|local",
@@ -64,8 +71,9 @@ def validate_profile_request(request):
     command, action, arguments = request["command"], request["action"], request["arguments"]
     if command not in PROFILE_ACTIONS or action not in PROFILE_ACTIONS.get(command, {}):
         raise ValueError("Only domain, groups, agents, and tools choices can change remotely.")
-    expected = PROFILE_ACTIONS[command][action]
-    if not isinstance(arguments, dict) or set(arguments) != set(expected):
+    expected = set(PROFILE_ACTIONS[command][action])
+    required = expected - OPTIONAL.get((command, action), set())
+    if not isinstance(arguments, dict) or not required <= set(arguments) <= expected:
         raise ValueError(f"Invalid values for remote {command} {action}.")
     for key, value in arguments.items():
         if not isinstance(value, str) or not re.fullmatch(PATTERNS[(command, key)], value):

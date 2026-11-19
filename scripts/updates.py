@@ -3,6 +3,7 @@
 Usage: dotfleet check; dotfleet status.
 An upstream is the remote branch tracked by a checkout's current branch.
 Fetches stop after 10 seconds. No checkout, profile, or managed file is applied here.
+Check also asks Mise for the newest version of each selected tool.
 Help: python3 scripts/updates.py --help.
 """
 
@@ -272,7 +273,36 @@ def check_marketplaces(home, display):
     return int(any(result["behind"] and not result["pin"] for result in results.values()))
 
 
-def check(home, profile, display=True, marketplaces=False):
+def check_tools(home, profile, display):
+    """Look up selected tools after marketplaces. Return 1 when a newer version exists."""
+    import tool_updates
+
+    if not tool_updates.selected(profile):
+        return 0
+    try:
+        results = tool_updates.check(home, profile)
+    except (OSError, ValueError, RuntimeError) as error:
+        print(f"Warning: Could not check tools: {error}.", file=sys.stderr)
+        return 2
+    code = 0
+    for name, result in results.items():
+        if result["state"] == "failed":
+            print(f"Warning: Could not check tool {name}: {result['error']}.", file=sys.stderr)
+            code = 2
+            continue
+        if result["state"] == "skipped":
+            state = "records several versions; not checked"
+        elif result["state"] == "behind":
+            state = f"{result['newest']} available @ {result['recorded']}"
+            code = max(code, 1)
+        else:
+            state = f"up to date @ {result['recorded']}"
+        if display:
+            print(f"\nTool {name}: {state}")
+    return code
+
+
+def check(home, profile, display=True, marketplaces=False, tools=False):
     name = "manager"
     try:
         sources = []
@@ -310,6 +340,9 @@ def check(home, profile, display=True, marketplaces=False):
     if marketplaces:
         # The update gate leaves marketplaces out; marketplaces update advances them.
         result = max(result, check_marketplaces(home, display))
+    if tools:
+        # The update gate leaves tools out; tools update records newer versions.
+        result = max(result, check_tools(home, profile, display))
     return result
 
 

@@ -20,6 +20,7 @@ Use flags for optional parameters and for values that a reader can confuse with 
 Commands and action words stay positional. A positional argument is a value without a named flag.
 The single trailing machine in status, check, diff, doctor, and update is the subject. Keep that machine name positional.
 Tools set and remove take one tool name as their subject. Keep the version as a named flag.
+Tools update takes an optional tool name as its subject. Without it, the action covers every selected tool.
 Use --name and --target for SSH registration. One flag supplies both values unless the other flag gives a different value.
 Help and examples show flags. Keep promised positional SSH-registration forms readable, but do not document them as the main interface.
 Command groups require explicit action verbs. A bare group prints its action list.
@@ -50,6 +51,7 @@ The command audit uses these forms:
 | groups list / set | set requires --name and --state; --machine selects a registered machine |
 | tools set | TOOL, --version; --machine selects a registered machine |
 | tools remove | TOOL; --machine selects a registered machine |
+| tools update | Optional TOOL; --machine selects a registered machine |
 | tools uninstall | TOOL, --version |
 | backups restore | --backup; no flag lists backups |
 | status, check, diff, doctor, update | One optional machine subject; diff also has --stat |

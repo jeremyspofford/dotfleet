@@ -24,6 +24,7 @@ import owned_views
 import updates
 import agent_table
 import marketplaces
+import tool_updates
 import datetime
 import style
 from common import toml
@@ -89,6 +90,17 @@ def command_goldens():
         )
         (home / ".local/share/fleet/marketplaces-check.json").write_text(
             json.dumps({"marketplaces": {"agent-market": {"behind": 2}}})
+        )
+        (home / tool_updates.CACHE).write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "checked_at": datetime.datetime(2026, 11, 17, 9, 2).astimezone().isoformat(),
+                    "tools": {
+                        "node": {"state": "behind", "recorded": "26.13.1", "newest": "26.14.0"}
+                    },
+                }
+            )
         )
         (home / ".config/fleet").mkdir(parents=True)
         (home / ".config/fleet/profile.toml").write_text(toml(profile))
@@ -184,6 +196,7 @@ def command_goldens():
             outputs["help"] = command.parser().format_help()
             with (
                 patch.object(updates, "validate_content"),
+                patch.object(tool_updates, "newest", return_value="26.14.0"),
                 patch.object(
                     marketplaces,
                     "check",
