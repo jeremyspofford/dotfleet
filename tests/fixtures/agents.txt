@@ -1,24 +1,32 @@
 
 8. Agents
 An agent is a coding assistant. Only detected agents can be configured.
+This content declares no agent configuration yet. On or off changes nothing today.
+On means this machine receives agent configuration at a later update, when you add some.
 
 Agent: claude
+When on, Fleet writes only entries it owns and never touches the agent's login.
+When off, outputs Fleet wrote earlier stay in place.
 Setup stops before writing if it finds a value Fleet did not write.
-  on   Write this agent's settings from your content. (Current.)
-  off  Write nothing new for it. Earlier outputs stay.
+  on   Fleet manages its skills, MCP entries, rules, and packages. (Current.)
+  off  Fleet leaves its configuration alone. The agent still works.
 Press Enter alone to choose on.
 claude [on]:
 
 Agent: codex
+When on, Fleet writes only entries it owns and never touches the agent's login.
+When off, outputs Fleet wrote earlier stay in place.
 Setup stops before writing if it finds a value Fleet did not write.
-  on   Write this agent's settings from your content.
-  off  Write nothing new for it. Earlier outputs stay. (Current.)
+  on   Fleet manages its skills, MCP entries, rules, and packages.
+  off  Fleet leaves its configuration alone. The agent still works. (Current.)
 Press Enter alone to choose off.
 codex [off]:
 
 Agent: gemini
+When on, Fleet writes only entries it owns and never touches the agent's login.
+When off, outputs Fleet wrote earlier stay in place.
 Setup stops before writing if it finds a value Fleet did not write.
-  on   Write this agent's settings from your content.
-  off  Write nothing new for it. Earlier outputs stay. (Current.)
+  on   Fleet manages its skills, MCP entries, rules, and packages.
+  off  Fleet leaves its configuration alone. The agent still works. (Current.)
 Press Enter alone to choose off.
 gemini [off]:
