@@ -311,7 +311,7 @@ class Bash32Tests(unittest.TestCase):
             f'echo "$*" >> {fixture.run_log}\n'
         )
         resolved.chmod(0o755)
-        code, output = self.run32("bash", "scripts/dotfleet.sh", "status", fixture=fixture)
+        code, output = self.run32("bash", "/manager/scripts/dotfleet.sh", "status", fixture=fixture)
         self.assertEqual(code, 0, output)
         self.assertEqual(fixture.run_log.read_text(), "/manager/scripts/dotfleet.sh status\n")
 

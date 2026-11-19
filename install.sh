@@ -224,7 +224,8 @@ if [ "${BASH_VERSINFO[0]}" -lt 4 ] || { [ "${BASH_VERSINFO[0]}" -eq 4 ] && [ "${
 		error_exit "Fleet started a resolved bash, but it reports $BASH_VERSION at $BASH. Fleet needs bash 4.4 or newer."
 	fi
 	update_bash=no
-	for argument in "$@"; do
+	# The parser above shifted every argument. An empty array needs this form on bash 3.2.
+	for argument in ${arguments[@]+"${arguments[@]}"}; do
 		if [ "$argument" = --update-bash ]; then update_bash=yes; fi
 	done
 	if [ -n "$script_dir" ]; then
@@ -240,9 +241,9 @@ if [ "${BASH_VERSINFO[0]}" -lt 4 ] || { [ "${BASH_VERSINFO[0]}" -eq 4 ] && [ "${
 	# The new process makes its own work folder and run entry.
 	trap - EXIT
 	rm -rf -- "$work_dir"
-	if [ -n "$script_dir" ]; then exec "$modern_bash" "${BASH_SOURCE[0]}" "$@"; fi
+	if [ -n "$script_dir" ]; then exec "$modern_bash" "${BASH_SOURCE[0]}" ${arguments[@]+"${arguments[@]}"}; fi
 	installer=$(curl -fsSL "$raw/install.sh") || error_exit "Could not download $raw/install.sh."
-	exec "$modern_bash" -c "$installer" install.sh "$@"
+	exec "$modern_bash" -c "$installer" install.sh ${arguments[@]+"${arguments[@]}"}
 fi
 # Every Fleet script in this run uses this bash: Python reads FLEET_BASH, and env finds the link.
 export FLEET_BASH=$BASH

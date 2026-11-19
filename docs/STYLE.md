@@ -22,7 +22,7 @@ The bootstrap layer finds a modern bash, or installs one with Homebrew after the
 1. Keep the bootstrap layer safe for POSIX sh and bash 3.2. It runs before any upgrade exists.
 2. The bootstrap layer is `scripts/bash_floor.sh`, the bash check at the top of `install.sh`, the deploy probe and bash install scripts, and `scripts/dotfleet.sh`.
 3. In that layer, use no arrays, no `mapfile`, and no `[[ ]]`. Never expand an empty array under `set -u`.
-4. Expand all arguments as `"$@"`, which bash 3.2 allows under `set -u`.
+4. Expand all arguments as `"$@"`, which bash 3.2 allows under `set -u`. Expand a saved array as `${name[@]+"${name[@]}"}`.
 5. The launcher, `scripts/dotfleet.sh`, stays wholly in that layer. It must start on bash 3.2 to reach `fleet update`.
 6. All other shell code may use modern bash. The bootstrap guarantees 4.4 or newer before that code runs.
 7. Start scripts with the resolved bash by path. Python reads it from `FLEET_BASH`; never rely on PATH order over SSH.
