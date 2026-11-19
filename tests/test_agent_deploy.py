@@ -387,6 +387,78 @@ pi = { id = "npm:@example/review" }
 """
 
 
+class AntigravityTests(Fixture):
+    """Antigravity renders only its gateway entry, the surface tested on agy 1.5.10."""
+
+    def setUp(self):
+        super().setUp()
+        self.profile["agents"]["antigravity"] = True
+
+    def test_the_gateway_entry_has_no_references_and_no_empty_args(self):
+        result = self.run_plan()
+        tree = self.home / agent_deploy.TREE
+        servers = self.read_json(".gemini/config/mcp_config.json")["mcpServers"]
+        self.assertEqual(servers, {"fleet": {"command": str(tree / "gateway/run-antigravity")}})
+        served = self.read_json(f"{agent_deploy.TREE}/gateway/antigravity.json")["servers"]
+        self.assertEqual(set(served), {"docs", "issues"})
+        self.assertIn(
+            "antigravity: rule set style is untested for this agent; Fleet writes nothing.",
+            result.notes,
+        )
+        self.assertIn(
+            "antigravity: hook guard is untested for this agent; Fleet writes nothing.",
+            result.notes,
+        )
+        self.assertFalse((tree / "hooks/guard/run-antigravity").exists())
+        self.assertFalse((tree / "rules/antigravity.md").exists())
+        self.assertFalse((self.home / ".gemini/config/rules").exists())
+        self.assertFalse((self.home / ".gemini/config/hooks.json").exists())
+
+    def test_connectors_are_reported_not_written(self):
+        manifest = MANIFEST.replace('agents = ["claude", "codex"]', 'agents = ["antigravity"]')
+        result = self.run_plan(manifest)
+        servers = self.read_json(".gemini/config/mcp_config.json")["mcpServers"]
+        self.assertEqual(set(servers), {"fleet"})
+        self.assertIn(
+            "antigravity: connector calendar is untested for this agent; Fleet writes nothing.",
+            result.notes,
+        )
+
+    def test_the_empty_file_from_agy_first_start_is_accepted(self):
+        config = self.home / ".gemini/config/mcp_config.json"
+        config.parent.mkdir(parents=True)
+        config.write_text("")
+        self.run_plan()
+        self.assertIn("fleet", self.read_json(".gemini/config/mcp_config.json")["mcpServers"])
+
+    def test_agy_rewrites_keep_the_entry_current(self):
+        self.run_plan()
+        config = self.home / ".gemini/config/mcp_config.json"
+        # agy mcp add rewrites the file: it adds its own server and keeps Fleet's entry.
+        data = json.loads(config.read_text())
+        data["mcpServers"]["mine"] = {"command": "/bin/true", "disabled": False, "env": {"A": "1"}}
+        config.write_text(json.dumps(data, indent=2) + "\n")
+        again = self.run_plan()
+        self.assertEqual(again.conflicts, [])
+        self.assertIn("mine", self.read_json(".gemini/config/mcp_config.json")["mcpServers"])
+
+    def test_plugins_are_reported_and_no_installer_runs(self):
+        plugins = PLUGINS + 'antigravity = { id = "review-kit@antigravity-plugins-official" }\n'
+        result = self.plan(plugins)
+        self.assertIn(
+            "antigravity: plugin review-kit is untested for this agent; Fleet installs nothing.",
+            result.notes,
+        )
+        self.assertEqual(
+            [plugin for plugin in result.plugins if plugin["agent"] == "antigravity"], []
+        )
+
+    def test_turning_antigravity_off_writes_nothing_new(self):
+        self.profile["agents"]["antigravity"] = False
+        self.run_plan()
+        self.assertFalse((self.home / ".gemini/config/mcp_config.json").exists())
+
+
 class PluginTests(Fixture):
     """Listing agents receive plugin entries; Codex and Gemini CLI run their installers."""
 
