@@ -346,7 +346,7 @@ class ScreenTests(unittest.IsolatedAsyncioTestCase):
             record.update(hostname=name, ssh_target=target)
             data["machines"][name] = record
         path = self.home / registry.REGISTRY
-        path.parent.mkdir(parents=True)
+        path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(registry.serialize(data))
 
         def execute(home, machine, action, **options):
@@ -501,7 +501,7 @@ class ScreenTests(unittest.IsolatedAsyncioTestCase):
             record.update(hostname=name, ssh_target=target)
             records[name] = record
         path = self.home / registry.REGISTRY
-        path.parent.mkdir(parents=True)
+        path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(registry.serialize({"schema_version": 1, "machines": records}))
         app = FleetApp(FixtureSession())
         with patch.object(remote, "execute", return_value=0) as execute:
