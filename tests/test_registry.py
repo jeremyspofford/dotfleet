@@ -55,7 +55,7 @@ class RegistryTests(unittest.TestCase):
         self.assertNotIn("private@example.invalid", text)
         self.assertNotIn("24.14.1", text)
         self.assertEqual((self.home / registry.REGISTRY).stat().st_mode & 0o777, 0o600)
-        self.assertFalse((self.home / "dotfiles").exists())
+        self.assertFalse((self.home / ".fleet/dotfiles").exists())
 
     def test_legacy_view_is_unchosen_and_does_not_create_store(self):
         atomic(

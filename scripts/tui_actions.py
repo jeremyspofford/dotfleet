@@ -13,6 +13,7 @@ import command
 import registry
 import ui_channel
 from tui_navigation import ACTIONS
+import dotfiles_library
 
 
 def field(name, label, default="", choices=None, required=True):
@@ -82,7 +83,7 @@ def domain_arguments(home):
 
 def group_arguments(home):
     saved = command.profile(home)
-    manifest = command.content_manifest(home / "dotfiles")
+    manifest = command.content_manifest(dotfiles_library.active(home))
     choices = [
         (name + " — " + spec["description"], name)
         for name, spec in manifest.get("groups", {}).items()
@@ -153,6 +154,38 @@ def marketplace_delete_arguments(home):
     names = sorted(marketplaces.load_records(home)["marketplaces"])
     selected = choose("Delete a marketplace", "Marketplace", [(name, name) for name in names])
     return ["marketplaces", "delete", "--name", selected] if selected is not None else None
+
+
+def dotfiles_download_arguments(home):
+    answer = form(
+        "Download a dotfiles repository",
+        [
+            field("url", "Git URL or local repository path"),
+            field("name", "Name in the library (empty: repository name)", required=False),
+        ],
+        "Downloading changes no applied file. Use activates a download later. Cancel stops.",
+    )
+    if answer is None:
+        return None
+    arguments = ["dotfiles", "download", answer["url"].strip()]
+    if answer["name"].strip():
+        arguments += ["--name", answer["name"].strip()]
+    return arguments
+
+
+def dotfiles_choice(home, title, action, inactive):
+    current = dotfiles_library.active_name(home)
+    names = [name for name in dotfiles_library.names(home) if not inactive or name != current]
+    selected = choose(title, "Download", [(name, name) for name in names])
+    return ["dotfiles", action, selected] if selected is not None else None
+
+
+def dotfiles_use_arguments(home):
+    return dotfiles_choice(home, "Activate a downloaded repository", "use", True)
+
+
+def dotfiles_remove_arguments(home):
+    return dotfiles_choice(home, "Remove a downloaded repository", "remove", True)
 
 
 def pin_arguments(home):
@@ -255,6 +288,9 @@ FORMS = {
     "agent-set": agent_item_arguments,
     "agent-import": agent_import_arguments,
     "marketplace-add": marketplace_add_arguments,
+    "dotfiles-download": dotfiles_download_arguments,
+    "dotfiles-use": dotfiles_use_arguments,
+    "dotfiles-remove": dotfiles_remove_arguments,
     "marketplace-delete": marketplace_delete_arguments,
     "pin-set": pin_arguments,
     "pin-remove": unpin_arguments,

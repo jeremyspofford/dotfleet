@@ -19,6 +19,8 @@ import time
 import tomllib
 import unittest
 
+import dotfiles_library
+
 import test_manager as helpers
 from test_manager import ROOT, command, repository
 from common import toml
@@ -441,7 +443,7 @@ else: sys.exit(1)
         self.assert_review_golden("uninstall", output)
         self.assertFalse(self.exe.exists())
         self.assertFalse((self.home / ".fleet/manager").exists())
-        self.assertTrue((self.home / "dotfiles/.git").exists())
+        self.assertTrue((self.home / ".fleet/dotfiles/content/.git").exists())
         self.assertTrue((self.home / ".fleet/backups").exists())
         self.assertEqual((self.home / ".file").read_text(), "before enrollment\n")
 

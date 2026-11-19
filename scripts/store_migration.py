@@ -17,6 +17,9 @@ import shutil
 import sys
 
 from common import atomic, read_toml, toml
+
+# Import before any move: migration can move the folder this code runs from.
+import dotfiles_library
 import style
 
 ROOT = ".fleet"
@@ -175,6 +178,40 @@ def rewritten_files(home):
     return result
 
 
+def content_move(home):
+    """Return (old checkout, library place, profile text) for a ~/dotfiles checkout, or None.
+
+    Only the checkout that the saved profile names moves. An unrelated ~/dotfiles stays.
+    """
+    old = home / "dotfiles"
+    profile_path = home / ROOT / "profile.toml"
+    if old.is_symlink() or not (old / ".git").is_dir() or not profile_path.is_file():
+        return None
+    profile = read_toml(profile_path)
+    if profile.get("dotfiles"):
+        return None
+    repo = profile.get("content_repo", "")
+    origin = dotfiles_library.source(old)
+    if repo == str(old) or origin == "local":
+        name, profile["content_repo"] = dotfiles_library.ADOPTED, ""
+    elif dotfiles_library.same_source(origin, repo):
+        name = dotfiles_library.name_for(repo)
+    else:
+        return None
+    if not dotfiles_library.NAME.fullmatch(name):
+        name = "dotfiles"
+    destination = home / dotfiles_library.LIBRARY / name
+    if destination.exists() or destination.is_symlink():
+        raise ValueError(
+            f"Store migration stopped: ~/dotfiles and ~/{dotfiles_library.LIBRARY}/{name}"
+            " conflict. Nothing was moved."
+        )
+    profile["dotfiles"] = name
+    if not profile["content_repo"]:
+        profile["content_repo"] = str(destination)
+    return old, destination, toml(profile)
+
+
 def undo(journal):
     """Reverse journal steps, newest first. Return the lines that could not be undone."""
     problems = []
@@ -210,7 +247,7 @@ def undo(journal):
 def migrate(home, stash):
     """Move every older store into ~/.fleet. Return display records and the undo journal."""
     moves, emptied, stale = plan(home)
-    if not moves and not stale:
+    if not moves and not stale and content_move(home) is None:
         return [], []
     root = home / ROOT
     journal = []
@@ -228,6 +265,19 @@ def migrate(home, stash):
         for folder in emptied:
             folder.rmdir()
             journal.append({"kind": "rmdir", "path": str(folder)})
+        content = content_move(home)
+        if content is not None:
+            old, destination, profile_text = content
+            if not destination.parent.exists():
+                destination.parent.mkdir(mode=0o700)
+                journal.append({"kind": "mkdir", "path": str(destination.parent)})
+            old.rename(destination)
+            journal.append({"kind": "rename", "old": str(old), "new": str(destination)})
+            profile_path = root / "profile.toml"
+            journal.append(
+                {"kind": "write", "path": str(profile_path), "old_text": profile_path.read_text()}
+            )
+            atomic(profile_path, profile_text)
         for path, old_target, new_target in list(links(home)):
             path.unlink()
             path.symlink_to(new_target)
@@ -243,6 +293,8 @@ def migrate(home, stash):
             f"Store migration stopped and put everything back: {error}. Old stores stay in place."
         ) from error
     records = [{"old": str(folder), "new": str(root)} for folder in emptied]
+    if content is not None:
+        records.append({"old": str(content[0]), "new": str(content[1])})
     records += [
         {"old": str(source), "new": str(destination)}
         for source, destination in moves

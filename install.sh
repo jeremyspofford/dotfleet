@@ -174,7 +174,7 @@ Headings, input, and warnings use the shared logger's colors. Choices also have 
 Set NO_COLOR to disable colors, even with an empty value. Redirected output and TERM=dumb remain plain.
 Requires git, curl, tar, and Python 3.11+. Supports Linux, macOS, and WSL (Windows Subsystem for Linux).
 Missing chezmoi and Mise go in ~/.local/bin. Setup never uses sudo or installs content-default tools.
-Content lives in ~/dotfiles. Backups live in ~/.fleet/backups/<timestamp>/.
+Content lives in ~/.fleet/dotfiles/NAME. Backups live in ~/.fleet/backups/<timestamp>/.
 The installer adds ~/.local/bin/dotfleet. Use its --help for updates, checks, rollback, and saved choices.
 The manager checkout lives in ~/.fleet/manager. Software results include the installed command.
 Setup and update maintain ~/.fleet/tui, a private Python environment for Textual's terminal interface.

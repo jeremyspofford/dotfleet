@@ -85,7 +85,7 @@ class RunAccountTests(unittest.TestCase):
         self.assertIn("  ~ ~/.changed\n", category(text, 3))
         self.assertIn("  − ~/.removed\n", text)
         self.assertIn("Group extra  on → off", text)
-        self.assertIn(f"Content  {old[:8]} → {new[:8]} · ~/dotfiles", text)
+        self.assertIn(f"Content  {old[:8]} → {new[:8]} · ~/.fleet/dotfiles/content", text)
         latest = sorted((self.home / ".fleet/backups").iterdir())[-1]
         record = json.loads((latest / "RUN.json").read_text())
         from render_run import render

@@ -16,6 +16,8 @@ import sys
 import termios
 import time
 import unittest
+
+import dotfiles_library
 from unittest.mock import patch
 
 import test_command as commands
@@ -309,7 +311,7 @@ class ChannelTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result, 0, output)
         self.assertFalse(profile.exists())
         self.assertFalse((self.home / ".local/bin/dotfleet").exists())
-        self.assertTrue((self.home / "dotfiles").is_dir())
+        self.assertTrue(any((self.home / ".fleet/dotfiles").glob("*/.git")))
         self.assertEqual(self.record()[0]["result"], "SUCCESS")
         self.assertIn("3 · Files", output)
         self.assertIn({"kind": "uninstalled", "value": True}, events)

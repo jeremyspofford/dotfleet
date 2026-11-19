@@ -9,6 +9,8 @@ from pathlib import Path
 import socket
 import unittest
 
+import dotfiles_library
+
 import registry
 from common import read_toml, toml
 import test_command as helpers
@@ -40,7 +42,7 @@ class OwnedViewTests(unittest.TestCase):
         self.assertIn("bytes", self.cli("backups", "list"))
         self.assertIn("clean", self.cli("content"))
         self.assertIn("0 behind", self.cli("content"))
-        self.assertIn("~/dotfiles", self.cli("content"))
+        self.assertIn("~/.fleet/dotfiles/content", self.cli("content"))
         self.assertIn("this machine", self.cli("machines", "export"))
         self.assertEqual(profile.read_bytes(), before)
         self.assertEqual(sorted((self.home / ".fleet/backups").iterdir()), backups)
@@ -49,7 +51,7 @@ class OwnedViewTests(unittest.TestCase):
 
     def test_secrets_never_print_values_or_execute_assignments(self):
         self.enroll()
-        manifest = self.home / "dotfiles/dotfleet.toml"
+        manifest = dotfiles_library.active(self.home) / "dotfleet.toml"
         manifest.write_text(
             manifest.read_text() + "\n[secrets]\nTOKEN = {}\nEMPTY = {}\nUNSET = {}\n"
         )

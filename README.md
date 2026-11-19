@@ -15,7 +15,7 @@ Git records history. chezmoi applies files. Mise selects developer tool versions
 curl -fsSL https://raw.githubusercontent.com/jeremyspofford/fleet/main/install.sh | bash
 ```
 
-- Setup backs up existing files and keeps your editable content at `~/dotfiles`.
+- Setup backs up existing files and keeps your editable content in `~/.fleet/dotfiles/NAME`.
 - Re-run the same command to update. Saved selections remain unchanged.
 - Backups live in `~/.fleet/backups/<timestamp>/`. Review `MANIFEST.json` before restoring `home/` files and external targets.
 
@@ -54,15 +54,15 @@ The scan cannot prove that remaining files contain no secrets. Review your local
 Adopted files keep their exact contents, including existing Mise files. Profile choices do not rewrite adopted files.
 Only accepted files enter the first local Git commit. Nothing is uploaded.
 
-1. Review `~/dotfiles` and its Git history.
+1. Review `~/.fleet/dotfiles/adopted` and its Git history.
 2. Create an empty repository on your chosen Git host.
-3. Run `cd ~/dotfiles && git remote add origin URL`, replacing URL with that repository's address.
+3. Run `cd ~/.fleet/dotfiles/adopted && git remote add origin URL`, replacing URL with that repository's address.
 4. Run `git push -u origin main` when ready.
 
 Each prompt lists its choices one per line: the word to type, then its effect.
 Each prompt marks the recommended or current choice and states what Enter alone does.
 
-An unrelated `~/dotfiles` stops setup. Preserve it before choosing another repository or adopting files.
+Setup never reads or changes a `~/dotfiles` folder of your own. Content lives in `~/.fleet/dotfiles`.
 Native chezmoi templates and hooks can execute code. Use trusted content only.
 Quitting review cancels planned file changes. A small attempt entry records the cancellation. Fleet also moves this run's [store moves](README.md#store-migration) back.
 Preparation uses temporary files outside home; missing tools move into `~/.local/bin` only after confirmation.
@@ -133,7 +133,7 @@ This example is checked against the renderer's recorded test fixture:
   Group docker  on → off
 
 5 · Locations
-  Content  ~/dotfiles
+  Content  ~/.fleet/dotfiles/default
   Profile  ~/.fleet/profile.toml
   Source   ~/.fleet/chezmoi-source
   Backup   ~/.fleet/backups/20261116-140000
@@ -186,7 +186,7 @@ Old Layer 0 enrollment migrates automatically. Setup reads old chezmoi data, ren
 Migration also saves existing Mise settings in the profile. Existing Fleet profiles remain authoritative. Backups preserve replaced files and prior staged sources.
 Conflict menus explain letter keys and require Enter. Skipping changes can leave differences; the summary reports that as incomplete enrollment.
 
-1. Edit content files in `~/dotfiles`. Change profile choices through `dotfleet domain`, `tools`, `groups`, or `configure`.
+1. Edit content files in the active download under `~/.fleet/dotfiles`. Change profile choices through `dotfleet domain`, `tools`, `groups`, or `configure`.
 2. Commit and push content changes before updating. Setup refuses uncommitted edits to managed files.
    Unmanaged files, such as untracked notes, never block setup.
 3. Run `dotfleet update` to convert and apply. The one-liner remains available for manager recovery.
@@ -376,9 +376,31 @@ Fleet keeps its own state in one folder, `~/.fleet`:
 | `~/.fleet/tui/` | The private Python environment for the terminal interface. |
 | `~/.fleet/python` and `~/.fleet/mise/` | Fleet's own Python, when a deploy installed one. |
 | `~/.fleet/deploy/` | Files that a deploy staged on this machine. |
+| `~/.fleet/dotfiles/NAME/` | Downloaded dotfiles repositories, one Git clone each. The profile names the active one. |
 
 Some files stay where other tools read them. The command stays at `~/.local/bin/dotfleet`.
-The content checkout stays at `~/dotfiles`. Generated files such as `~/.secrets` and the chezmoi and Mise configs also stay.
+Generated files such as `~/.secrets` and the chezmoi and Mise configs also stay where those tools read them.
+
+## Dotfiles repositories
+
+Fleet keeps each dotfiles repository you download in `~/.fleet/dotfiles/NAME`. One of them is active.
+Update, check, diff, and the wizard use only the active repository. They never touch the others.
+
+1. Run `fleet dotfiles download URL` to clone a repository into the library. Downloading changes no applied file.
+2. Run `fleet dotfiles list` to see each download, its source, and the active one.
+3. Run `fleet dotfiles use NAME` to activate a download. Review the changes, then type `use` and press Enter.
+4. Run `fleet dotfiles remove NAME` to delete a download. You cannot remove the active one.
+
+Names:
+- **Default:** the name comes from the repository name. The starter pack is named `default`, and adopted files go in `adopted`.
+- **Your own:** `--name NAME` chooses the name up front. A name uses only letters, numbers, dashes, and underscores.
+- **Taken names:** if a name is taken, a terminal asks for another one. Without a terminal, the download stops and names the collision.
+- **No silent changes:** Fleet never renames a download silently or overwrites one.
+
+Using a repository takes a backup and applies its files.
+Files that only the previous repository managed are removed, unless you edited them. Fleet keeps edited files and reports each one.
+Domain, groups, tools, and agents carry over. If the new repository does not declare your domain, Fleet applies core and says so.
+Your saved domain stays, so switching back applies it again.
 
 ## Store migration
 
@@ -389,6 +411,7 @@ The installer and installed command move older stores into `~/.fleet` before oth
 - `~/.local/state/dotfleet/` moves into `~/.fleet/`.
 - `~/fleet-backups/` and `~/dotfleet-backups/` move to `~/.fleet/backups/`.
 - `~/.cache/fleet-deploy/` moves to `~/.fleet/deploy/`.
+- A `~/dotfiles` checkout of the saved content moves to `~/.fleet/dotfiles/NAME` and stays active. An unrelated `~/dotfiles` stays.
 
 Each item moves intact. Files keep their bytes, and old backups come along. Emptied old folders are removed.
 The registry becomes `~/.fleet/registry.toml`, and the terminal interface environment becomes `~/.fleet/tui/`.

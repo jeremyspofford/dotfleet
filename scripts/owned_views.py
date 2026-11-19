@@ -11,6 +11,7 @@ import shlex
 from common import atomic, read_toml, run
 import registry
 from command_display import command_name, current_command
+import dotfiles_library
 
 
 def profile_rows(home, profile):
@@ -91,7 +92,7 @@ def secret_rows(home, manifest):
 
 
 def content_rows(home, profile, checkout_state):
-    checkout = home / "dotfiles"
+    checkout = dotfiles_library.active(home)
     return [
         ("Checkout", str(checkout)),
         ("Repository", profile["content_repo"]),

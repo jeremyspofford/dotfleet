@@ -159,6 +159,7 @@ class CommandSurfaceTests(unittest.TestCase):
             "status": "views/status.txt",
             "diff": "views/diff changed.txt",
             "domain": "views/domain.txt",
+            "dotfiles": "views/dotfiles.txt",
             "groups": "views/groups.txt",
             "tools": "views/tools.txt",
             "configure": "views/configure review.txt",

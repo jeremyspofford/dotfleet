@@ -19,6 +19,7 @@ import ui_channel
 import updates
 from tui_navigation import ACTIONS as COMMAND_ACTIONS
 from run_account import commit
+import dotfiles_library
 
 ROOT = Path(__file__).resolve().parents[1]
 ACTIONS = ("dashboard", *COMMAND_ACTIONS)
@@ -39,7 +40,7 @@ def dashboard(home):
         ("Machine", registry.machine_name()),
         ("Domain", rows["Domain"]),
         ("Content", profile["content_repo"]),
-        ("Commit", commit(home / "dotfiles") or "not recorded"),
+        ("Commit", commit(dotfiles_library.active(home)) or "not recorded"),
         ("Fleet", (ROOT / "VERSION").read_text().strip()),
         ("Updates", updates.summary(home, profile).removeprefix("Updates: ")),
         ("Last backup", backup),

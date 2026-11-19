@@ -32,7 +32,7 @@
     },
     {
       "name": "Content",
-      "path": "/home/example/dotfiles",
+      "path": "/home/example/.fleet/dotfiles/default",
       "old": "abcdef01bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
       "new": "abcdef01bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
     }
@@ -71,7 +71,7 @@
     }
   ],
   "locations": {
-    "Content checkout": "/home/example/dotfiles",
+    "Content checkout": "/home/example/.fleet/dotfiles/default",
     "Profile file": "/home/example/.fleet/profile.toml",
     "Converted source": "/home/example/.fleet/chezmoi-source",
     "Backup folder": "/home/example/.fleet/backups/20261116-140000"

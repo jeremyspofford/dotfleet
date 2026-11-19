@@ -24,6 +24,7 @@ import registry
 import style
 import run_index
 from store_migration import STATE_RECORDS, recorded_moves, restore
+import dotfiles_library
 
 RECORD = ".fleet/last-run.json"
 
@@ -101,13 +102,13 @@ class RunAccount:
             },
             {
                 "name": "Content",
-                "path": str(home / "dotfiles"),
-                "old": commit(home / "dotfiles"),
+                "path": str(dotfiles_library.active(home)),
+                "old": commit(dotfiles_library.active(home)),
                 "new": None,
             },
         ]
         self.locations = {
-            "Content checkout": str(home / "dotfiles"),
+            "Content checkout": str(dotfiles_library.active(home)),
             "Profile file": str(home / ".fleet/profile.toml"),
             "Converted source": "None (not prepared)",
             "Backup folder": "None (not created)",

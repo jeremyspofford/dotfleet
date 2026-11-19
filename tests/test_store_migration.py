@@ -74,6 +74,16 @@ class StoreMigrationTests(unittest.TestCase):
             (root / "python").symlink_to(python)
         names = sorted(names or (path.name for path in root.iterdir()))
         moved = {}
+        if "dotfiles" in names:
+            # Before the library, the one content checkout lived at ~/dotfiles.
+            names.remove("dotfiles")
+            profile_path = root / "profile.toml"
+            profile = tomllib.loads(profile_path.read_text())
+            checkout = root / "dotfiles" / profile.pop("dotfiles")
+            moved["dotfiles"] = (str(checkout.relative_to(self.home)), checkout.stat().st_ino)
+            checkout.rename(self.home / "dotfiles")
+            (root / "dotfiles").rmdir()
+            profile_path.write_text(toml(profile))
         for name in names:
             old = OLDER.get(name, ".local/share/fleet/" + name)
             if generation == 1:
@@ -109,7 +119,10 @@ class StoreMigrationTests(unittest.TestCase):
         for old, (new, inode) in moved.items():
             self.assertFalse((self.home / old).exists() or (self.home / old).is_symlink(), old)
             path = self.home / new
-            if path.is_symlink():
+            if new.endswith("profile.toml") and "dotfiles" in moved:
+                # Moving the content checkout rewrites the profile to name the active download.
+                self.assertTrue(path.is_file(), new)
+            elif path.is_symlink():
                 # A relinked link is a new link; its target must name the new place.
                 self.assertTrue(path.resolve().is_relative_to(self.home / ".fleet"), new)
             else:
@@ -145,8 +158,21 @@ class StoreMigrationTests(unittest.TestCase):
         names = {path.name for path in (self.home / ".fleet").iterdir()}
         self.assertTrue({"manager", "profile.toml", "registry.toml", "backups"} <= names, names)
         self.assertFalse((self.home / ".local/state/dotfleet").exists())
-        self.assertTrue((self.home / "dotfiles").is_dir())
+        self.assertFalse((self.home / "dotfiles").exists())
+        library = self.home / ".fleet/dotfiles"
+        self.assertEqual([path.name for path in library.iterdir()], ["content"])
+        self.assertTrue((library / "content/.git").is_dir())
         self.assertTrue((self.home / ".local/bin/dotfleet").is_file())
+
+    def test_content_checkout_moves_into_the_library_as_active(self):
+        self.enroll()
+        moved = self.older_layout(["dotfiles"])
+        self.assertTrue((self.home / "dotfiles/.git").is_dir())
+        self.migrate_and_rerun(moved)
+        profile = tomllib.loads((self.home / ".fleet/profile.toml").read_text())
+        self.assertEqual(profile["dotfiles"], "content")
+        self.assertIn("content", self.cli("dotfiles", "list"))
+        self.assertIn("active", self.cli("dotfiles", "list"))
 
     def test_profile_moves_from_config(self):
         self.enroll()
@@ -241,7 +267,8 @@ class StoreMigrationTests(unittest.TestCase):
         self.assertFalse((self.home / ".fleet").exists())
         for name, (inode, content) in before.items():
             path = self.home / name
-            if not path.is_symlink():
+            # The profile is rewritten and restored, so compare its bytes, not its inode.
+            if not path.is_symlink() and not name.endswith("profile.toml"):
                 self.assertEqual(path.lstat().st_ino, inode, name)
             if content is not None:
                 current = path.read_bytes() if not path.is_symlink() else os.readlink(path)

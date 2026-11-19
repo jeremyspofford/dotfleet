@@ -11,6 +11,7 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -44,9 +45,18 @@ class ConsolidationTests(unittest.TestCase):
                     self.assertEqual(text, "Error: Use fleet " + successor + ".\n")
                     profile.assert_not_called()
 
+    def sandbox(self):
+        if not hasattr(self, "_sandbox"):
+            folder = tempfile.TemporaryDirectory()
+            self.addCleanup(folder.cleanup)
+            self._sandbox = folder.name
+        return self._sandbox
+
     def both_forms(self, *arguments):
         result = subprocess.run(
             [sys.executable, "-B", str(ROOT / "scripts/command.py"), *arguments],
+            # Never read or write the real home's Fleet state from a test.
+            env=dict(os.environ, HOME=self.sandbox()),
             text=True,
             capture_output=True,
         )
@@ -123,7 +133,7 @@ class ConsolidationTests(unittest.TestCase):
         names = next(
             item for item in parser._actions if isinstance(item, argparse._SubParsersAction)
         ).choices
-        self.assertEqual(len(names), 21)  # Agents and marketplaces joined the consolidated 19.
+        self.assertEqual(len(names), 22)  # Agents, marketplaces, and dotfiles joined the 19.
         self.assertTrue({"backups", "tools", "status", "content"}.issubset(names))
         self.assertFalse({"backup", "rollback", "pins", "profile"}.intersection(names))
 

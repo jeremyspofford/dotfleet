@@ -12,7 +12,7 @@
   Group docker  on → off
 
 5 · Locations
-  Content  ~/dotfiles
+  Content  ~/.fleet/dotfiles/default
   Profile  ~/.fleet/profile.toml
   Source   ~/.fleet/chezmoi-source
   Backup   ~/.fleet/backups/20261116-140000

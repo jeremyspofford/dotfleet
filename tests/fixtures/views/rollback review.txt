@@ -8,7 +8,7 @@
 4 · Profile changes — no changes.
 
 5 · Locations
-  Content  ~/dotfiles
+  Content  ~/.fleet/dotfiles/content
   Profile  ~/.fleet/profile.toml
   Source   ~/.fleet/chezmoi-source
   Backup   ~/.fleet/backups/20261117-120000

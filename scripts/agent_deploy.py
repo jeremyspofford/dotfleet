@@ -29,6 +29,7 @@ import tomllib
 
 import agent_table
 from common import atomic, value
+import dotfiles_library
 
 ROOT = Path(__file__).resolve().parents[1]
 TREE = ".fleet/agents"
@@ -1365,7 +1366,7 @@ def main():
     home = args.home
     profile = read_toml(home / ".fleet/profile.toml")
     catalog = read_toml(ROOT / "agents/manifest.toml")["agents"]
-    checkout = home / "dotfiles"
+    checkout = dotfiles_library.active(home)
     from convert import content_manifest
 
     try:

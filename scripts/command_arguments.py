@@ -79,9 +79,22 @@ GROUPS = {
         "set": "Choose a domain and apply its content additions.",
     },
     "addons": {"list": "List installed add-on records.\nNo add-ons ship with Fleet."},
+    "dotfiles": {
+        "download": "Download a dotfiles repository into ~/.fleet/dotfiles.\n"
+        "Downloading never activates it and changes no applied file.\n"
+        "Without --name, the repository's name names the download.",
+        "list": "List downloaded repositories, their sources, and the active one.",
+        "remove": "Delete a downloaded repository.\n"
+        "The active repository cannot be removed.\nType remove to confirm, then press Enter.",
+        "use": "Activate a downloaded repository.\n"
+        "Review its file changes, then type use to confirm. A backup comes first.\n"
+        "Files that only the old repository managed go, unless they have local edits.\n"
+        "Domain, groups, tools, and agents carry over. An undeclared domain applies core.",
+    },
 }
 
 EXAMPLES = {
+    "dotfiles": "dotfiles list; dotfiles download https://github.com/example/dotfiles; dotfiles download https://github.com/example/dotfiles --name work; dotfiles use work; dotfiles remove default",
     "marketplaces": "marketplaces list; marketplaces add --source https://github.com/example/agent-market; marketplaces add --source URL --packages review-kit; marketplaces add --source URL --features review-kit/mcp.docs; marketplaces update; marketplaces update --name agent-market --pin v1.2.0; marketplaces update --name agent-market --unpin; marketplaces delete --name agent-market",
     "agents": "agents import --agent claude; agents list; agents set --name mcp.docs --state off; agents set --name mcp.docs --state local",
     "logs": "logs list; logs list --limit 10; logs show; logs show --name BACKUP; logs show --json",
@@ -239,6 +252,11 @@ def add_action_parameters(parser, name, action):
             choices=["local", "off", "on"],
             help="on: Fleet manages it; off: removed here; local: keep this machine's value",
         )
+    elif name == "dotfiles" and action == "download":
+        parser.add_argument("url", help="Git URL or local repository path")
+        parser.add_argument("--name", help="download name; default: the repository's name")
+    elif name == "dotfiles" and action in ("use", "remove"):
+        parser.add_argument("name", help="download from dotfiles list")
     elif name == "domain" and action == "set":
         parser.add_argument("--name", required=True, help="domain from domain list")
     elif name == "groups" and action == "set":
@@ -307,6 +325,7 @@ OTHER_FORMS = {
     "marketplace": "marketplaces",
     "secret": "secrets",
     "tool": "tools",
+    "dotfile": "dotfiles",
 }
 
 

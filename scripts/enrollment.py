@@ -21,6 +21,7 @@ from render_run import human
 from convert import FURNITURE, content_domains, detect
 import manager
 import agent_detection
+import dotfiles_library
 import scan_view
 import updates
 
@@ -101,9 +102,12 @@ def detected_agents(home=None, tools=None):
     return agent_detection.detected(home or Path.home(), agent_manifest(), tools)
 
 
-def stage_repo(home, repo, workspace):
-    """Fetch into scratch, enforcing the same clean/fast-forward rules as an update."""
-    canonical = home / "dotfiles"
+def stage_repo(home, repo, workspace, name=None):
+    """Fetch into scratch, enforcing the same clean/fast-forward rules as an update.
+
+    Name selects the download in ~/.fleet/dotfiles; without one, the active download.
+    """
+    canonical = dotfiles_library.path(home, name) if name else dotfiles_library.active(home)
     destination = workspace / f"checkout-{len(list(workspace.glob('checkout-*')))}"
     if canonical.exists() or canonical.is_symlink():
         updates.validate_content(canonical, repo)
@@ -125,15 +129,14 @@ def stage_repo(home, repo, workspace):
     return destination
 
 
-def adopt(home, workspace, found, excluded):
-    existing = home / "dotfiles"
+def adopt(home, workspace, found, excluded, name=dotfiles_library.ADOPTED):
+    existing = dotfiles_library.path(home, name)
+    shown = "~/" + dotfiles_library.LIBRARY + "/" + name
     if existing.exists() or existing.is_symlink():
         if existing.is_symlink() or not (existing / ".git").is_dir():
-            raise ValueError(
-                "~/dotfiles is not a Git checkout. Move it aside yourself before adoption."
-            )
+            raise ValueError(f"{shown} is not a Git checkout. Move it aside before adoption.")
         if run("git", "-C", str(existing), "status", "--porcelain").strip():
-            raise ValueError("~/dotfiles has local edits. Preserve them before adoption.")
+            raise ValueError(f"{shown} has local edits. Preserve them before adoption.")
     selected = [name for name in found if name not in excluded]
     if not selected:
         raise ValueError("No files remain after the secrets scan. Nothing was committed.")
@@ -212,7 +215,7 @@ def door_options(home, profile, found, excluded):
     enrolled = any(
         (home / name).exists()
         for name in (
-            "dotfiles",
+            dotfiles_library.LIBRARY,
             ".fleet/profile.toml",
             ".config/dotfiles/profile.toml",
             ".config/chezmoi/chezmoi.toml",
@@ -390,16 +393,19 @@ def steps(home, args, workspace, profile, found, excluded, start=0, checkout=Non
             found, excluded = scan(home)
             for line in scan_view.exclusions(excluded):
                 print(line)
-            checkout = adopt(home, workspace, found, excluded)
-            repo = str(home / "dotfiles")
+            name = dotfiles_library.free_name(home, dotfiles_library.ADOPTED, True, reuse="local")
+            checkout = adopt(home, workspace, found, excluded, name)
+            repo = str(dotfiles_library.path(home, name))
+            shown = "~/" + dotfiles_library.LIBRARY + "/" + name
             profile["adopted"] = True
             profile["source_door"] = "adopt"
             profile["adoption_excluded"] = sorted(excluded)
-            print("Your repository starts local at ~/dotfiles. Nothing is uploaded.")
+            profile["dotfiles"] = name
+            print(f"Your repository starts local at {shown}. Nothing is uploaded.")
             print(
                 (
                     "Later: create an empty remote repository, then run git remote add "
-                    "origin URL and git push -u origin main in ~/dotfiles."
+                    f"origin URL and git push -u origin main in {shown}."
                 )
             )
         else:
@@ -414,7 +420,9 @@ def steps(home, args, workspace, profile, found, excluded, start=0, checkout=Non
                         f"Press Enter alone to keep {repo}."
                     ),
                 )
-            checkout = stage_repo(home, repo, workspace)
+            name = dotfiles_library.name_for_source(home, repo, profile, True)
+            profile["dotfiles"] = name
+            checkout = stage_repo(home, repo, workspace, name)
         try:
             kind, manifest = detect(checkout, args.format or profile.get("format"))
         except ValueError as error:

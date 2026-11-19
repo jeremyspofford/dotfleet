@@ -36,7 +36,8 @@ def command_goldens():
     with tempfile.TemporaryDirectory() as temporary:
         home = Path(temporary)
         for path in [
-            "dotfiles/.git",
+            ".fleet/dotfiles/default/.git",
+            ".fleet/dotfiles/work/.git",
             ".fleet/manager/.git",
             ".fleet/chezmoi-source",
             ".config/chezmoi",
@@ -55,11 +56,12 @@ def command_goldens():
             "agents": {"codex": False},
             "agent_items": {"mcp.docs": "local"},
             "content_repo": "https://example.invalid/dotfiles",
+            "dotfiles": "default",
         }
         root = home / "manager-fixture"
         root.mkdir()
         (root / "VERSION").write_text("0.4.0\n")
-        (home / "dotfiles/fleet.toml").write_text(
+        (home / ".fleet/dotfiles/default/fleet.toml").write_text(
             'format = "plain"\noverlays = ["core", "personal", "work", "client"]\n'
             '[domains]\ncore = "Base files only."\npersonal = "Personal shortcuts."\n'
             '[groups.helpers]\ndescription = "Fleet command shortcut."\n'
@@ -190,6 +192,9 @@ def command_goldens():
                     result = command.read_view(argparse.Namespace(command=name), home, profile)
                 assert result == 0, output.getvalue()
                 outputs[name] = output.getvalue()
+            with contextlib.redirect_stdout(io.StringIO()) as output:
+                command.dotfiles_command(home, argparse.Namespace(action="list"), "fleet")
+            outputs["dotfiles"] = output.getvalue()
             with contextlib.redirect_stdout(io.StringIO()) as output:
                 command.main(["machines", "export"])
             outputs["machine export"] = output.getvalue()

@@ -20,6 +20,7 @@ import run_index
 from common import atomic, read_toml
 from command_display import current_command
 from render_run import render
+import dotfiles_library
 
 STORE = ".fleet/cleanup-runs"
 WARNING = "Deleted backups cannot be rolled back to."
@@ -106,7 +107,7 @@ def planned_record(home, names):
         "result": "PLANNED",
         "warnings": [WARNING],
         "locations": {
-            "Content checkout": str(home / "dotfiles"),
+            "Content checkout": str(dotfiles_library.active(home)),
             "Profile file": str(home / ".fleet/profile.toml"),
             "Converted source": read_toml(home / ".config/chezmoi/chezmoi.toml").get("sourceDir"),
         },

@@ -10,7 +10,7 @@
 4 · Profile changes — no changes.
 
 5 · Locations
-  Content  ~/dotfiles
+  Content  ~/.fleet/dotfiles/default
   Profile  ~/.fleet/profile.toml
   Source   not set
   Backup   not created

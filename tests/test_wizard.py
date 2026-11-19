@@ -11,6 +11,8 @@ import subprocess
 import tomllib
 import unittest
 
+import dotfiles_library
+
 import test_manager as helpers
 from convert import manifest_path
 from test_manager import ROOT, command, repository
@@ -87,6 +89,11 @@ class WizardTests(unittest.TestCase):
         self.assertIn("will be", output)
         self.assertIn("chezmoi status: clean", output)
         self.assert_quiet_status()
+        # The example source downloads the starter pack as default and activates it.
+        self.assertEqual(
+            [path.name for path in (self.home / ".fleet/dotfiles").iterdir()], ["default"]
+        )
+        self.assertIn('dotfiles = "default"', (self.home / ".fleet/profile.toml").read_text())
         profile = (self.home / ".fleet/profile.toml").read_bytes()
         output = self.terminal([], flags=[], auto_wizard=False)
         self.assertNotIn("9. Review", output)
@@ -108,7 +115,8 @@ class WizardTests(unittest.TestCase):
         self.assertIn("Press Enter alone to choose adopt.", output)
         self.assertIn("Sensitive files are excluded.", output)
         self.assertNotIn("fake-secret-for-this-test", output)
-        checkout = self.home / "dotfiles"
+        checkout = dotfiles_library.active(self.home)
+        self.assertEqual(checkout.name, "adopted")
         names = command("git", "-C", str(checkout), "ls-files").splitlines()
         self.assertNotIn(".service-config", names)
         self.assertEqual(set(names), set(before) - {".service-config"} | {"fleet.toml"})
@@ -199,7 +207,7 @@ class WizardTests(unittest.TestCase):
         self.assertIn(
             "Domain was never explicitly chosen (recorded: personal)", failed.stdout + failed.stderr
         )
-        self.assertFalse((self.home / "dotfiles").exists())
+        self.assertFalse((self.home / ".fleet/dotfiles").exists())
         self.terminal(
             [
                 (b"Domain [personal]:", b"personal\n"),
@@ -324,7 +332,7 @@ class WizardTests(unittest.TestCase):
         self.defaults_origin()
         self.terminal(self.answers(), flags=[], auto_wizard=False)
         previous_commit = command(
-            "git", "-C", str(self.home / "dotfiles"), "rev-parse", "HEAD"
+            "git", "-C", str(dotfiles_library.active(self.home)), "rev-parse", "HEAD"
         ).strip()
         before = (self.home / ".zshrc").read_bytes()
         answers = self.answers("adopt")

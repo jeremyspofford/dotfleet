@@ -22,6 +22,8 @@ import sys
 import tempfile
 import tomllib
 import unittest
+
+import dotfiles_library
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -149,7 +151,8 @@ class EnrollmentTests(unittest.TestCase):
     def assert_clean(self):
         self.assert_quiet_status()
         self.assertEqual(
-            command("git", "-C", str(self.home / "dotfiles"), "status", "--porcelain"), ""
+            command("git", "-C", str(dotfiles_library.active(self.home)), "status", "--porcelain"),
+            "",
         )
         self.assertEqual((self.home / ".secrets").stat().st_mode & 0o777, 0o600)
         for shell in ["bash", "zsh"]:
@@ -357,7 +360,7 @@ class EnrollmentTests(unittest.TestCase):
         )
         self.exercise(repo)
         config = tomllib.loads((self.home / ".config/chezmoi/chezmoi.toml").read_text())
-        self.assertEqual(config["sourceDir"], str(self.home / "dotfiles"))
+        self.assertEqual(config["sourceDir"], str(dotfiles_library.active(self.home)))
 
     def test_migration_reads_all_sources_and_preserves_pins(self):
         for name, data in {
@@ -621,7 +624,7 @@ class EnrollmentTests(unittest.TestCase):
             ]:
                 self.assertIn(text, result.stdout + result.stderr)
             self.assertEqual(path.read_bytes(), before)
-            self.assertFalse((self.home / "dotfiles").exists())
+            self.assertFalse((self.home / ".fleet/dotfiles").exists())
             self.assertFalse((self.home / ".config/chezmoi/chezmoi.toml").exists())
             self.assertFalse((self.home / ".fleet/backups").exists())
 
@@ -920,7 +923,7 @@ class EnrollmentTests(unittest.TestCase):
         self.assertIn("Apply stopped", result.stdout + result.stderr)
         self.assertEqual(path.read_bytes(), before)
 
-    def test_occupied_checkout_stops(self):
+    def test_an_unrelated_home_dotfiles_folder_stays_untouched(self):
         (self.home / "dotfiles").mkdir()
         marker = self.home / "dotfiles/keep"
         marker.write_text("keep")
@@ -942,10 +945,11 @@ class EnrollmentTests(unittest.TestCase):
             text=True,
             capture_output=True,
         )
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("not the selected clone", result.stdout + result.stderr)
+        # Content now lives in ~/.fleet/dotfiles, so a folder of the user's own never blocks setup.
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(marker.read_text(), "keep")
-        self.assertFalse((self.home / ".config/chezmoi").exists())
+        self.assertEqual(sorted(path.name for path in (self.home / "dotfiles").iterdir()), ["keep"])
+        self.assertTrue((dotfiles_library.active(self.home) / ".git").is_dir())
 
 
 class ConverterTests(unittest.TestCase):
@@ -1090,9 +1094,13 @@ class ConverterTests(unittest.TestCase):
             self.assertEqual(set(agent["skills_paths"]), {"darwin", "linux", "windows", "wsl"})
 
     def test_shell_help_and_unknown_flags(self):
+        # A throwaway home: an invalid run may still migrate stores or record a failed attempt.
+        home = tempfile.TemporaryDirectory()
+        self.addCleanup(home.cleanup)
+        env = dict(os.environ, HOME=home.name)
         for path in [ROOT / "install.sh", *sorted((ROOT / "scripts").glob("*.sh"))]:
             for flag in ["--help", "-h"]:
-                output = command("bash", str(path), flag)
+                output = command("bash", str(path), flag, env=env)
                 words = (
                     ["Usage:", "global options:"]
                     if path.name == "dotfleet.sh"
@@ -1102,7 +1110,7 @@ class ConverterTests(unittest.TestCase):
                     self.assertIn(word, output, str(path))
                 self.assertNotIn("exit code", output.lower(), str(path))
             result = subprocess.run(
-                ["bash", str(path), "--unknown"], text=True, capture_output=True
+                ["bash", str(path), "--unknown"], text=True, capture_output=True, env=env
             )
             self.assertEqual(result.returncode, 2, str(path))
             self.assertIn("Usage:", result.stderr)

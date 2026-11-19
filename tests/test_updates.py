@@ -14,6 +14,8 @@ import subprocess
 import time
 import tomllib
 import unittest
+
+import dotfiles_library
 from unittest.mock import patch
 
 import test_command as commands
@@ -50,7 +52,7 @@ class UpdateTests(unittest.TestCase):
     assert_quiet_status = commands.CommandTests.assert_quiet_status
 
     def paths(self):
-        return self.home / MANAGER, self.home / "dotfiles"
+        return self.home / MANAGER, dotfiles_library.active(self.home)
 
     def snapshot(self):
         return (
@@ -265,7 +267,7 @@ class UpdateTests(unittest.TestCase):
 
     def test_local_adopted_content_without_remote_matches_update(self):
         self.enroll()
-        content = self.home / "dotfiles"
+        content = dotfiles_library.active(self.home)
         command("git", "-C", str(content), "remote", "remove", "origin")
         path = self.home / ".fleet/profile.toml"
         profile = tomllib.loads(path.read_text())

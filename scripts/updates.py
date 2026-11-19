@@ -18,6 +18,7 @@ import sys
 
 from common import atomic
 from installation import MANAGER
+import dotfiles_library
 
 CACHE = ".fleet/check.json"
 FETCH_TIMEOUT = 10
@@ -88,10 +89,12 @@ def remote_url(path, name):
 
 def validate_content(path, repo):
     if path.is_symlink() or not (path / ".git").is_dir():
-        raise CheckError("~/dotfiles is missing or is not the selected clone")
+        raise CheckError("the active dotfiles repository is missing or is not a Git clone")
     urls = [remote_url(path, name) for name in git(path, "remote").splitlines()]
     if str(path) != repo and repo_id(repo) not in {repo_id(url) for url in urls}:
-        raise CheckError("~/dotfiles belongs to another repository; nothing was overwritten")
+        raise CheckError(
+            "the active dotfiles repository belongs to another source; nothing was overwritten"
+        )
 
 
 def edited_paths(path):
@@ -244,7 +247,7 @@ def require_no_collision(path, current, target, history=None):
     collisions = sorted((changed & local) - {""})
     if collisions:
         raise CheckError(
-            "the update changes files with local edits in ~/dotfiles: "
+            "the update changes files with local edits in the active dotfiles repository: "
             + ", ".join(collisions[:5])
             + "; commit or move them before updating"
         )
@@ -306,7 +309,7 @@ def check(home, profile, display=True, marketplaces=False, tools=False):
     name = "manager"
     try:
         sources = []
-        for name, path in [("manager", home / MANAGER), ("content", home / "dotfiles")]:
+        for name, path in [("manager", home / MANAGER), ("content", dotfiles_library.active(home))]:
             if name == "content":
                 validate_content(path, profile["content_repo"])
             local_only = name == "content" and profile["content_repo"] == str(path)

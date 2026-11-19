@@ -83,8 +83,8 @@ class AgentDetectionTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as folder:
             home = Path(folder)
-            checkout = home / "dotfiles"
-            checkout.mkdir()
+            checkout = home / ".fleet/dotfiles/default"
+            checkout.mkdir(parents=True)
             command("git", "init", "-q", str(checkout))
             tools = {"gemini-cli": [{"version": "1.0.0"}]}
             catalog = enrollment.agent_manifest()
