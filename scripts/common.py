@@ -20,6 +20,11 @@ def run(*args, cwd=None, env=None):
     return result.stdout
 
 
+def bash():
+    """Return the bash for Fleet's scripts. The launcher and installer resolve it by path."""
+    return os.environ.get("FLEET_BASH") or "bash"
+
+
 def read_toml(path):
     return tomllib.loads(Path(path).read_text()) if Path(path).exists() else {}
 

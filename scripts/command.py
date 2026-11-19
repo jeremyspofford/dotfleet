@@ -17,7 +17,7 @@ import subprocess
 import sys
 import tempfile
 
-from common import LoggerStream, atomic, read_toml, relative, run, toml
+from common import LoggerStream, atomic, bash, read_toml, relative, run, toml
 import manager
 import enrollment
 import registry
@@ -588,7 +588,7 @@ def update(home):
         environment = dict(os.environ)
         environment.pop("DOTFLEET_LOCAL_CONTENT", None)
         environment["FLEET_UPDATE_TRIGGERS"] = json.dumps(triggers)
-        arguments = ["bash", str(staged / "install.sh")]
+        arguments = [bash(), str(staged / "install.sh")]
         if ui_channel.active() or os.environ.get(remote.CONTEXT) == "1":
             # TUI and SSH runs leave profile decisions to a real terminal on the target.
             arguments.append("--defaults")

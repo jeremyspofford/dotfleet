@@ -39,7 +39,7 @@ import tui_environment
 import tempfile
 import textwrap
 
-from common import atomic, read_toml, relative, run, toml
+from common import atomic, bash, read_toml, relative, run, toml
 from command_display import command_name
 from render_run import change_marker
 from convert import GENERATED, convert, detect, source_name, tracked
@@ -1069,7 +1069,7 @@ def apply_confirmed_plan(
     # Agent outputs first: earlier skill links must leave before content installs skill folders.
     agent_deploy.apply(home, plan["agents"], wizard_catalog(), account)
     account.confirm_files(fingerprint)
-    result = subprocess.run(["bash", str(ROOT / "scripts/apply.sh")])
+    result = subprocess.run([bash(), str(ROOT / "scripts/apply.sh")])
     account.confirm_files(fingerprint)
     if result.returncode:
         raise RuntimeError(

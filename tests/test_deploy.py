@@ -430,8 +430,160 @@ class DeployTests(unittest.TestCase):
         self.assertEqual(os.readlink(link), str(python))
         self.assertTrue(self.registry(self.home)["mini-pc"]["enrolled"])
 
+    def bash_fixture(self, path_bash="old", brew=True, brew_bash=False):
+        """Give the target an old or modern bash on PATH and an optional Homebrew prefix.
+
+        The old bash answers Fleet's version check with 3.2 and logs every script it runs.
+        The fake brew installs a bash that logs each run, then hands it to the real bash.
+        Homebrew stays off PATH, as it often is over SSH.
+        """
+        real = shutil.which("bash")
+        self.old_log = self.base / "old-bash.log"
+        self.brew_log = self.base / "brew.log"
+        self.resolved_log = self.base / "resolved-bash.log"
+        old = self.base / "old-bash"
+        old.mkdir(parents=True)
+        (old / "bash").write_text(
+            "#!/bin/sh\n"
+            'if [ "$1" = -c ]; then case $2 in *BASH_VERSINFO*) echo 3.2; exit 0 ;; esac; fi\n'
+            f'echo "$*" >> {self.old_log}\n'
+            f'exec {real} "$@"\n'
+        )
+        (old / "bash").chmod(0o755)
+        prefix = self.base / "homebrew"
+        resolved = f'#!/bin/sh\\necho "$*" >> {self.resolved_log}\\nexec {real} "$@"\\n'
+        if brew:
+            (prefix / "bin").mkdir(parents=True)
+            (prefix / "bin/brew").write_text(
+                "#!/bin/sh\n"
+                f'echo "$*" >> {self.brew_log}\n'
+                'case "$1" in\n'
+                f"--prefix) echo {prefix} ;;\n"
+                f"install) printf '{resolved}' > {prefix}/bin/bash; chmod 755 {prefix}/bin/bash ;;\n"
+                "esac\n"
+            )
+            (prefix / "bin/brew").chmod(0o755)
+            if brew_bash:
+                (prefix / "bin/bash").write_text(resolved.replace("\\n", "\n"))
+                (prefix / "bin/bash").chmod(0o755)
+        tools = self.base / "ssh-tools"
+        first = f"{old}:" if path_bash == "old" else ""
+        self.prepare(target_path=f"{first}{tools}:{self.env['PATH']}")
+        homes = self.base / "homes.json"
+        data = json.loads(homes.read_text())
+        data["mini-pc"]["FLEET_BREW_PREFIXES"] = str(prefix)
+        homes.write_text(json.dumps(data))
+        self.old_bash = old / "bash"
+        self.brew_bash = prefix / "bin/bash"
+
+    def terminal_deploy(self, answers, expected=0):
+        self.env = self.caller_env
+        return test_command.CommandTests.terminal(
+            self,
+            [
+                "machines",
+                "install",
+                "mini-pc",
+                "--domain",
+                "core",
+                "--git-name",
+                "Target Person",
+                "--git-email",
+                "target@example.invalid",
+                "--repo",
+                str(self.content),
+                "--return-target",
+                "caller",
+            ],
+            answers,
+            expected=expected,
+        )
+
+    def assert_no_brew_install(self):
+        # The probe may ask brew for its prefix; it must never install.
+        calls = self.brew_log.read_text().splitlines() if self.brew_log.exists() else []
+        self.assertNotIn("install bash", calls)
+
+    def assert_fleet_ran_with_the_resolved_bash(self):
+        runs = self.resolved_log.read_text()
+        self.assertIn(f"{self.target}/.fleet/deploy/run.sh", runs)
+        old = self.old_log.read_text() if self.old_log.exists() else ""
+        for script in ("run.sh", "install.sh", "apply.sh"):
+            self.assertNotIn(script, old)
+        self.assertTrue(self.registry(self.home)["mini-pc"]["enrolled"])
+
+    def test_an_old_bash_with_homebrew_prompts_before_installing_then_runs_it(self):
+        self.bash_fixture()
+        output = self.terminal_deploy(
+            [(b"Install bash [stop]:", b"maybe\n"), (b"Install bash [stop]:", b"yes\n")]
+        )
+        # The prompt wraps to the terminal width, so compare its words.
+        words = " ".join(output.split())
+        found = f"mini-pc has bash 3.2 at {self.old_bash}."
+        self.assertIn(found + " Fleet's scripts need a modern bash: 4.4 or newer.", words)
+        brew = f"{self.base}/homebrew/bin/brew"
+        self.assertIn(f"Fleet will install bash with Homebrew: {brew} install bash.", words)
+        self.assertIn("  stop  Stop the deploy. Nothing is installed.", output)
+        self.assertIn("Type yes or stop.", output)
+        self.assertLess(output.index("Install bash [stop]:"), output.index("installing bash with"))
+        self.assertIn("install bash", self.brew_log.read_text().splitlines())
+        self.assertIn(f"mini-pc: installed bash 5", output)
+        self.assertIn(f"at {self.brew_bash}.", output)
+        self.assert_fleet_ran_with_the_resolved_bash()
+
+    def test_declining_the_bash_install_stops_with_nothing_installed(self):
+        self.bash_fixture()
+        output = self.terminal_deploy([(b"Install bash [stop]:", b"stop\n")], expected=1)
+        self.assertIn("deploy failed (bash declined)", output)
+        self.assertIn("mini-pc: stopped. Nothing was installed.", output)
+        self.assert_no_brew_install()
+        self.assertFalse(self.brew_bash.exists())
+        self.assertFalse((self.target / ".fleet").exists())
+        self.assertNotIn("mini-pc", self.registry(self.home))
+
+    def test_an_old_bash_without_homebrew_names_the_homebrew_install_command(self):
+        self.bash_fixture(brew=False)
+        output = self.deploy(expected=2)
+        self.assertIn("deploy failed (missing floor)", output)
+        self.assertIn(f"  bash: mini-pc has bash 3.2 at {self.old_bash}.", output)
+        self.assertIn(f"    {deploy.HOMEBREW_COMMAND}", output)
+        self.assertIn("Fleet does not install Homebrew: its installer needs admin rights.", output)
+        self.assertFalse((self.target / ".fleet").exists())
+
+    def test_without_a_terminal_only_update_bash_accepts_the_install(self):
+        self.bash_fixture()
+        output = self.deploy(expected=2)
+        self.assertIn("No terminal is attached, so Fleet cannot ask first.", output)
+        self.assertIn("add --update-bash to accept the bash install.", output)
+        self.assert_no_brew_install()
+        self.assertFalse((self.target / ".fleet").exists())
+        output = self.deploy("--update-bash", "--return-target", "caller")
+        self.assertNotIn("Install bash [stop]:", output)
+        self.assertIn("install bash", self.brew_log.read_text().splitlines())
+        self.assert_fleet_ran_with_the_resolved_bash()
+
+    def assert_left_alone(self, expected):
+        output = self.deploy("--return-target", "caller")
+        self.assertNotIn("Install bash", output)
+        self.assert_no_brew_install()
+        self.assertRegex(output, rf"mini-pc: bash [4-9]\.\d+ at {expected}\.")
+        self.assertTrue(self.registry(self.home)["mini-pc"]["enrolled"])
+
+    def test_a_modern_bash_on_path_is_left_alone(self):
+        self.bash_fixture(path_bash="modern")
+        self.assert_left_alone(shutil.which("bash"))
+
+    def test_a_users_own_homebrew_bash_is_found_by_path_and_left_alone(self):
+        self.bash_fixture(brew_bash=True)
+        self.assert_left_alone(self.brew_bash)
+        self.assert_fleet_ran_with_the_resolved_bash()
+
     def test_a_missing_certificate_bundle_is_a_floor_item(self):
-        facts = {f"have_{tool}": "yes" for tool in deploy.FLOOR} | {"python": "3.12", "os": "Linux"}
+        facts = {f"have_{tool}": "yes" for tool in deploy.FLOOR} | {
+            "python": "3.12",
+            "os": "Linux",
+            "modern_bash": "/usr/bin/bash",
+        }
         result = subprocess.CompletedProcess(
             [],
             0,

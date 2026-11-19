@@ -5,6 +5,7 @@
 # --domain, --git-name, and --git-email supply profile choices. Repeat --tool TOOL=VERSION for full tool versions.
 # --adopt keeps scanned home files. --group NAME=on|off selects groups. --agents chooses coding assistants.
 # --format selects plain (real names) or chezmoi (native sources); -h/--help prints help.
+# --update-bash accepts installing bash with Homebrew when the found bash is older than 4.4.
 # Example: bash install.sh --repo https://github.com/jeremyspofford/dotfiles
 # Exit codes: 0 success/help; 1 setup failure; 2 invalid arguments.
 # Without a terminal, missing identity, an unconfirmed domain, or floating tool versions exit 1.
@@ -136,6 +137,7 @@ Options:
   --repo URL       Content Git repository; default: https://github.com/jeremyspofford/dotfiles.
                    Plain repositories use real names. Chezmoi repositories use native source names.
   --tool TOOL=VERSION Record a full tool version, such as node=24.14.1. Repeat for more tools.
+  --update-bash    Accept installing bash with Homebrew when the found bash is older than 4.4.
 A profile saves the repository, domain, Git author identity, tool versions, and content groups.
 Domains choose optional additions from your content repository. Identity and tools are chosen separately.
 The content declares its domains in fleet.toml. Core always applies.
@@ -172,7 +174,10 @@ Supply the listed flags to complete those values. New group defaults are printed
 Prompts read /dev/tty, the terminal device, never piped input.
 Headings, input, and warnings use the shared logger's colors. Choices also have text labels.
 Set NO_COLOR to disable colors, even with an empty value. Redirected output and TERM=dumb remain plain.
-Requires git, curl, tar, and Python 3.11+. Supports Linux, macOS, and WSL (Windows Subsystem for Linux).
+Requires bash 4.4+, git, curl, tar, and Python 3.11+. Supports Linux, macOS, and WSL (Windows Subsystem for Linux).
+macOS ships bash 3.2. Fleet then asks to install bash with Homebrew before anything else changes.
+Type yes to install it, or stop to quit. Without a terminal, only --update-bash gives that answer.
+Without Homebrew, setup stops and names the Homebrew install command. Fleet never installs Homebrew.
 Missing chezmoi and Mise go in ~/.local/bin. Setup never uses sudo or installs content-default tools.
 Content lives in ~/.fleet/dotfiles/NAME. Backups live in ~/.fleet/backups/<timestamp>/.
 The installer adds ~/.local/bin/dotfleet. Use its --help for updates, checks, rollback, and saved choices.
@@ -196,7 +201,7 @@ while [[ $# -gt 0 ]]; do
 		usage
 		exit 0
 		;;
-	--configure | --defaults | --adopt) shift ;;
+	--configure | --defaults | --adopt | --update-bash) shift ;;
 	--repo | --format | --domain | --git-name | --git-email | --pin | --tool | --group | --agents)
 		[[ $# -ge 2 && -n $2 && $2 != --* ]] || {
 			usage >&2
@@ -210,6 +215,42 @@ while [[ $# -gt 0 ]]; do
 		;;
 	esac
 done
+# Bootstrap layer: this block and scripts/bash_floor.sh run on bash 3.2. See docs/STYLE.md.
+# macOS ships bash 3.2. Fleet's scripts need 4.4, so find or install one, then run again with it.
+if [ "${BASH_VERSINFO[0]}" -lt 4 ] || { [ "${BASH_VERSINFO[0]}" -eq 4 ] && [ "${BASH_VERSINFO[1]}" -lt 4 ]; }; then
+	run_stage="bash check"
+	run_error="Fleet needs bash 4.4 or newer; found $BASH_VERSION at $BASH."
+	if [ -n "${FLEET_BASH_BOOTSTRAPPED:-}" ]; then
+		error_exit "Fleet started a resolved bash, but it reports $BASH_VERSION at $BASH. Fleet needs bash 4.4 or newer."
+	fi
+	update_bash=no
+	for argument in "$@"; do
+		if [ "$argument" = --update-bash ]; then update_bash=yes; fi
+	done
+	if [ -n "$script_dir" ]; then
+		# shellcheck source=scripts/bash_floor.sh
+		. "$script_dir/scripts/bash_floor.sh"
+	else
+		floor_text=$(curl -fsSL "$raw/scripts/bash_floor.sh") || error_exit "Could not download $raw/scripts/bash_floor.sh."
+		eval "$floor_text"
+	fi
+	modern_bash=$(fleet_ensure_bash "$update_bash") || exit 1
+	log_info "Running Fleet with bash at $modern_bash"
+	export FLEET_BASH_BOOTSTRAPPED=1
+	# The new process makes its own work folder and run entry.
+	trap - EXIT
+	rm -rf -- "$work_dir"
+	if [ -n "$script_dir" ]; then exec "$modern_bash" "${BASH_SOURCE[0]}" "$@"; fi
+	installer=$(curl -fsSL "$raw/install.sh") || error_exit "Could not download $raw/install.sh."
+	exec "$modern_bash" -c "$installer" install.sh "$@"
+fi
+# Every Fleet script in this run uses this bash: Python reads FLEET_BASH, and env finds the link.
+export FLEET_BASH=$BASH
+kept_arguments=()
+for argument in "${arguments[@]}"; do
+	if [[ $argument != --update-bash ]]; then kept_arguments+=("$argument"); fi
+done
+arguments=("${kept_arguments[@]}")
 # Start before preflight. Reuse the installed writer if a bootstrap download fails.
 if [[ -n $script_dir && -r $script_dir/scripts/run_index.py ]]; then
 	index_script="$script_dir/scripts/run_index.py"
@@ -267,7 +308,11 @@ Darwin) host=macOS ;;
 esac
 log_section "Fleet setup"
 log_info "Host: $host / $(uname -m)"
+log_info "Bash: $BASH_VERSION at $BASH"
 export PATH="$HOME/.local/bin:$PATH"
+mkdir -p "$work_dir/bash"
+ln -s "$BASH" "$work_dir/bash/bash"
+export PATH="$work_dir/bash:$PATH"
 umask 077
 run_stage="software preparation"
 python3 -B "$index_script" stage --name "$run_stage"

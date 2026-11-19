@@ -101,7 +101,7 @@ class CommandTests(unittest.TestCase):
         paths = sorted((self.home / ".fleet/backups").glob("*/RUN.json"))
         return json.loads(paths[-1].read_text()), paths[-1].parent
 
-    def terminal(self, args, answers):
+    def terminal(self, args, answers, expected=0):
         master, slave = pty.openpty()
 
         def setup():
@@ -145,7 +145,7 @@ class CommandTests(unittest.TestCase):
         finally:
             os.close(master)
         text = re.sub(r"\x1b\[[0-9;]*m", "", data.decode()).replace("\r\n", "\n")
-        self.assertEqual(process.returncode, 0, text)
+        self.assertEqual(process.returncode, expected, text)
         self.assertEqual(sent, len(answers), text)
         return text
 
