@@ -70,6 +70,11 @@ GROUPS = {
         "A current tool stays unchanged.\n"
         "One failed tool does not stop the others.\n"
         "A tool that is not selected fails; select it first with tools set.",
+        "adopt": "Record the installed version of each tool that records no version.\n"
+        "A tool with several versions adopts the one Mise reports as active.\n"
+        "Adopt skips a tool when no version is active or the version is not exact.\n"
+        "Adopt never replaces a recorded version. It installs and uninstalls nothing.\n"
+        "Without TOOL, adopt every installed tool except those removed with tools remove.",
     },
     "groups": {
         "list": "List content groups, their state, and what each adds.",
@@ -102,7 +107,7 @@ EXAMPLES = {
     "machines": "machines install mini-pc; machines install lab --target me@10.0.0.7 --return-target me@desk; machines list; machines set-ssh --target mini-pc; machines set-ssh --name beelink --target mini-pc; machines export --output FILE; machines remove --name NAME; machines uninstall mini-pc",
     "domain": "domain list; domain set --name personal",
     "groups": "groups list; groups set --name docker --state off",
-    "tools": "tools list; tools set node --version 26.13.1; tools remove node; tools uninstall node --version 26.3.1; tools update; tools update node",
+    "tools": "tools list; tools set node --version 26.13.1; tools remove node; tools uninstall node --version 26.3.1; tools update; tools update node; tools adopt; tools adopt jq",
     "backups": "backups create; backups list; backups restore --backup BACKUP; backups delete --name BACKUP; backups delete --keep 2; backups delete --all",
     "secrets": "secrets list",
     "content": "content",
@@ -277,6 +282,12 @@ def add_action_parameters(parser, name, action):
             "tool",
             nargs="?",
             help="selected tool, such as node; omit to update every selected tool",
+        )
+    elif name == "tools" and action == "adopt":
+        parser.add_argument(
+            "tool",
+            nargs="?",
+            help="installed tool, such as jq; omit to adopt every unrecorded tool",
         )
     elif name == "tools" and action in ("set", "remove", "uninstall"):
         parser.add_argument("tool", help="tool name, such as node")

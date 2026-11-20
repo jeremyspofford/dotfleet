@@ -145,7 +145,8 @@ DESCRIPTIONS = {
         "Set installs that exact version.\n"
         "Remove clears the selection without uninstalling the tool.\n"
         "Uninstall removes one extra installed version after typed confirmation.\n"
-        "Update records and installs the newest version that Mise finds."
+        "Update records and installs the newest version that Mise finds.\n"
+        "Adopt records the installed version of each tool without a recorded version."
     ),
     "secrets": (
         "List secret names as set or unset.\n"
@@ -1164,6 +1165,14 @@ def save_remote_choice(home, request):
             changed.pop("agent_items")
     elif action == "update":
         failed = save_newest_tools(home, saved, changed, values.get("tool"), display)
+    elif action == "adopt":
+        import tool_updates
+
+        adopted, skipped = tool_updates.adoption(
+            enrollment.installed(home), saved, display, values.get("tool")
+        )
+        print(adoption_report(adopted, skipped))
+        record_adopted(changed, adopted)
     elif action == "set":
         tool, version = values["tool"], values["version"]
         if not manager.exact_version(version):
@@ -1182,7 +1191,7 @@ def save_remote_choice(home, request):
             set(changed.get("unpinned_tools", [])) | {values["tool"]}
         )
     if changed == saved:
-        if action != "update":
+        if action not in ("update", "adopt"):
             print("No change. The profile already holds this choice.")
         return failed
     with tempfile.TemporaryDirectory(prefix="dotfleet-profile-") as folder:
@@ -1239,6 +1248,7 @@ def changes_state(args):
         "delete",
         "uninstall",
         "update",
+        "adopt",
         "download",
         "use",
     )
@@ -1381,6 +1391,8 @@ def dispatch(args, argument_parser, home):
                 return uninstall(home, saved_profile, args.tool, args.version)
             if args.action == "update":
                 return update_tools(home, saved_profile, args.tool, display)
+            if args.action == "adopt":
+                return adopt_tools(home, saved_profile, args.tool, display)
             if not args.pin:
                 argument_parser.error("tools set needs TOOL and --version; tools remove needs TOOL")
             if args.action == "remove":
@@ -1465,6 +1477,59 @@ def update_tools(home, saved_profile, tool, display):
         return ("updated", "") if saved == version else ("cancelled", "")
 
     return tool_updates.update(home, saved_profile, tool, display, apply)
+
+
+def adoption_report(adopted, skipped):
+    """Show the adopted and skipped sections, then the count line."""
+    import tool_updates
+
+    text = tool_updates.adoption_text(adopted, skipped)
+    if not text:
+        text = "Nothing to adopt. Every installed tool records a version.\n"
+    return text + "\n" + tool_updates.adoption_count(adopted, skipped)
+
+
+def record_adopted(value, adopted):
+    """Record each adopted version. A tool removed earlier leaves the removed list."""
+    if not adopted:
+        return
+    value.setdefault("pins", {}).update(adopted)
+    if "unpinned_tools" in value:
+        value["unpinned_tools"] = sorted(set(value["unpinned_tools"]) - set(adopted))
+
+
+def adopt_tools(home, saved_profile, tool, display):
+    """Record installed versions in one apply. Adopt installs and uninstalls nothing."""
+    import tool_updates
+
+    installed = enrollment.installed(home)
+    adopted, skipped = tool_updates.adoption(installed, saved_profile, display, tool)
+    if not adopted:
+        print(adoption_report(adopted, skipped))
+        return 0
+    software = [
+        {
+            "name": name,
+            "version": version,
+            "old": None,
+            "path": next(
+                str(item.get("install_path", "Mise installation"))
+                for item in installed[name]
+                if item.get("version") == version
+            ),
+            "action": "present",
+        }
+        for name, version in adopted.items()
+    ]
+    code = manager.main(
+        ["--defaults"], edit=lambda value: record_adopted(value, adopted), software=software
+    )
+    pins = profile(home).get("pins", {})
+    # The result follows the apply review. A cancelled or failed apply records nothing.
+    saved = {name: version for name, version in adopted.items() if pins.get(name) == version}
+    print()
+    print(adoption_report(saved, skipped))
+    return code
 
 
 def agent_items(home):

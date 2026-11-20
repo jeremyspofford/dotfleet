@@ -167,6 +167,7 @@ Stow layouts under `packages/<package>/` also work; their package prefixes do no
 Your profile lives at `~/.fleet/profile.toml`. It saves the domain, Git identity, exact tool versions, and group choices between runs.
 Use `fleet tools set TOOL --version VERSION` to select and install a version. Mise records which versions are installed; Fleet reads that list during setup.
 Use `fleet tools update TOOL` to select and install the newest version that Mise finds. The profile still records that exact version.
+Use `fleet tools adopt` to record the installed version of each tool without a recorded version. Adopt installs nothing.
 A saved tool choice selects a version. It does not mean that version is installed.
 Setup asks when identity is incomplete, the domain choice is unconfirmed, or a tool version floats, such as `latest`.
 Prompts show recorded values. Press Enter to use the stated action, or type `skip` to leave a choice incomplete.
@@ -264,6 +265,8 @@ Command groups require an action. Bare `machines`, `backups`, `secrets`, `tools`
 | `dotfleet tools remove node` | Remove the selection and prevent content defaults from filling it again. Keep installed software. |
 | `dotfleet tools update node` | Ask Mise for the newest version, then record and install it as tools set does. A current tool stays unchanged. |
 | `dotfleet tools update` | Update every selected tool. Print one result line per tool, then a summary. Exit 1 when any tool failed. |
+| `dotfleet tools adopt` | Record the installed version of every unrecorded tool. Print each skipped tool with its reason. |
+| `dotfleet tools adopt jq` | Record one tool. With several versions, adopt the one Mise reports as active. With none active, skip it. |
 | `dotfleet configure` | Reopen the enrollment wizard. |
 | `dotfleet doctor` | Check profile completeness, drift, checkout edits, and backups. Print a fix for each failed check. |
 | `dotfleet machines list` | List saved machines with known facts and connections. Make no network requests. |
@@ -643,7 +646,7 @@ Target runs never prompt. Incomplete profiles name the missing choices and stop;
 Configure requires a terminal on the target. Remote rollback and uninstall are refused because they are destructive.
 Run those commands on the target itself.
 
-Profile choices also run on a registered machine. Add `--machine NAME` to `domain`, `groups`, `agents`, or `tools` list and set actions, and to `tools remove` and `tools update`:
+Profile choices also run on a registered machine. Add `--machine NAME` to `domain`, `groups`, `agents`, or `tools` list and set actions, and to `tools remove`, `tools update`, and `tools adopt`:
 
 ```sh
 fleet domain set --name work --machine mini-pc
@@ -656,6 +659,7 @@ fleet update mini-pc
 The target's manager is the only writer of its profile. `tools set` also installs that exact version on the target through Mise.
 `tools update` asks the target's Mise for the newest version, installs it there, and saves it. The target's next update applies it.
 If one tool fails there, the target still saves the other tools and exits 1.
+`tools adopt` reads the target's installed versions and saves them there. The target's next update applies them.
 An invalid or undeclared value fails on the target with exit 2; nothing is saved.
 
 The target renders results under its machine header. Updates that change files write RUN.json in its backup folder, using the local run renderer.
