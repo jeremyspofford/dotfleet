@@ -32,10 +32,11 @@ PROFILE_ACTIONS = {
         "set": ("tool", "version"),
         "remove": ("tool",),
         "update": ("tool",),
+        "adopt": ("tool",),
     },
 }
-# A request may leave these values out. Tools update without a tool updates every selected tool.
-OPTIONAL = {("tools", "update"): {"tool"}}
+# A request may leave these values out. Without a tool, update and adopt cover every tool.
+OPTIONAL = {("tools", "update"): {"tool"}, ("tools", "adopt"): {"tool"}}
 PATTERNS = {
     ("agents", "name"): r"(?:skills|rules|mcp|connectors|plugins|hooks)\.[a-z0-9]+(?:-[a-z0-9]+)*",
     ("agents", "state"): r"on|off|local",

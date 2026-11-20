@@ -1,7 +1,8 @@
 """Find the newest available version of each selected tool, and record it on request.
 
-Usage: dotfleet tools update [TOOL]; dotfleet check; dotfleet status.
+Usage: dotfleet tools update [TOOL]; dotfleet tools adopt [TOOL]; dotfleet check; dotfleet status.
 A selected tool has an exact version recorded in the profile.
+Adopt records the installed version of each tool that records none yet.
 Mise reports the newest available version. That lookup can use the network.
 Check saves tool results under the manager store. Status reads them without network requests.
 Help: python3 scripts/tool_updates.py --help.
@@ -196,6 +197,62 @@ def update(home, profile, tool, display, apply, remote=False):
     if tool is None:
         print(summary_line(results, remote))
     return int(any(result["state"] == "failed" for result in results))
+
+
+def adoption(installed, profile, display, tool=None):
+    """Choose the version to record for each installed tool that records no version yet.
+
+    Installed comes from mise ls --installed --json. Return the adopted versions by tool,
+    and the skipped tools with their reasons. Never guess a version.
+    """
+    import manager
+
+    pins = profile.get("pins", {})
+    removed = set(profile.get("unpinned_tools", []))
+    if tool is not None and not installed.get(tool):
+        raise ValueError(f"{tool} is not installed. Run {display} tools list.")
+    adopted, skipped = {}, []
+    for name in [tool] if tool else sorted(installed):
+        items = installed.get(name) or []
+        if name in pins:
+            if tool:
+                skipped.append((name, "records a version already; adopt never replaces it"))
+            continue
+        if not items:
+            continue
+        if tool is None and name in removed:
+            skipped.append((name, f"removed with tools remove; run {display} tools adopt {name}"))
+            continue
+        versions = [str(item.get("version", "")) for item in items]
+        active = [str(item.get("version", "")) for item in items if item.get("active")]
+        if len(versions) > 1 and not active:
+            skipped.append((name, "several versions and none active: " + ", ".join(versions)))
+            continue
+        if len(active) > 1:
+            skipped.append((name, "several active versions: " + ", ".join(active)))
+            continue
+        version = active[0] if active else versions[0]
+        if not manager.exact_version(version):
+            skipped.append((name, f"version {version} is not exact"))
+            continue
+        adopted[name] = version
+    return adopted, skipped
+
+
+def adoption_text(adopted, skipped):
+    """Show adopted rows, then skipped rows with reasons. Leave out an empty section."""
+    from render_run import render_view
+
+    sections = []
+    if adopted:
+        sections.append(render_view("Adopted", list(adopted.items())))
+    if skipped:
+        sections.append(render_view("Skipped", skipped))
+    return "\n".join(sections)
+
+
+def adoption_count(adopted, skipped):
+    return f"Tools: {len(adopted)} adopted, {len(skipped)} skipped."
 
 
 def usage():
