@@ -186,6 +186,24 @@ class ListRenderingTests(unittest.TestCase):
         output = render_rows("Rows", [("a", "1", "x"), ("bbbbbb", "y")])
         self.assertTrue(output.endswith("  a       1  x\n  bbbbbb     y\n"), output)
 
+    def test_addons_list_uses_one_row_per_item(self):
+        import addons
+
+        installed = [
+            {"id": "lab-tools", "version": "1.2.0", "description": "Lab bench helpers."},
+            {"id": "x", "version": "0.1.0", "description": "Short."},
+        ]
+        with patch.object(addons, "installed_addons", return_value=installed):
+            entities = command_views.collection("addons", self.home, {}, {})
+        rows = command_views.uses_rows("addons", entities)
+        _, output = printed(command_views.directory, "Addons", entities, self.home, rows=rows)
+        self.assertTrue(
+            output.endswith("  lab-tools  1.2.0  Lab bench helpers.\n  x          0.1.0  Short.\n"),
+            output,
+        )
+        for name in ("agents", "domain", "groups", "secrets"):
+            self.assertTrue(command_views.uses_rows(name, []))
+
     def test_no_list_output_has_two_consecutive_blank_lines(self):
         for name, output in test_style.command_goldens().items():
             with self.subTest(name):

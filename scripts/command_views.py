@@ -15,12 +15,12 @@ from render_run import render_entities, render_rows
 
 # A small fleet keeps one block per machine; beyond this count each machine gets a row.
 MACHINE_BLOCKS = 5
+# These lists show one aligned row per item.
+ROW_LISTS = ("backups", "marketplaces", "groups", "domain", "secrets", "addons", "agents")
 
 
 def uses_rows(name, entities):
-    return (
-        name in ("backups", "marketplaces") or name == "machines" and len(entities) > MACHINE_BLOCKS
-    )
+    return name in ROW_LISTS or name == "machines" and len(entities) > MACHINE_BLOCKS
 
 
 def directory(title, entities, home, empty="None recorded.", rows=False):
@@ -45,16 +45,6 @@ def directory(title, entities, home, empty="None recorded.", rows=False):
     print("\n".join(sections), end="")
 
 
-KIND_LABELS = {
-    "skills": "Skill",
-    "rules": "Rule set",
-    "mcp": "MCP server",
-    "connectors": "Connector",
-    "plugins": "Plugin",
-    "hooks": "Hook",
-}
-
-
 def agent_entities(home, profile):
     import agent_table
     import command
@@ -69,15 +59,13 @@ def agent_entities(home, profile):
         if "domains" in spec and profile.get("domain", "core") not in spec["domains"]:
             state = "not in domain " + profile.get("domain", "core")
         agents = spec.get("agents") or (sorted(spec["sources"]) if item.kind == "plugins" else [])
-        fields = [
-            ("Kind", KIND_LABELS[item.kind]),
-            *([("Source", "marketplace " + item.origin)] if item.origin != "content" else []),
-            ("Adds", spec.get("description", f"Skill folder .agents/skills/{item.name}")),
-            ("Agents", ", ".join(agents) or "every selected agent that supports it"),
-            ("Domains", ", ".join(spec.get("domains", [])) or "every domain"),
-            ("State", state),
+        details = [
+            spec.get("description", f"Skill folder .agents/skills/{item.name}"),
+            *(["marketplace " + item.origin] if item.origin != "content" else []),
+            *(["agents: " + ", ".join(agents)] if agents else []),
+            *(["domains: " + ", ".join(spec["domains"])] if "domains" in spec else []),
         ]
-        entities.append({"name": key, "fields": fields})
+        entities.append({"name": key, "row": (key, state, " · ".join(details))})
     return entities
 
 
@@ -142,33 +130,31 @@ def collection(name, home, profile, manifest):
         return [
             {
                 "name": group,
-                "fields": [
-                    ("State", "on" if profile.get("groups", {}).get(group, True) else "off"),
-                    ("Adds", spec["description"]),
-                ],
+                "row": (
+                    group,
+                    "on" if profile.get("groups", {}).get(group, True) else "off",
+                    spec["description"],
+                ),
             }
             for group, spec in manifest.get("groups", {}).items()
         ]
     if name == "domain":
+        current = profile.get("domain", "core")
+        label = (
+            "current · chosen · "
+            if profile.get("domain_chosen", False)
+            else "current · UNCHOSEN · "
+        )
         return [
             {
                 "name": domain,
-                "fields": [("Adds", description)],
-                "notes": [
-                    (
-                        "Current · chosen"
-                        if profile.get("domain_chosen", False)
-                        else "Current · UNCHOSEN"
-                    )
-                ]
-                if domain == profile.get("domain", "core")
-                else [],
+                "row": (domain, (label if domain == current else "") + description),
             }
             for domain, description in command.domain_choices(home).items()
         ]
     if name == "secrets":
         return [
-            {"name": name, "fields": [("State", state)]}
+            {"name": name, "row": (name, state)}
             for name, state in owned_views.secret_rows(home, manifest)
             if name != "Declared variables"
         ]
@@ -176,10 +162,7 @@ def collection(name, home, profile, manifest):
         from addons import installed_addons
 
         return [
-            {
-                "name": item["id"],
-                "fields": [("Version", item["version"]), ("Description", item["description"])],
-            }
+            {"name": item["id"], "row": (item["id"], item["version"], item["description"])}
             for item in installed_addons(home, (command.ROOT / "VERSION").read_text().strip())
         ]
     raise ValueError("Unknown collection: " + name)

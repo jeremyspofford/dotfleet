@@ -392,7 +392,7 @@ def render_rows(title, rows, home="", empty="None recorded.", notes=None):
         if len(prefix + cells[-1]) <= WIDTH:
             lines.append(prefix + cells[-1])
         else:
-            lines += wrap(cells[-1], prefix, " " * min(len(prefix), 40))
+            lines += wrap(cells[-1], prefix, " " * min(len(prefix), 60))
         for note in (notes or {}).get(row[0], []):
             lines += wrap(human(note, home), "    ", "      ")
     if not rows:
