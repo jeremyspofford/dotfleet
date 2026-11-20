@@ -159,17 +159,38 @@ def pick(home, purpose="connect"):
     return None if target == "cancel" else target
 
 
-def invoke(target, command, payload=None, *, probe=False):
-    arguments = ["ssh", "-T"]
+# A sibling WSL distro on this Windows host is reached through wsl.exe, never through SSH.
+WSL = "wsl:"
+INTEROP_STEP = "enable interop in /etc/wsl.conf ([interop] enabled = true), then restart WSL."
+
+
+def is_sibling(target):
+    return bool(target) and target.startswith(WSL)
+
+
+def argv(target, command, terminal=False):
+    """Return the command line that runs COMMAND on TARGET: SSH, or wsl.exe for a sibling."""
+    if is_sibling(target):
+        # The distro starts if it is stopped. --exec skips the default shell, so quoting holds.
+        return ["wsl.exe", "-d", target[len(WSL) :], "--cd", "~", "--exec", "sh", "-c", command]
+    arguments = ["ssh", "-t" if terminal else "-T"]
     for option in OPTIONS:
         arguments.extend(["-o", option])
-    arguments.extend(["--", target, command])
+    return arguments + ["--", target, command]
+
+
+def environment():
+    # WSL_UTF8 makes wsl.exe print UTF-8; SSH ignores it.
+    return dict(os.environ, SSH_ASKPASS_REQUIRE="never", LC_ALL="C", WSL_UTF8="1")
+
+
+def invoke(target, command, payload=None, *, probe=False):
     return subprocess.run(
-        arguments,
+        argv(target, command),
         input=payload if payload is not None else "",
         text=True,
         capture_output=True,
-        env=dict(os.environ, SSH_ASKPASS_REQUIRE="never", LC_ALL="C"),
+        env=environment(),
         timeout=TIMEOUT if probe else None,
     )
 
@@ -180,6 +201,12 @@ def one_line(text):
 
 def failure(home, name, target, error):
     """Return one error line and one next step, using the host OS for missing SSH."""
+    if is_sibling(target):
+        if isinstance(error, FileNotFoundError):
+            return "wsl.exe is unavailable; Windows interop is off", INTEROP_STEP
+        return "the sibling distro did not answer: " + one_line(str(error))[:200], (
+            f"run wsl.exe -d {target[len(WSL) :]} once to check the distro; then retry."
+        )
     if isinstance(error, FileNotFoundError):
         system = registry.os_name()
         step = (
