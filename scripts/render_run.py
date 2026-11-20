@@ -370,6 +370,49 @@ def render_entities(title, entities, home="", empty="None recorded."):
     return "\n".join(lines) + "\n"
 
 
+def render_rows(title, rows, home="", empty="None recorded.", notes=None):
+    """Show a list as a heading and one aligned row per item, with no blank lines between rows.
+
+    Each row is a tuple of cells. Every cell but the last is padded to its column's width.
+    Notes, keyed by a row's first cell, follow that row as indented lines.
+    """
+    lines = [section(title)]
+    widths = [
+        min(
+            max((len(human(row[index], home)) for row in rows if len(row) > index + 1), default=0),
+            28,
+        )
+        for index in range(max((len(row) for row in rows), default=1) - 1)
+    ]
+    for row in rows:
+        cells = [human(cell, home) for cell in row]
+        prefix = "  " + "".join(cell.ljust(width) + "  " for cell, width in zip(cells[:-1], widths))
+        # A row with fewer cells still starts its last cell in the last column.
+        prefix = prefix.ljust(2 + sum(width + 2 for width in widths))
+        if len(prefix + cells[-1]) <= WIDTH:
+            lines.append(prefix + cells[-1])
+        else:
+            lines += wrap(cells[-1], prefix, " " * min(len(prefix), 40))
+        for note in (notes or {}).get(row[0], []):
+            lines += wrap(human(note, home), "    ", "      ")
+    if not rows:
+        lines += wrap(empty, "  ")
+    return "\n".join(lines) + "\n"
+
+
+def packed(title, items):
+    """Show short items as a wrapped run, not one row each. An item never splits across lines."""
+    lines, line = [section(title)], ""
+    for item in items:
+        joined = line + " · " + item if line else "  " + item
+        if line and len(joined) > WIDTH:
+            lines.append(line)
+            joined = "  " + item
+        line = joined
+    lines += [line] if line else []
+    return "\n".join(lines) + "\n"
+
+
 def usage():
     """Describe this module when help is requested directly."""
     import argparse

@@ -169,7 +169,9 @@ class MarketplaceCommandTests(unittest.TestCase):
         self.assertEqual(saved["take"], {"packages": ["review-kit"]})
         self.assertEqual(saved["version"], "v1.0.0")
         listing = self.cli("marketplaces", "list")
-        self.assertIn("Installed  review-kit", listing)
+        self.assertRegex(
+            listing, r"\n  market +v1\.0\.0 @ \w{8}  review-kit · updates not checked yet\n"
+        )
         self.assertIn("v1.0.0 @", listing)
         refused = self.cli("marketplaces", "add", "--source", str(self.market), expected=1)
         self.assertIn("Marketplace market exists", refused)
@@ -252,8 +254,8 @@ class MarketplaceCommandTests(unittest.TestCase):
             "v1.1.0",
         )
         checked = self.cli("check")
-        self.assertIn("Marketplace market: 1 commit behind", checked)
-        self.assertIn("Pinned at v1.0.0; the pin blocks the update.", checked)
+        self.assertIn("Marketplace market  1 commit behind", checked)
+        self.assertIn(" · the pin v1.0.0 blocks the update\n", checked)
         self.assertIn("market +1, held at v1.0.0", self.cli("status"))
         self.assertIn("the pin blocks them", self.cli("marketplaces", "list"))
         output = self.cli("marketplaces", "update")
@@ -267,7 +269,7 @@ class MarketplaceCommandTests(unittest.TestCase):
         self.assertEqual((saved["pin"], saved["version"]), ("", "v1.1.0"))
 
         self.publish({"notes/rules/style.md": "Write shorter notes.\n"}, "v1.2.0")
-        self.assertIn("Marketplace market: 1 commit behind", self.cli("check", expected=1))
+        self.assertIn("Marketplace market  1 commit behind", self.cli("check", expected=1))
         self.cli("marketplaces", "update")
         self.assertIn(
             "Write shorter notes.", (self.home / agent_deploy.TREE / "rules/claude.md").read_text()

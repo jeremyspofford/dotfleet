@@ -85,7 +85,7 @@ class ToolUpdateTests(unittest.TestCase):
         self.assertNotIn("Tools:", output)
         self.assertEqual(self.pins()["node"], "24.15.0")
         self.assertTrue((self.home / ".local/share/mise/installs/node/24.15.0").is_dir())
-        self.assertIn("Installed  24.14.1 (extra), 24.15.0 (recorded)", self.cli("tools", "list"))
+        self.assertIn("node  24.15.0  installed · also 24.14.1\n", self.cli("tools", "list"))
         self.assert_quiet_status()
 
     def test_current_tool_changes_nothing_and_unselected_tool_names_tools_set(self):
@@ -126,8 +126,8 @@ class ToolUpdateTests(unittest.TestCase):
         self.enroll()
         fake_mise(self, {"node": "24.15.0"}, {"node": "24.14.1"})
         output = self.cli("check", expected=1)
-        self.assertIn("Content: up to date", output)
-        self.assertTrue(output.endswith("\n\nTool node: 24.15.0 available @ 24.14.1\n"), output)
+        self.assertRegex(output, r"\n  Content +up to date @ \w{8}\n")
+        self.assertTrue(output.endswith("\n  Tool node  24.15.0 available @ 24.14.1\n"), output)
         calls = self.home / ".mise-calls"
         calls.unlink()
         status = self.cli("status")
@@ -142,7 +142,7 @@ class ToolUpdateTests(unittest.TestCase):
         )
         self.cli("tools", "update")
         self.assertRegex(self.cli("status"), r"Tool updates +none \(checked \d\d:\d\d\)\n")
-        self.assertIn("Tool node: up to date @ 24.15.0", self.cli("check"))
+        self.assertRegex(self.cli("check"), r"\n  Tools +up to date: node 24\.15\.0\n")
 
 
 class RemoteToolUpdateTests(unittest.TestCase):

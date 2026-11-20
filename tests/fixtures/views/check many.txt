@@ -1,0 +1,9 @@
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Check
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Manager                   3 commits behind @ 12345678
+  Content                   up to date @ abcdef01
+  Marketplace agent-market  2 commits behind @ abcdef01 · the pin v1.0.0 blocks the update
+  Tool node                 26.14.0 available @ 26.13.1
+  Tool uv                   records several versions; not checked
+  Tools                     up to date: gh 2.105.0, herdr 0.9.5

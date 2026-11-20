@@ -325,23 +325,23 @@ def entities(home):
         )
         checked = cache.get(name)
         if not checked:
-            updates = "not checked yet"
+            updates = "updates not checked yet"
         elif checked["behind"] and record.get("pin"):
             updates = f"{checked['behind']} newer commits; the pin blocks them"
         elif checked["behind"]:
             updates = f"{checked['behind']} newer commits"
         else:
-            updates = "none"
+            updates = "up to date"
+        version = f"{record['version']} @ {record['commit'][:8]}"
+        details = [
+            part for part in (packages, "pinned" if record.get("pin") else "", updates) if part
+        ]
         result.append(
             {
                 "name": name,
-                "fields": [
-                    ("Source", record["source"]),
-                    ("Version", f"{record['version']} @ {record['commit'][:8]}"),
-                    ("Pin", record.get("pin") or "none"),
-                    ("Installed", packages),
-                    ("Updates", updates),
-                ],
+                "row": (name, version, " · ".join(details)),
+                # A source address is too long to share the row, so it follows on its own line.
+                "notes": [record["source"]],
             }
         )
     return result

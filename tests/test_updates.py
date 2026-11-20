@@ -21,6 +21,7 @@ from unittest.mock import patch
 import test_command as commands
 from test_manager import command
 from common import toml
+from style import section
 from installation import MANAGER
 import updates
 
@@ -75,8 +76,8 @@ class UpdateTests(unittest.TestCase):
         behind_check = self.cli("check", expected=1)
         self.assertEqual(
             behind_check,
-            f"Manager: 3 commits behind @ {before[0][:8]}\n\n"
-            f"Content: 1 commit behind @ {before[1][:8]}\n",
+            section("Check") + f"\n  Manager  3 commits behind @ {before[0][:8]}\n"
+            f"  Content  1 commit behind @ {before[1][:8]}\n",
         )
         self.assertEqual(untouched, self.snapshot())
         cache = self.home / updates.CACHE
@@ -105,7 +106,8 @@ class UpdateTests(unittest.TestCase):
         current_check = self.cli("check")
         self.assertEqual(
             current_check,
-            f"Manager: up to date @ {targets[0][:8]}\n\nContent: up to date @ {targets[1][:8]}\n",
+            section("Check") + f"\n  Manager  up to date @ {targets[0][:8]}\n"
+            f"  Content  up to date @ {targets[1][:8]}\n",
         )
         current_status = self.cli("status")
         self.assertIn(f"Updates           none (checked {self.checked_time()})", current_status)
@@ -157,7 +159,7 @@ class UpdateTests(unittest.TestCase):
             output,
         )
         self.assertEqual(output.count("  Updates "), 1)
-        self.assertNotIn("Manager: 3 commits behind", output)
+        self.assertNotIn("Manager  3 commits behind", output)
         self.assertEqual(before, self.snapshot())
 
     def test_offline_keeps_successful_cache_and_plain_status_works(self):
@@ -191,8 +193,8 @@ class UpdateTests(unittest.TestCase):
             command("git", "-C", str(local), "remote", "rename", "origin", "upstream")
             command("git", "-C", str(local), "config", "branch.main.merge", "refs/heads/stable")
         output = self.cli("check", expected=1)
-        self.assertIn("Manager: 3 commits behind", output)
-        self.assertIn("Content: 1 commit behind", output)
+        self.assertIn("Manager  3 commits behind", output)
+        self.assertIn("Content  1 commit behind", output)
         self.cli("update")
         for path, target in zip(self.paths(), targets):
             self.assertEqual(command("git", "-C", str(path), "rev-parse", "HEAD").strip(), target)
@@ -237,7 +239,7 @@ class UpdateTests(unittest.TestCase):
         self.enroll()
         local = self.home / MANAGER
         target = advance(local, 1, content="local")
-        self.assertIn("Manager: up to date", self.cli("check"))
+        self.assertIn("Manager  up to date", self.cli("check"))
         self.cli("update")
         self.assertEqual(command("git", "-C", str(local), "rev-parse", "HEAD").strip(), target)
         cache = (self.home / updates.CACHE).read_bytes()
@@ -274,7 +276,7 @@ class UpdateTests(unittest.TestCase):
         profile.update(content_repo=str(content), adopted=True, source_door="adopt")
         path.write_text(toml(profile))
         output = self.cli("check")
-        self.assertIn("Content: up to date (local content; no remote)", output)
+        self.assertIn("Content  up to date (local content; no remote)", output)
         old = command("git", "-C", str(content), "rev-parse", "HEAD")
         self.cli("update")
         self.cli("check")

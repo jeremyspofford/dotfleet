@@ -22,17 +22,6 @@ def recorded_versions(value):
     return {str(item.get("version", "") if isinstance(item, dict) else item) for item in values}
 
 
-def installed_labels(installed, recorded):
-    versions = recorded_versions(recorded)
-    return (
-        ", ".join(
-            item["version"] + (" (recorded)" if item["version"] in versions else " (extra)")
-            for item in installed
-        )
-        or "none"
-    )
-
-
 def uninstall(home, saved, tool, version):
     import command
     import enrollment

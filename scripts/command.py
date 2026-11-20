@@ -383,25 +383,30 @@ def read_view(args, home, saved_profile):
         "addons",
         "domain",
         "groups",
-        "tools",
     ):
         entities = command_views.collection(name, home, saved_profile, manifest)
         empty = {
             "backups": f"No backups yet. Run {display} backups create.",
             "secrets": "No secret variables declared.",
-            "tools": "No tool versions recorded.",
             "groups": "No content groups declared.",
             "agents": "No agent items declared.",
             "marketplaces": f"No marketplaces. Run {display} marketplaces add --source URL.",
             "addons": "No installed add-ons. None ship with Fleet.",
         }.get(name, "None recorded.")
         # The marketplaces view names the feature, Fleet Marketplace.
-        title = "Fleet Marketplace" if name == "marketplaces" else name.capitalize()
-        command_views.directory(title, entities, home, empty)
+        title = {
+            "marketplaces": "Fleet Marketplace",
+            "backups": "Backups in ~/.fleet/backups",
+        }.get(name, name.capitalize())
+        rows = command_views.uses_rows(name, entities)
+        command_views.directory(title, entities, home, empty, rows)
         if name == "domain":
             print(f"\nChoose: {display} domain set --name NAME · use a name listed above")
         if name == "agents" and entities:
             print(f"\nChange: {display} agents set --name ITEM --state on, off, or local")
+        return 0
+    elif name == "tools":
+        print(command_views.tool_view(home, saved_profile, "No tool versions recorded."), end="")
         return 0
     elif name == "version":
         pairs = [
@@ -924,7 +929,11 @@ def transaction(home, operations, label, selected=None, require_word=None, tree_
 def restore_command(args, home):
     backups = records(home)
     command_views.directory(
-        "Backups", owned_views.backup_entities(home, backups), home, "No backups yet."
+        "Backups in ~/.fleet/backups",
+        owned_views.backup_entities(home, backups),
+        home,
+        "No backups yet.",
+        rows=True,
     )
     if not args.backup:
         if not backups:

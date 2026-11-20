@@ -5,7 +5,6 @@ Usage: use dotfleet status, backups list, secrets list, content, or machines exp
 
 import os
 from pathlib import Path
-import re
 import shlex
 
 from common import atomic, read_toml, run
@@ -42,29 +41,27 @@ def profile_rows(home, profile):
 
 
 def backup_entities(home, folders):
+    """Describe each backup as a row of name, result, and size.
+
+    Backups without a run result form their own section.
+    """
+    import json
+
+    from backup_cleanup import details
+
     entities = []
     for folder in reversed(folders):
-        import json
-
         record_path = folder / "RUN.json"
         record = json.loads(record_path.read_text()) if record_path.is_file() else {}
-        from backup_cleanup import details
-
-        size = details(folder)["size"]
-        date = folder.name[:15]
-        if re.fullmatch(r"\d{8}-\d{6}", date):
-            date = f"{date[:4]}-{date[4:6]}-{date[6:8]} {date[9:11]}:{date[11:13]}:{date[13:15]}"
+        size = f"{details(folder)['size']:,} bytes"
+        result = record.get("result")
         entities.append(
-            {
+            {"name": folder.name, "row": (folder.name, result, size)}
+            if result
+            else {
                 "name": folder.name,
-                "fields": [
-                    ("Date", date),
-                    ("Result", record.get("result")),
-                    ("Size", f"{size:,} bytes"),
-                    ("Folder", str(folder)),
-                    ("Run record", str(record_path) if record_path.is_file() else None),
-                ],
-                "notes": [] if record.get("result") else ["No run result recorded."],
+                "row": (folder.name, size),
+                "group": "Backups without a run result",
             }
         )
     return entities

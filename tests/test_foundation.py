@@ -28,7 +28,7 @@ class FoundationTests(unittest.TestCase):
         self.assertIn("Content checkout PASS · clean", " ".join(self.cli("doctor").split()))
         advance(self.content, 1, ".file", "updated")
         output = self.cli("check", expected=1)
-        self.assertIn("Content: 1 commit behind", output)
+        self.assertIn("Content  1 commit behind", output)
         update = self.cli("update")
         self.assertNotIn("scratch.txt", update)
         self.assertEqual((self.home / ".file").read_text(), "updated 1\n")

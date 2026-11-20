@@ -93,8 +93,7 @@ else: sys.exit(1)
     def test_list_labels_extras_and_recorded_versions(self):
         self.prepare()
         output = self.cli("tools", "list")
-        self.assertIn("26.3.1 (extra)", output)
-        self.assertIn("26.13.1 (recorded)", output)
+        self.assertIn("node  26.13.1  installed · also 26.3.1\n", output)
 
 
 class ArgumentErrorTests(unittest.TestCase):

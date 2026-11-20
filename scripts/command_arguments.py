@@ -57,7 +57,8 @@ GROUPS = {
     },
     "secrets": {"list": "List declared variable names as set or unset.\nNever print a value."},
     "tools": {
-        "list": "List recorded and installed versions.\nInstalled versions are marked recorded or extra.",
+        "list": "List recorded tools with their install state and extra versions.\n"
+        "List other installed tools in their own section.",
         "set": "Install and record an exact tool version.",
         "remove": "Remove a recorded version without uninstalling the tool.",
         "uninstall": "Uninstall one installed extra version through Mise.\n"

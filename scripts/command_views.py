@@ -1,4 +1,4 @@
-"""Render command results with one named block per entity.
+"""Render command results as lists of rows, or one named block per entity.
 
 Usage: import read_view from the command dispatcher. Views do not fetch updates.
 Help: python3 scripts/command_views.py --help.
@@ -10,11 +10,39 @@ import sys
 import enrollment
 import owned_views
 import registry
-from render_run import render_entities
+from render_run import render_entities, render_rows
 
 
-def directory(title, entities, home, empty="None recorded."):
-    print(render_entities(title, entities, str(home), empty), end="")
+# A small fleet keeps one block per machine; beyond this count each machine gets a row.
+MACHINE_BLOCKS = 5
+
+
+def uses_rows(name, entities):
+    return (
+        name in ("backups", "marketplaces") or name == "machines" and len(entities) > MACHINE_BLOCKS
+    )
+
+
+def directory(title, entities, home, empty="None recorded.", rows=False):
+    """Print entities as blocks, or as aligned rows grouped into sections by their group."""
+    if not rows:
+        print(render_entities(title, entities, str(home), empty), end="")
+        return
+    groups = {title: []}
+    for entity in entities:
+        groups.setdefault(entity.get("group", title), []).append(entity)
+    sections = [
+        render_rows(
+            name,
+            [entity["row"] for entity in items],
+            str(home),
+            empty,
+            {entity["row"][0]: entity.get("notes", []) for entity in items},
+        )
+        for name, items in groups.items()
+        if items or name == title and len(groups) == 1
+    ]
+    print("\n".join(sections), end="")
 
 
 KIND_LABELS = {
@@ -51,6 +79,50 @@ def agent_entities(home, profile):
         ]
         entities.append({"name": key, "fields": fields})
     return entities
+
+
+def tool_view(home, profile, empty):
+    """Show recorded tools as rows and other installed tools as one wrapped run."""
+    import command
+    from render_run import packed, render_rows
+    from tool_actions import recorded_versions
+
+    installed = enrollment.installed(home)
+    # A selection that records no version is not a recorded tool.
+    pins = {
+        tool: value
+        for tool, value in profile.get("pins", {}).items()
+        if recorded_versions(value) - {""}
+    }
+    rows = []
+    for tool, value in sorted(pins.items()):
+        versions = recorded_versions(value)
+        present = [item["version"] for item in installed.get(tool, [])]
+        missing = [version for version in sorted(versions) if version not in present]
+        state = (
+            "installed"
+            if not missing
+            else "not installed"
+            if len(missing) == len(versions)
+            else "not installed: " + ", ".join(missing)
+        )
+        extra = [version for version in present if version not in versions]
+        rows.append(
+            (
+                tool,
+                command.format_pin(value),
+                state + (" · also " + ", ".join(extra) if extra else ""),
+            )
+        )
+    text = render_rows("Recorded", rows, str(home), empty)
+    others = [
+        tool + ": " + ", ".join(item["version"] for item in items)
+        for tool, items in sorted(installed.items())
+        if tool not in pins and items
+    ]
+    if others:
+        text += "\n" + packed("Also installed — not recorded", others)
+    return text
 
 
 def collection(name, home, profile, manifest):
@@ -93,23 +165,6 @@ def collection(name, home, profile, manifest):
                 else [],
             }
             for domain, description in command.domain_choices(home).items()
-        ]
-    if name == "tools":
-        from tool_actions import installed_labels
-
-        installed = enrollment.installed(home)
-        return [
-            {
-                "name": tool,
-                "fields": [
-                    ("Version", command.format_pin(version)),
-                    ("Installed", installed_labels(installed.get(tool, []), version)),
-                ],
-            }
-            for tool, version in {
-                tool: profile.get("pins", {}).get(tool, "none")
-                for tool in sorted(set(profile.get("pins", {})) | set(installed))
-            }.items()
         ]
     if name == "secrets":
         return [

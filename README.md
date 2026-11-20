@@ -435,7 +435,8 @@ If a name already exists in `~/.fleet`, migration stops before moving anything a
 
 ## Remove an extra tool version
 
-1. Run `fleet tools list`. Installed versions are marked recorded or extra.
+1. Run `fleet tools list`. A recorded tool's row names extra versions after "also".
+   Unrecorded tools appear under "Also installed — not recorded".
 2. Run `fleet tools uninstall node --version 26.3.1` with the extra tool and version you want to remove.
 3. Review the version and path. Type uninstall and press Enter to confirm, or cancel to stop.
 
