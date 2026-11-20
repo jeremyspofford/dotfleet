@@ -50,12 +50,14 @@ class ToolAdoptTests(unittest.TestCase):
             self.profile()["pins"],
             {"jq": "1.7.1", "node": "24.14.1", "python": "3.14.6"},
         )
-        self.assertRegex(output, r"  Adopted\n━+\n  jq      1\.7\.1\n  python  3\.14\.6\n")
-        self.assertIn("  pandoc  version 3.10 is not exact\n", output)
-        self.assertIn("  shfmt   several versions and none active: 3.8.0, 3.13.1\n", output)
-        self.assertTrue(output.endswith("Tools: 2 adopted, 2 skipped.\n"), output)
-        # A recorded tool is neither adopted nor listed, and its extra version stays extra.
-        self.assertNotIn("node", output.split("Tools:")[0].split("Adopted")[1])
+        # The result follows the apply review. A recorded tool is neither adopted nor listed.
+        self.assertRegex(
+            output,
+            r"\n━+\n  Adopted\n━+\n  jq      1\.7\.1\n  python  3\.14\.6\n\n"
+            r"━+\n  Skipped\n━+\n  pandoc  version 3\.10 is not exact\n"
+            r"  shfmt   several versions and none active: 3\.8\.0, 3\.13\.1\n\n"
+            r"Tools: 2 adopted, 2 skipped\.\n$",
+        )
         # Adopt only records: it asks Mise for nothing that installs or uninstalls.
         calls = (self.home / ".mise-calls").read_text()
         self.assertNotRegex(calls, r"(?m)^(install|uninstall|use)\b")
@@ -91,6 +93,51 @@ class ToolAdoptTests(unittest.TestCase):
         self.cli("tools", "adopt", "node")
         self.assertEqual(self.profile()["pins"]["node"], "24.14.1")
         self.assertNotIn("node", self.profile().get("unpinned_tools", []))
+
+
+class AdoptionRuleTests(unittest.TestCase):
+    def test_any_recorded_form_counts_and_odd_names_and_repeats_are_handled(self):
+        import tool_updates
+
+        installed = {
+            "aqua:cli/cli": [{"version": "2.40.0"}],
+            "go": [{"version": "1.22.0", "active": True}, {"version": "1.22.0", "active": True}],
+            "node": [{"version": "24.14.1"}],
+            "uv": [{"version": "0.4.0"}],
+            "ruby": [{"version": "3.3.0"}, {"version": "3.4.1"}],
+        }
+        profile = {"pins": {"node": {"version": "24.14.1"}, "uv": ["0.4.0", "0.3.0"]}}
+        adopted, skipped = tool_updates.adoption(installed, profile, "fleet")
+        self.assertEqual(adopted, {"aqua:cli/cli": "2.40.0", "go": "1.22.0"})
+        self.assertEqual(skipped, [("ruby", "several versions and none active: 3.3.0, 3.4.1")])
+
+    def test_nothing_adopted_leaves_the_profile_unchanged(self):
+        import command
+
+        value = {"domain": "core"}
+        command.record_adopted(value, {})
+        self.assertEqual(value, {"domain": "core"})
+        value = {"unpinned_tools": ["jq", "node"]}
+        command.record_adopted(value, {"jq": "1.7.1"})
+        self.assertEqual(value, {"pins": {"jq": "1.7.1"}, "unpinned_tools": ["node"]})
+
+    def test_a_cancelled_apply_reports_nothing_adopted(self):
+        import contextlib
+        import io
+        from unittest.mock import patch
+
+        import command
+
+        installed = {"jq": [{"version": "1.7.1", "install_path": "/opt/jq"}]}
+        with (
+            patch.object(command.enrollment, "installed", return_value=installed),
+            patch.object(command.manager, "main", return_value=0),
+            patch.object(command, "profile", return_value={"pins": {}}),
+            contextlib.redirect_stdout(io.StringIO()) as output,
+        ):
+            command.adopt_tools(None, {"pins": {}}, None, "fleet")
+        self.assertNotIn("Adopted", output.getvalue())
+        self.assertTrue(output.getvalue().endswith("Tools: 0 adopted, 0 skipped.\n"))
 
 
 class RemoteToolAdoptTests(unittest.TestCase):

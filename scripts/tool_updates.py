@@ -2,7 +2,7 @@
 
 Usage: dotfleet tools update [TOOL]; dotfleet tools adopt [TOOL]; dotfleet check; dotfleet status.
 A selected tool has an exact version recorded in the profile.
-Adopt records the installed version of each tool that records none yet.
+Adopt records the installed version of each tool without a recorded version.
 Mise reports the newest available version. That lookup can use the network.
 Check saves tool results under the manager store. Status reads them without network requests.
 Help: python3 scripts/tool_updates.py --help.
@@ -223,8 +223,11 @@ def adoption(installed, profile, display, tool=None):
         if tool is None and name in removed:
             skipped.append((name, f"removed with tools remove; run {display} tools adopt {name}"))
             continue
-        versions = [str(item.get("version", "")) for item in items]
-        active = [str(item.get("version", "")) for item in items if item.get("active")]
+        # Mise may list one version twice; a repeated version is still one version.
+        versions = list(dict.fromkeys(str(item.get("version", "")) for item in items))
+        active = list(
+            dict.fromkeys(str(item.get("version", "")) for item in items if item.get("active"))
+        )
         if len(versions) > 1 and not active:
             skipped.append((name, "several versions and none active: " + ", ".join(versions)))
             continue

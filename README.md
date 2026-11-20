@@ -167,7 +167,7 @@ Stow layouts under `packages/<package>/` also work; their package prefixes do no
 Your profile lives at `~/.fleet/profile.toml`. It saves the domain, Git identity, exact tool versions, and group choices between runs.
 Use `fleet tools set TOOL --version VERSION` to select and install a version. Mise records which versions are installed; Fleet reads that list during setup.
 Use `fleet tools update TOOL` to select and install the newest version that Mise finds. The profile still records that exact version.
-Use `fleet tools adopt` to record the installed version of each tool that records none. Adopt installs nothing.
+Use `fleet tools adopt` to record the installed version of each tool without a recorded version. Adopt installs nothing.
 A saved tool choice selects a version. It does not mean that version is installed.
 Setup asks when identity is incomplete, the domain choice is unconfirmed, or a tool version floats, such as `latest`.
 Prompts show recorded values. Press Enter to use the stated action, or type `skip` to leave a choice incomplete.
@@ -265,7 +265,7 @@ Command groups require an action. Bare `machines`, `backups`, `secrets`, `tools`
 | `dotfleet tools remove node` | Remove the selection and prevent content defaults from filling it again. Keep installed software. |
 | `dotfleet tools update node` | Ask Mise for the newest version, then record and install it as tools set does. A current tool stays unchanged. |
 | `dotfleet tools update` | Update every selected tool. Print one result line per tool, then a summary. Exit 1 when any tool failed. |
-| `dotfleet tools adopt` | Record the installed version of every unrecorded tool. Skip a tool when its version is not exact. |
+| `dotfleet tools adopt` | Record the installed version of every unrecorded tool. Print each skipped tool with its reason. |
 | `dotfleet tools adopt jq` | Record one tool. With several versions, adopt the one Mise reports as active. With none active, skip it. |
 | `dotfleet configure` | Reopen the enrollment wizard. |
 | `dotfleet doctor` | Check profile completeness, drift, checkout edits, and backups. Print a fix for each failed check. |

@@ -146,7 +146,7 @@ DESCRIPTIONS = {
         "Remove clears the selection without uninstalling the tool.\n"
         "Uninstall removes one extra installed version after typed confirmation.\n"
         "Update records and installs the newest version that Mise finds.\n"
-        "Adopt records the installed version of each tool that records none."
+        "Adopt records the installed version of each tool without a recorded version."
     ),
     "secrets": (
         "List secret names as set or unset.\n"
@@ -1491,8 +1491,10 @@ def adoption_report(adopted, skipped):
 
 def record_adopted(value, adopted):
     """Record each adopted version. A tool removed earlier leaves the removed list."""
+    if not adopted:
+        return
     value.setdefault("pins", {}).update(adopted)
-    if adopted and "unpinned_tools" in value:
+    if "unpinned_tools" in value:
         value["unpinned_tools"] = sorted(set(value["unpinned_tools"]) - set(adopted))
 
 
@@ -1505,7 +1507,6 @@ def adopt_tools(home, saved_profile, tool, display):
     if not adopted:
         print(adoption_report(adopted, skipped))
         return 0
-    print(tool_updates.adoption_text(adopted, skipped))
     software = [
         {
             "name": name,
@@ -1524,9 +1525,10 @@ def adopt_tools(home, saved_profile, tool, display):
         ["--defaults"], edit=lambda value: record_adopted(value, adopted), software=software
     )
     pins = profile(home).get("pins", {})
-    # A cancelled or failed apply records nothing, so the count shows only saved versions.
+    # The result follows the apply review. A cancelled or failed apply records nothing.
     saved = {name: version for name, version in adopted.items() if pins.get(name) == version}
-    print(tool_updates.adoption_count(saved, skipped))
+    print()
+    print(adoption_report(saved, skipped))
     return code
 
 
