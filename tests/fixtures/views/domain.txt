@@ -1,18 +1,9 @@
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   Domain
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-core
-  Adds  Base files only.
-
-personal
-  Adds  Personal shortcuts.
-  Current · chosen
-
-work
-  Adds  Content additions; inspect the overlay file.
-
-client
-  Adds  Content additions; inspect the overlay file.
+  core      Base files only.
+  personal  current · chosen · Personal shortcuts.
+  work      Content additions; inspect the overlay file.
+  client    Content additions; inspect the overlay file.
 
 Choose: fleet domain set --name NAME · use a name listed above

@@ -1,34 +1,10 @@
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   Agents
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-mcp.docs
-  Kind     MCP server
-  Adds     Search the documentation.
-  Agents   every selected agent that supports it
-  Domains  every domain
-  State    local value on this machine
-
-mcp.issues
-  Kind     MCP server
-  Adds     Read work issues.
-  Agents   every selected agent that supports it
-  Domains  work
-  State    not in domain personal
-
-skills.notes
-  Kind     Skill
-  Adds     Skill folder .agents/skills/notes
-  Agents   every selected agent that supports it
-  Domains  every domain
-  State    on
-
-mcp.review-docs
-  Kind     MCP server
-  Source   marketplace agent-market/review-kit
-  Adds     Search review guides.
-  Agents   every selected agent that supports it
-  Domains  every domain
-  State    on
+  mcp.docs         local value on this machine  Search the documentation.
+  mcp.issues       not in domain personal       Read work issues. · domains: work
+  skills.notes     on                           Skill folder .agents/skills/notes
+  mcp.review-docs  on                           Search review guides. · marketplace
+                                                agent-market/review-kit
 
 Change: fleet agents set --name ITEM --state on, off, or local
