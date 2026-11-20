@@ -1,8 +1,8 @@
 # Layer 2 agent module
 
-Status: ruled design. The owner ruled on all thirteen open questions and changed parts of the design during review.
-This document records that ruled design. It changes no code, tests, or other documents.
-A pull request (PR) is a proposed repository change. The owner merges this PR after review.
+Status: ruled design, now built. The owner ruled on all thirteen open questions and changed parts of the design during review.
+Sections 1 to 10 record that ruled design as written on 2026-11-17. The build on `main` followed it in most points.
+The Current state section describes `main` today. Section 11 marks each open point as built, built differently, or not built.
 
 Fleet is Layer 1: the manager for machine enrollment and later changes. Dotfiles is Layer 0: independent configuration content.
 Layer 2 adds shared modules that the manager applies. The agent module is the first Layer 2 build.
@@ -24,10 +24,10 @@ A ruling is the owner's decision on one open question. Section 6 records all thi
 - A provider is a service that supplies models to an agent. OpenRouter is one.
 - An item is one declared skill limit, rule set, server, connector, plugin, or hook.
 - The manifest is `fleet.toml` in the content repository. TOML is a configuration file format.
-- The profile is `~/.config/fleet/profile.toml`. It saves this machine's choices.
-- The manager store is `~/.local/share/fleet`. It holds the manager's own records.
+- The profile is `~/.fleet/profile.toml`. It saves this machine's choices.
+- The manager store is `~/.fleet`. It holds the manager's own records.
 - The agent catalog is `agents/manifest.toml` in the manager. It lists each agent's detection commands, formats, and paths.
-- The inventory is `~/.local/state/dotfleet/agents.json`. It records every output that Fleet rendered. The rulings call it the record.
+- The inventory is `~/.fleet/agents.json`. It records every output that Fleet rendered. The rulings call it the record.
 - A fingerprint records a file's content hash and permissions, or a link's target.
 - The payload is the full agent configuration that one machine receives.
 - The tree is the Fleet-owned folder that holds the payload.
@@ -122,32 +122,53 @@ Ruling 7 also differs from the rule for tools. A content default never installs 
 
 ## Current state
 
-This section describes Fleet 0.5.0. In this document, today means that release.
-The first build of this module began after it.
-The manager already ships a small agent generator. See [the agent guide](AGENTS.md).
+This section describes `main` at commit `2f1e154`, after release 0.10.0. The build of phases 1 to 4 has shipped.
+Outside this section, today means Fleet 0.5.0, the release before the build.
+[The agent guide](AGENTS.md) describes the built module for users.
 
-- The agent catalog names seven agents and their home paths. It marks Ollama as unsupported.
-- Wizard step 8 turns each detected agent on or off. The profile saves those choices under `agents`.
-- The generator writes one settings file per agent and one link per skill.
-- Each settings file holds minimal valid content: `{}` or one comment line.
-- The inventory records each output's hash or link target.
-- Unknown or modified outputs stop generation before any write.
-- Outputs for a deselected agent stay in place. The generator prints one progress line for each.
+Each row names the files that prove it.
 
-Six limits block the ruled design:
+| Area | On `main` | Proof |
+| --- | --- | --- |
+| Agent catalog | Eight agents. Grok and Ollama render nothing. Antigravity receives only the gateway entry. | `agents/manifest.toml`, `scripts/agent_deploy.py` |
+| Agent choice | The wizard's sixth step, `agents`, turns each detected agent on or off. | `scripts/enrollment.py` |
+| Store | `~/.fleet` holds the manager store, the profile, and the inventory. Older store folders move there. | `scripts/store_migration.py` |
+| Profile | `~/.fleet/profile.toml` saves agent choices, the domain, and the exception list under `agent_items`. | `scripts/store_migration.py`, `scripts/agent_table.py` |
+| Agents table | `fleet.toml` declares skills, rule sets, servers, connectors, plugins, and hooks. | `scripts/agent_table.py` |
+| Skills | Skills are ordinary content at `~/.agents/skills`. Claude Code reads them through a link in its plugin folder. | `scripts/agent_deploy.py` |
+| Tree | `~/.fleet/agents` holds the payload. An update replaces a hand edit there, and the backup keeps the edited copy. | `scripts/agent_deploy.py` |
+| Pointers | Claude Code and Gemini CLI get linked folders. Codex, OpenCode, Pi, and Antigravity get owned entries. | `scripts/agent_deploy.py` |
+| Gateway | Every declared server reaches each agent through one `stdio` entry named `fleet`. | `scripts/gateway.py`, `scripts/agent_deploy.py` |
+| Plugins | Codex and Gemini CLI run their installers. Claude Code, OpenCode, and Pi get an entry in their plugin listing. | `scripts/agent_deploy.py` |
+| Exceptions | `fleet agents set` sets an item `on`, `off`, or `local`. `fleet agents list` shows each item's state. | `scripts/command_arguments.py`, `scripts/agent_deploy.py` |
+| Import | `fleet agents import --agent NAME` prints table entries from one agent's settings. It writes nothing. | `scripts/agent_import.py` |
+| Marketplaces | `fleet marketplaces` adds, updates, deletes, and lists marketplaces. Packages sit in `~/.fleet/marketplace-packages`. | `scripts/marketplaces.py`, `scripts/command_arguments.py` |
+| Remote changes | Dispatch saves a domain, group, agent, or tool choice on another machine. Its next update applies the choice. | `scripts/remote.py`, `scripts/command.py` |
+| Inventory | `~/.fleet/agents.json` lists owned paths, owned entries, and the keys that Fleet wrote. | `scripts/agent_deploy.py` |
+| Drift | Status lines include agent outputs that differ from their records. | `scripts/command.py` |
+| Conflicts | A differing value at a pointer or an owned entry stops the run before backup. | `scripts/agent_deploy.py`, `scripts/manager.py` |
+| Foundation | Uncommitted edits to managed content block an update. Untracked and unmanaged files never block it. | `scripts/updates.py` |
 
-1. Settings carry no rules, servers, plugins, connectors, or hooks.
-2. The generator owns whole files. An existing hand-written settings file stops setup.
-3. The agent catalog fixes the skills folder name. Skill links point into the content checkout.
-4. Status, doctor, and the update gate read chezmoi status only. They do not see agent drift.
-5. Uninstall deletes every path that the inventory lists. Rollback rewrites each saved file whole.
-6. Check and update refuse a content checkout with any uncommitted change. An untracked file counts.
+These limits remain on `main`:
 
-Limit 2 matters most. On the test machine, four of five installed agents already had that settings file.
-The agent or the user wrote each one. Fleet cannot own those files whole.
-The deployment model answers limit 2: Fleet owns a tree of its own and points each agent at it.
-Limit 5 makes whole-file records dangerous for shared files. Section 4 sets the rules for uninstall and rollback.
-The foundation model changes limit 6. Section 3 states the new rule.
+1. Codex and Pi receive no rule sets. Fleet reports their rule sets as unsupported.
+2. OpenCode and Pi run no declared hooks. Fleet reports those hooks as unsupported. `docs/BRIDGE-SPIKE.md` proposes a fix.
+3. Grok and Ollama receive nothing. Antigravity receives the gateway entry only.
+4. A conflict offers no choice in the run. The user sets a `local` exception or moves the value aside, then updates again.
+5. Fleet does not check whether an agent already holds a declared plugin.
+
+Fleet 0.5.0 shipped a small generator. It wrote one minimal settings file per agent and one link per skill.
+Its catalog named seven agents, and wizard step 8 chose them. Unknown or modified outputs stopped it before any write.
+That release had six limits that blocked this design. The build removed each one:
+
+| Limit in Fleet 0.5.0 | On `main` |
+| --- | --- |
+| Settings carried no rules, servers, plugins, connectors, or hooks. | The agents table declares all six kinds. |
+| The generator owned whole files, so a hand-written settings file stopped setup. | Fleet owns a tree, pointers, and single entries. |
+| The catalog fixed the skills folder name, and skill links pointed into the content checkout. | Skills are ordinary content at `~/.agents/skills`. |
+| Status, doctor, and the update gate read chezmoi status only. | Status lines include agent drift. |
+| Uninstall deleted every listed path, and rollback rewrote each saved file whole. | Uninstall and restore change only Fleet's paths and entries. |
+| Any uncommitted change in the content checkout stopped check and update. | Only uncommitted edits to managed content stop them. |
 
 ## 1. Contract addition
 
@@ -463,7 +484,7 @@ Fleet builds every tree file from the foundation or the library. The inventory l
 The builder chooses the tree's path and layout. This sketch shows one layout inside the manager store:
 
 ```text
-~/.local/share/fleet/agents/
+~/.fleet/agents/
 ├── rules/
 │   ├── commit-style.md               one copy of each rule set
 │   ├── claude.md                     the combined rules that Claude Code receives
@@ -931,7 +952,7 @@ The first draft compared three places for the store:
 | Placement | Meaning | Result |
 | --- | --- | --- |
 | Content repository only | Declarations and machine choices both live in content. | Breaks rule 1. Machine choices would enter content. |
-| Manager store only | Fleet keeps declarations under `~/.local/share/fleet`. | Breaks rule 1. Content no longer declares. Machines need a new transfer path. |
+| Manager store only | Fleet keeps declarations in the manager store. | Breaks rule 1. Content no longer declares. Machines need a new transfer path. |
 | Split | Each kind of data lives with its owner. | Meets all three rules. |
 
 The ruled design keeps the split by owner. The foundation model adds the library and its record.
@@ -946,7 +967,7 @@ The ruled design keeps the split by owner. The foundation model adds the library
 | Pulled-in components | Library | The foundation model. Git does not track them. |
 | Marketplace installation record | Manager store | The foundation model. It names each source, version, pin, and package. |
 | The tree | A Fleet-owned folder on the machine | The deployment model. Fleet can rebuild it. |
-| Inventory | Manager state: `~/.local/state/dotfleet/agents.json` | Rule 2. Fleet lists every output. |
+| Inventory | Manager store: `~/.fleet/agents.json` | Rule 2. Fleet lists every output. |
 | Pointers and owned entries | Each agent's native location | Fleet can rebuild them from content, agent catalog, and profile. |
 | Installed plugins | Each agent's own plugin store | The agent's installer writes them. The inventory names each one. |
 | Agent sign-in sessions and tokens | Each agent's own store | Fleet never reads or writes them. |
@@ -1483,6 +1504,15 @@ This design treats that shared folder as the skills part of the payload.
 The rulings leave some points open. For other points, this document had to interpret a ruling.
 The first list holds the points that need the owner. Each one carries a recommendation.
 The second list holds the smaller proposals in this document. The owner can overrule any of them.
+The owner has ruled on none of these points. The build made a choice for most of them.
+
+Each point carries one mark for `main` at commit `2f1e154`. The mark names the file that proves it:
+
+- BUILT AS RECOMMENDED: `main` does what the recommendation says.
+- BUILT DIFFERENTLY: `main` covers the point but does something else. The mark says what.
+- NOT BUILT: no code on `main` covers the point.
+
+A mark records the build, not a ruling. Each point still needs the owner's ruling.
 
 ### Points for the owner
 
@@ -1491,25 +1521,33 @@ The second list holds the smaller proposals in this document. The owner can over
    Option B keeps the value, releases any record, and reports once. It never prompts and never stops a run.
    Under option B, Fleet also never takes over an equal value. The main text uses option B.
    Recommendation: option B. It follows "no prompt, no refusal", and it matches ruling 6 for a changed stale output.
+   BUILT DIFFERENTLY: a differing value is a conflict that stops every run before backup, without a prompt.
+   An unrecorded equal value is taken over. A `local` exception resolves the conflict. Proof: `scripts/agent_deploy.py`, `scripts/manager.py`.
 2. What happens to a hand edit inside the tree?
    Option A uses the file conflict path, as a changed managed file does today.
    Option B replaces the file, saves the edited copy in the run backup, and prints one line.
    Recommendation: option B. The tree is generated, and the foundation is the only conflict surface.
+   BUILT AS RECOMMENDED: option B. Proof: `scripts/agent_deploy.py`.
 3. What does a `local` exception hold, and how far does it reach?
    This design reads "an item with a local value" as a marker. The profile names the item and never stores the value.
    The marker covers every agent on the machine.
    Recommendation: keep the marker without the value, because a hand-written value can hold a secret.
    Add a form for one agent only when a case needs it.
+   BUILT AS RECOMMENDED: the profile stores `local` under the item's key, for every agent. Proof: `scripts/agent_table.py`, `scripts/agent_deploy.py`.
 4. May an item's `domains` list name `core`?
    As built from the first draft, `core` in a list selects the machines whose own domain is core.
    "Core always applies" points the other way: a `core` item would reach every machine.
    Recommendation: reject `core` in a list. An item for every machine omits `domains`.
+   BUILT DIFFERENTLY: validation accepts `core`, and it selects only machines whose domain is core. Proof: `scripts/agent_table.py`.
 5. Does Claude Code get one link per skill, or one link for all skills?
    The single link runs through the plugin folder. It also changes each skill's name to `/fleet:NAME`.
    Recommendation: one link per skill in the first build. Switch only after a session test passes.
+   BUILT DIFFERENTLY: one link, `~/.claude/skills/fleet`, leads to the plugin folder. That folder links to `~/.agents/skills`.
+   Proof: `scripts/agent_deploy.py`. This document holds no record of a session test.
 6. Does Codex get one hook entry per hook, or one entry per event that runs a Fleet script?
    The second form is set once. Fleet's script must then match tools and merge the hooks' results.
    Recommendation: one entry per hook. Codex then keeps its own matching, time limits, and exit codes.
+   BUILT AS RECOMMENDED: one owned entry per hook in `~/.codex/hooks.json`. Proof: `scripts/agent_deploy.py`.
 7. Which rule pointer does an agent get where the include line does not fit?
    Codex can take the `developer_instructions` key, or a session-start hook that prints the rules.
    Recommendation for Codex: the key. It needs no trust step, and a rule change rewrites one key.
@@ -1517,6 +1555,8 @@ The second list holds the smaller proposals in this document. The owner can over
    Recommendation for Claude Code: build the include line first, as ruled. Move to the link after one session test.
    The link changes no shared file. Content can then still manage `CLAUDE.md`.
    Recommendation for Pi: the link at `APPEND_SYSTEM.md`, after one test of a linked file.
+   BUILT DIFFERENTLY: Codex and Pi receive no rule pointer. Fleet reports their rule sets as unsupported.
+   Claude Code receives the link `~/.claude/rules/fleet.md`, not an include line. Proof: `scripts/agent_deploy.py`.
 8. Which agent commands does a plugin install include, and which questions may Fleet answer?
    Codex needs `codex plugin marketplace add` before an install. Claude Code adds a plugin marketplace inside its install command.
    Gemini CLI asks every install to accept a risk warning. Its `--consent` option answers that question.
@@ -1526,51 +1566,73 @@ The second list holds the smaller proposals in this document. The owner can over
    Never pass `--yes`. It accepts a command that no person saw. Report that install as a manual step.
    A later schema could carry the reviewed command's hash. Fleet could then pass `--accept-command`.
    Report a Gemini CLI extension from a local path as a manual step, because it can ask about folder trust.
+   BUILT DIFFERENTLY: Fleet runs `codex plugin marketplace add` before `codex plugin add`, and it passes `--consent`.
+   Fleet runs no Claude Code installer, so `--yes` never arises. A Gemini CLI install from a local path fails the run.
+   Proof: `scripts/agent_deploy.py`.
 9. What happens when an agent already holds a declared plugin that Fleet did not install?
    Recommendation: treat it as the user's own. Record nothing, never uninstall it, and report it once.
    Fleet learns this from the agent's plugin records on disk. It runs no agent command for that check.
+   NOT BUILT: Fleet reads no agent plugin records. It plans every declared plugin as its own and records the install.
+   Proof: `scripts/agent_deploy.py`, function `plan_plugins`.
 10. How does Fleet remove an OpenCode plugin? Version 1.17.8 has no removal command.
     Option A reports a manual step. Option B removes the module from the `plugin` list by a file edit.
     Recommendation: option A first. Move to option B after a test shows that OpenCode stops loading the module.
+    BUILT DIFFERENTLY: option B. Fleet removes the module from the `plugin` list. Proof: `scripts/agent_deploy.py`.
 11. Do `fleet uninstall` and rollback remove the plugins that Fleet installed?
     Recommendation: no. Uninstall keeps installed tools today. Keep the plugins, and list each removal command.
+    BUILT DIFFERENTLY: uninstall and restore keep the plugins, but list no removal command.
+    Proof: `scripts/agent_deploy.py`, function `removal_operations`.
 12. When does a remote profile change apply, and does a remote domain count as a person's choice?
     The ruling says that the target's next update applies a remote domain.
     Fleet records whether a person chose each machine's domain.
     Recommendation: apply every remote profile change at the target's next update. Record a remote domain as chosen, because a person set it.
+    BUILT AS RECOMMENDED: the target saves the change, and its next update applies it. A remote domain is recorded as chosen.
+    Proof: `scripts/command.py`, function `save_remote_choice`.
 13. How does the gateway start, and how does it read variables?
     Recommendation: each agent starts it as a `stdio` server. The gateway reads `~/.secrets` itself.
     The Codex entry then never changes for a new variable. Connectors stay on their phase 1 outputs.
+    BUILT DIFFERENTLY: each agent starts the gateway as a `stdio` server, and connectors keep their own entries.
+    Each agent's gateway entry names every variable that a server reads. A new variable changes the entry.
+    Proof: `scripts/agent_deploy.py`, function `gateway`; `scripts/gateway.py`.
 14. What is the marketplace feature called? The name does not block the build. The owner picks it before phase 2 ships.
     Recommendation: avoid the bare word marketplace. Claude Code and Codex already use it for their plugin catalogs.
+    BUILT DIFFERENTLY: phase 2 shipped as `fleet marketplaces`. Proof: `scripts/command_arguments.py`, `docs/MARKETPLACES.md`.
 15. How does a bridge plugin reach OpenCode and Pi? The phase 4 study answers this.
     Recommendation: study a linked code file first. Both agents load code files from a folder (Documented).
+    NOT BUILT: no bridge code exists. The study recommends rendering each bridge into the tree, behind one pointer.
+    Proof: `docs/BRIDGE-SPIKE.md`. That study asks the owner four questions of its own.
+16. How does Fleet install a plugin for Claude Code, OpenCode, and Pi? The build raised this point.
+    Ruling 7 says that Fleet installs through the agent's own installer.
+    Option A runs each agent's installer command. Option B writes an entry in the agent's plugin listing. The agent then installs the plugin itself.
+    Option B runs no agent command, so it also fits ruling 8. Claude Code installs a listed plugin only at an interactive start.
+    Recommendation: option B. Record that a listing entry counts as the agent's installer under ruling 7.
+    BUILT DIFFERENTLY from the ruling's wording: option B. Proof: `scripts/agent_deploy.py`, constant `LISTED`; `docs/AGENTS.md`.
 
 ### Smaller proposals
 
-| Proposal | Section |
-| --- | --- |
-| The builder chooses the tree's path and layout. | 2 |
-| Fleet builds one combined rule file per agent in the tree. | 2 |
-| Fleet never removes a plugin marketplace. | 2 |
-| A blocked self-contained folder gets no fallback entries. | 2 |
-| The library sits outside the user's tracked content, in a folder that the builder chooses. | 3 |
-| Recorded skill links stay until content moves its skills. | 4 |
-| A changed stale output keeps a record that marks it as kept. | 4 |
-| An `off` exception makes an item's outputs stale. | 4 |
-| Fleet lists plugin changes in the review and records only a successful install. | 4 |
-| Fleet runs installers after the backup and before the entry writes. | 4 |
-| Fleet skips a shared file that it cannot edit safely. It does not stop the run. | 4 |
-| Fleet identifies its include line by the line's exact text. | 4 |
-| A marketplace version is a Git tag or commit. | 7 |
-| A marketplace choice belongs to one machine. A delete also removes that marketplace's installed packages. | 7 |
-| One link per pulled-in skill leads from `~/.agents/skills` into the library. | 7 |
-| A foundation item wins over a pulled-in item with the same key. | 7 |
-| A package item carries no `domains` key. The exception list and the agent choices apply to it. | 7 |
-| A marketplace update uses the existing update path: review, backup, and run account. | 7 |
-| The gateway reads its server list from the tree. | 8 |
-| A remote request carries one named profile change. The target validates it against its own content. | 9 |
-| The shared skills folder counts as the skills part of the payload. | 10 |
+| Proposal | Section | Mark on `main` | Proof |
+| --- | --- | --- | --- |
+| The builder chooses the tree's path and layout. | 2 | BUILT DIFFERENTLY: `~/.fleet/agents`, with agent folders and kind folders. | `scripts/agent_deploy.py` |
+| Fleet builds one combined rule file per agent in the tree. | 2 | BUILT AS RECOMMENDED | `scripts/agent_deploy.py` |
+| Fleet never removes a plugin marketplace. | 2 | BUILT AS RECOMMENDED | `scripts/agent_deploy.py` |
+| A blocked self-contained folder gets no fallback entries. | 2 | NOT BUILT: Fleet checks no policy or allow-list. | `scripts/agent_deploy.py` |
+| The library sits outside the user's tracked content, in a folder that the builder chooses. | 3 | BUILT AS RECOMMENDED: `~/.fleet/marketplace-packages`. | `scripts/marketplaces.py` |
+| Recorded skill links stay until content moves its skills. | 4 | BUILT DIFFERENTLY: the next update removes each recorded link that still matches its record. | `scripts/agent_deploy.py` |
+| A changed stale output keeps a record that marks it as kept. | 4 | BUILT DIFFERENTLY: a kept path loses its record. A kept entry keeps its record. | `scripts/agent_deploy.py` |
+| An `off` exception makes an item's outputs stale. | 4 | BUILT AS RECOMMENDED | `scripts/agent_table.py` |
+| Fleet lists plugin changes in the review and records only a successful install. | 4 | BUILT AS RECOMMENDED | `scripts/agent_deploy.py` |
+| Fleet runs installers after the backup and before the entry writes. | 4 | BUILT DIFFERENTLY: installers run after the entry writes. | `scripts/agent_deploy.py` |
+| Fleet skips a shared file that it cannot edit safely. It does not stop the run. | 4 | BUILT DIFFERENTLY: an unsafe shared file stops the run. | `scripts/agent_deploy.py` |
+| Fleet identifies its include line by the line's exact text. | 4 | NOT BUILT: Fleet writes no include line. | `scripts/agent_deploy.py` |
+| A marketplace version is a Git tag or commit. | 7 | BUILT AS RECOMMENDED | `scripts/marketplaces.py` |
+| A marketplace choice belongs to one machine. A delete also removes that marketplace's installed packages. | 7 | BUILT AS RECOMMENDED | `scripts/marketplaces.py`, `scripts/command.py` |
+| One link per pulled-in skill leads from `~/.agents/skills` into the library. | 7 | BUILT DIFFERENTLY: the link leads to a copy in the tree. | `scripts/agent_deploy.py` |
+| A foundation item wins over a pulled-in item with the same key. | 7 | BUILT DIFFERENTLY: a shared name stops the run. | `scripts/marketplaces.py` |
+| A package item carries no `domains` key. The exception list and the agent choices apply to it. | 7 | BUILT AS RECOMMENDED | `scripts/marketplaces.py`, `scripts/agent_table.py` |
+| A marketplace update uses the existing update path: review, backup, and run account. | 7 | BUILT AS RECOMMENDED | `scripts/command.py` |
+| The gateway reads its server list from the tree. | 8 | BUILT AS RECOMMENDED | `scripts/gateway.py`, `scripts/agent_deploy.py` |
+| A remote request carries one named profile change. The target validates it against its own content. | 9 | BUILT AS RECOMMENDED | `scripts/remote.py`, `scripts/command.py` |
+| The shared skills folder counts as the skills part of the payload. | 10 | BUILT DIFFERENTLY: the payload is the tree. `~/.agents/skills` holds content and links into the tree. | `scripts/agent_deploy.py` |
 
 ## Appendix A: Build phases
 
