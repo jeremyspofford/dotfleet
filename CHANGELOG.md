@@ -2,6 +2,28 @@
 
 This file follows Keep a Changelog. Versions use SemVer: major.minor.patch.
 
+## [0.11.0] - 2026-11-20
+
+### Added
+
+- add fleet tools adopt to record installed tool versions (#75)
+
+### Changed
+
+- https://claude.ai/code/session_01VHXAyaCJMYbiMbEbM2uXiY
+- Claude Opus 5.5 <noreply@anthropic.com>
+- record the owner's rulings on five agent module points (#78)
+- https://claude.ai/code/session_01VHXAyZNQYaE3KaWYVP4sXo
+- mark the agent module's open points against main (#74)
+
+### Fixed
+
+- show agents, groups, domain, secrets, and addons lists as rows (#76)
+- show lists as a heading and one aligned row per item (#73)
+- identify machines by a stable ID and name them by their hostname (#72)
+- write the Mise config with [tools] and [settings] tables (#71)
+- say what the Agents choice does and what the content declares (#69)
+
 ## [0.10.0] - 2026-11-19
 
 ### Added
