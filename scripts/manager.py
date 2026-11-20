@@ -1074,6 +1074,19 @@ def wizard_catalog():
     return wizard.agent_manifest()
 
 
+def kept_files_message(status):
+    """Name each differing file and the command that takes Fleet's version."""
+    paths = [line[3:] for line in status.splitlines() if len(line) > 3]
+    shown = ", ".join("~/" + path for path in paths)
+    commands = " ".join("~/" + shlex.quote(path) for path in paths)
+    return (
+        f"Managed files still differ after the apply: {shown}. "
+        "A local edit was kept at the conflict prompt. "
+        f"To take Fleet's version, run: chezmoi apply --force {commands}. "
+        "This run's backup holds your edited copy."
+    )
+
+
 def apply_confirmed_plan(
     home, checkout, profile, plan, backup_path, account, before_apply, warnings
 ):
@@ -1149,7 +1162,7 @@ def apply_confirmed_plan(
     run_index.stage("verify")
     status = run("chezmoi", "status")
     if status.strip():
-        raise ValueError("Managed files still differ:\n" + status)
+        raise ValueError(kept_files_message(status))
     # Record the applied profile. A later saved-only change then triggers an update.
     record = json.loads((home / RECORD).read_text())
     record["profile_sha256"] = hashlib.sha256(
