@@ -1,8 +1,7 @@
-Manager: 3 commits behind @ 12345678
-
-Content: up to date @ abcdef01
-
-Marketplace agent-market: 2 commits behind @ abcdef01
-  Pinned at v1.0.0; the pin blocks the update.
-
-Tool node: 26.14.0 available @ 26.13.1
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Check
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Manager                   3 commits behind @ 12345678
+  Content                   up to date @ abcdef01
+  Marketplace agent-market  2 commits behind @ abcdef01 · the pin v1.0.0 blocks the update
+  Tool node                 26.14.0 available @ 26.13.1

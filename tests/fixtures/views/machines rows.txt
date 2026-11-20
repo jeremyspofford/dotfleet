@@ -1,0 +1,9 @@
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Machines
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  this-box  this machine · Linux · work · Fleet 0.10.1 · no connection · SUCCESS 2026-11-10
+  box-1     Linux · work UNCHOSEN · Fleet 0.10.1 · ssh box-1 · SUCCESS 2026-11-11
+  box-2     Linux · work · Fleet 0.10.1 · ssh box-2 · SUCCESS 2026-11-12
+  box-3     Linux · work UNCHOSEN · Fleet 0.10.1 · ssh box-3 · SUCCESS 2026-11-13
+  box-4     Linux · work · Fleet 0.10.1 · ssh box-4 · SUCCESS 2026-11-14
+  box-5     Linux · work UNCHOSEN · Fleet 0.10.1 · ssh box-5 · SUCCESS 2026-11-15

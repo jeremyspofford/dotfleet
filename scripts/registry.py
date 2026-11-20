@@ -529,7 +529,7 @@ def duplicate_notes(members):
 
 
 def entities(home, manager_version):
-    """List known facts, with one compact block per machine."""
+    """List known facts as one compact block per machine, plus a one-line row for larger fleets."""
     data = load(home)
     local = machine_name()
     if local not in data["machines"]:
@@ -573,9 +573,23 @@ def entities(home, manager_version):
                     + (" · recorded " + record["last_run"] if record["last_run"] else ""),
                 )
             )
+        name = key + (" · this machine" if key == local else " · recorded only")
+        summary = [
+            "this machine" if key == local else None,
+            record.get("os"),
+            (record["domain"] + ("" if record["domain_chosen"] else " UNCHOSEN"))
+            if record["domain"]
+            else None,
+            "Fleet " + record["manager_version"] if record.get("manager_version") else None,
+            "ssh " + target if target else "no connection",
+            (record["result"] + " " + record["last_run"][:10]).strip()
+            if record["result"] and record["result"] != "not recorded"
+            else None,
+        ]
         output.append(
             {
-                "name": key + (" · this machine" if key == local else " · recorded only"),
+                "name": name,
+                "row": (key, " · ".join(part for part in summary if part)),
                 "fields": fields,
                 "notes": ([] if known else ["No local data recorded for this machine."])
                 + duplicates[key],

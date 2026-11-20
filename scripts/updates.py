@@ -253,7 +253,7 @@ def require_no_collision(path, current, target, history=None):
         )
 
 
-def check_marketplaces(home, display):
+def check_marketplaces(home, rows):
     """Check marketplaces after the manager and content. Return 1 when an unpinned one is behind."""
     import marketplaces
 
@@ -270,13 +270,12 @@ def check_marketplaces(home, display):
         state = f"{count} {unit} behind" if count else "up to date"
         state += f" @ {result['current'][:8]}"
         if result["pin"] and count:
-            state += f"\n  Pinned at {result['pin']}; the pin blocks the update."
-        if display:
-            print(f"\nMarketplace {name}: {state}")
+            state += f" · the pin {result['pin']} blocks the update"
+        rows.append(("Marketplace " + name, state))
     return int(any(result["behind"] and not result["pin"] for result in results.values()))
 
 
-def check_tools(home, profile, display):
+def check_tools(home, profile, rows):
     """Look up selected tools after marketplaces. Return 1 when a newer version exists."""
     import tool_updates
 
@@ -287,21 +286,21 @@ def check_tools(home, profile, display):
     except (OSError, ValueError, RuntimeError) as error:
         print(f"Warning: Could not check tools: {error}.", file=sys.stderr)
         return 2
-    code = 0
+    code, current = 0, []
     for name, result in results.items():
         if result["state"] == "failed":
             print(f"Warning: Could not check tool {name}: {result['error']}.", file=sys.stderr)
             code = 2
-            continue
-        if result["state"] == "skipped":
-            state = "records several versions; not checked"
+        elif result["state"] == "skipped":
+            rows.append(("Tool " + name, "records several versions; not checked"))
         elif result["state"] == "behind":
-            state = f"{result['newest']} available @ {result['recorded']}"
+            rows.append(("Tool " + name, f"{result['newest']} available @ {result['recorded']}"))
             code = max(code, 1)
         else:
-            state = f"up to date @ {result['recorded']}"
-        if display:
-            print(f"\nTool {name}: {state}")
+            current.append(f"{name} {result['recorded']}")
+    if current:
+        # Tools with nothing newer share one line, so a long tool list stays short.
+        rows.append(("Tools", "up to date: " + ", ".join(current)))
     return code
 
 
@@ -329,23 +328,25 @@ def check(home, profile, display=True, marketplaces=False, tools=False):
         run_index.failure(f"Warning: Could not check {name}: {error}.")
         print(f"Warning: Could not check {name}: {error}.", file=sys.stderr)
         return 2
-    if display:
-        for index, source in enumerate(sources):
-            if index:
-                print()
-            count = source["behind"]
-            unit = "commit" if count == 1 else "commits"
-            state = f"{count} {unit} behind" if count else "up to date"
-            if source["local_only"]:
-                state += " (local content; no remote)"
-            print(f"{source['name'].capitalize()}: {state} @ {source['current'][:8]}")
+    rows = []
+    for source in sources:
+        count = source["behind"]
+        unit = "commit" if count == 1 else "commits"
+        state = f"{count} {unit} behind" if count else "up to date"
+        if source["local_only"]:
+            state += " (local content; no remote)"
+        rows.append((source["name"].capitalize(), f"{state} @ {source['current'][:8]}"))
     result = int(any(source["behind"] for source in sources))
     if marketplaces:
         # The update gate leaves marketplaces out; marketplaces update advances them.
-        result = max(result, check_marketplaces(home, display))
+        result = max(result, check_marketplaces(home, rows))
     if tools:
         # The update gate leaves tools out; tools update records newer versions.
-        result = max(result, check_tools(home, profile, display))
+        result = max(result, check_tools(home, profile, rows))
+    if display:
+        from render_run import render_view
+
+        print(render_view("Check", rows), end="")
     return result
 
 
