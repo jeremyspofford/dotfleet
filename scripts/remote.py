@@ -207,8 +207,9 @@ def test_connection(home, name, target):
         topology.remember(home, name, target, "connection test", reason, 2)
         print("Saved connection kept. Retry after fixing access or waking the target.")
         return 2
-    print(f"PASS: {name}: SSH connection test passed.")
-    topology.remember(home, name, target, "connection test", "SSH test passed", 0)
+    kind = "wsl.exe" if connections.is_sibling(target) else "SSH"
+    print(f"PASS: {name}: {kind} connection test passed.")
+    topology.remember(home, name, target, "connection test", f"{kind} test passed", 0)
     return 0
 
 
@@ -298,15 +299,17 @@ def execute(home, machine, action, *, check=False, stat=False, request=None, rep
     # The target uses the shared renderer, with its own home and its own run record.
     if result.stdout:
         print(result.stdout, end="" if result.stdout.endswith("\n") else "\n")
+    # A sibling distro on this host answers through wsl.exe; its result line says so.
+    route = " through wsl.exe" if connections.is_sibling(target) else ""
     if result.returncode == 0:
         state = action + " succeeded"
-        print(f"{machine}: {state} (exit 0).")
+        print(f"{machine}: {state}{route} (exit 0).")
     elif result.returncode == 1 and (action in ("check", "diff") or check):
         state = "differences found" if action == "diff" else "updates available"
-        print(f"{machine}: {state} (exit 1).")
+        print(f"{machine}: {state}{route} (exit 1).")
     else:
         state = action + " failed"
-        print(f"Error: {machine}: {state} (exit {result.returncode}).")
+        print(f"Error: {machine}: {state}{route} (exit {result.returncode}).")
     topology.remember(home, machine, target, action, state, result.returncode)
     report["result"] = state if result.returncode == 0 else f"{state} (exit {result.returncode})"
     exchange(home, machine, target)

@@ -167,6 +167,23 @@ class WizardTests(unittest.TestCase):
         self.assertTrue((self.home / ".fleet/profile.toml").is_file())
         self.assert_quiet_status()
 
+    def test_first_wsl_enrollment_asks_for_and_saves_the_machine_name(self):
+        self.defaults_origin()
+        self.env["WSL_DISTRO_NAME"] = "AlertVenture"
+        self.env.pop("FLEET_MACHINE_NAME", None)
+        answers = [
+            (b"Machine name [", b"bad name!\n"),
+            (b"Machine name [", b"dell-wsl-alertventure\n"),
+        ] + self.answers()
+        output = self.terminal(answers, flags=[], auto_wizard=False)
+        self.assertIn("Use letters, digits, dots, hyphens, and underscores.", output)
+        self.assertEqual(
+            (self.home / ".fleet/machine-name").read_text().strip(), "dell-wsl-alertventure"
+        )
+        registry = tomllib.loads((self.home / ".fleet/registry.toml").read_text())
+        machines = registry.get("machines", registry)
+        self.assertEqual(machines["dell-wsl-alertventure"]["distro"], "AlertVenture")
+
     def test_review_go_back_changes_identity_before_apply(self):
         self.defaults_origin()
         answers = self.answers()
